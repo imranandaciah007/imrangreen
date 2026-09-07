@@ -93,7 +93,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      console.log('EV load start');
       const [list, conn] = await Promise.all([documentProvider.list(), documentProvider.getConnection()]);
+      console.log('EV loaded', list.length, cancelled);
       if (cancelled) return;
       setItems(list);
       setConnection(conn);
