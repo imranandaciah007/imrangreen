@@ -65,8 +65,8 @@ export function KanbanBoard() {
                           onClick={() =>
                             updateItem(
                               item.id,
-                              { status: statusForStage(STAGES[stageIndex - 1]) },
-                              `${item.exhibitId} → ${STAGES[stageIndex - 1]}`,
+                              { status: statusForStage(STAGES[stageIndex - 1]!) },
+                              `${item.exhibitId} → ${STAGES[stageIndex - 1]!}`,
                             )
                           }
                         >
@@ -80,8 +80,8 @@ export function KanbanBoard() {
                           onClick={() =>
                             updateItem(
                               item.id,
-                              { status: statusForStage(STAGES[stageIndex + 1]) },
-                              `${item.exhibitId} → ${STAGES[stageIndex + 1]}`,
+                              { status: statusForStage(STAGES[stageIndex + 1]!) },
+                              `${item.exhibitId} → ${STAGES[stageIndex + 1]!}`,
                             )
                           }
                         >

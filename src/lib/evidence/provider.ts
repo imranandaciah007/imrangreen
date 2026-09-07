@@ -11,9 +11,9 @@ import type { EvidenceItem } from "./types";
 export interface ProviderConnection {
   providerName: string;
   connected: boolean;
-  accountLabel?: string;
-  folderPath?: string;
-  lastSyncedAt?: string;
+  accountLabel?: string | undefined;
+  folderPath?: string | undefined;
+  lastSyncedAt?: string | undefined;
 }
 
 export interface DocumentProvider {

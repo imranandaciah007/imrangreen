@@ -65,7 +65,7 @@ export interface EvidenceItem {
   dateOfDocument: string;
   tags: Tag[];
   cloudDriveUrl: string;
-  translationFileUrl?: string;
+  translationFileUrl?: string | undefined;
   notes: string;
   auditTrail: AuditEntry[];
 }

@@ -562,7 +562,7 @@ function buildAudit(index: number, item: Omit<EvidenceItem, "auditTrail">): Evid
   const base = new Date(Date.UTC(2026, 5, 1 + (index % 25), 9 + (index % 8), (index * 7) % 60));
   const entries = [
     { action: `Synced from Drive as ${item.fileName}`, actor: "Drive Sync" },
-    { action: `Assigned ${item.exhibitId} and categorized under ${item.category}`, actor: ACTORS[index % ACTORS.length] },
+    { action: `Assigned ${item.exhibitId} and categorized under ${item.category}`, actor: ACTORS[index % ACTORS.length]! },
     { action: `Status set to ${item.status}`, actor: "A. Whitfield (Counsel)" },
   ];
   return entries.map((entry, i) => ({

@@ -78,7 +78,7 @@ function auditEntry(action: string) {
 
 function groupOf(exhibitId: string) {
   const match = /Exhibit\s+([A-Z]+)/i.exec(exhibitId);
-  return match ? match[1].toUpperCase() : "—";
+  return match ? match[1]!.toUpperCase() : "—";
 }
 
 export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
