@@ -14,7 +14,6 @@ import { CATEGORIES, STATUSES } from "@/lib/evidence/types";
 
 export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const { items, openInspector, setFilters, resetFilters } = useEvidence();
 
   useEffect(() => {
@@ -28,29 +27,16 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const q = query.trim().toLowerCase();
-  const matches = q
-    ? items
-        .filter((i) =>
-          [i.title, i.fileName, i.exhibitId, i.notes, i.tags.join(" ")].join(" ").toLowerCase().includes(q),
-        )
-        .slice(0, 8)
-    : items.slice(0, 6);
-
   return (
-    <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false} title="Command palette">
-      <CommandInput
-        value={query}
-        onValueChange={setQuery}
-        placeholder="Search exhibits, files, notes, tags — or run a command…"
-      />
-      <CommandList>
-        <CommandEmpty>No matching exhibits.</CommandEmpty>
-        <CommandGroup heading={q ? "Matching exhibits" : "Recent exhibits"}>
-          {matches.map((item) => (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandInput placeholder="Search exhibits, files, notes, tags — or run a command…" />
+      <CommandList className="max-h-[420px]">
+        <CommandEmpty>No matching exhibits or commands.</CommandEmpty>
+        <CommandGroup heading="Exhibits">
+          {items.map((item) => (
             <CommandItem
               key={item.id}
-              value={item.id}
+              value={`${item.exhibitId} ${item.title} ${item.fileName} ${item.subCategory} ${item.notes} ${item.tags.join(" ")}`}
               onSelect={() => {
                 openInspector(item.id);
                 setOpen(false);
@@ -63,11 +49,11 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
           ))}
         </CommandGroup>
         <CommandSeparator />
-        <CommandGroup heading="Filters">
+        <CommandGroup heading="Filter commands">
           {STATUSES.map((s) => (
             <CommandItem
               key={s}
-              value={`status-${s}`}
+              value={`filter status ${s}`}
               onSelect={() => {
                 setFilters({ statuses: [s] });
                 setOpen(false);
@@ -79,7 +65,7 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
           {CATEGORIES.map((c) => (
             <CommandItem
               key={c}
-              value={`cat-${c}`}
+              value={`filter category ${c}`}
               onSelect={() => {
                 setFilters({ categories: [c] });
                 setOpen(false);
@@ -89,7 +75,7 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
             </CommandItem>
           ))}
           <CommandItem
-            value="reset"
+            value="clear all filters reset"
             onSelect={() => {
               resetFilters();
               setOpen(false);
@@ -101,7 +87,7 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
         <CommandSeparator />
         <CommandGroup heading="Storage">
           <CommandItem
-            value="connect-drive"
+            value="connect drive folder google onedrive s3"
             onSelect={() => {
               onConnectDrive();
               setOpen(false);
