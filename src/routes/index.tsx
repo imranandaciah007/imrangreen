@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { CloudCog, Command, Scale } from "lucide-react";
+import { CircleDot, CloudCog, Command, Plus, Scale } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,7 @@ import { FilterToolbar } from "@/components/evidence/FilterToolbar";
 import { KanbanBoard } from "@/components/evidence/KanbanBoard";
 import { KpiBar } from "@/components/evidence/KpiBar";
 import { InspectorDrawer } from "@/components/evidence/InspectorDrawer";
+import { UploadDialog } from "@/components/evidence/UploadDialog";
 import { EvidenceStoreProvider, useEvidence } from "@/lib/evidence/store";
 
 const title = "Exhibit Vault — Green Card Evidence Command Center";
