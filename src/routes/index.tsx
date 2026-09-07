@@ -124,6 +124,7 @@ function Dashboard() {
       <InspectorDrawer />
       <CommandPalette onConnectDrive={() => setConnectOpen(true)} />
       <ConnectDriveDialog open={connectOpen} onOpenChange={setConnectOpen} />
+      <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
     </div>
   );
 }
