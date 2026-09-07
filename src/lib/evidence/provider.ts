@@ -24,6 +24,8 @@ export interface DocumentProvider {
   disconnect(): Promise<ProviderConnection>;
   /** Full listing of evidence items in the connected folder. */
   list(): Promise<EvidenceItem[]>;
+  /** Upload a new document into the connected folder. */
+  create(draft: Omit<EvidenceItem, "id" | "auditTrail">, file?: File): Promise<EvidenceItem>;
   /** Persist a partial change to one item. */
   update(id: string, patch: Partial<EvidenceItem>): Promise<EvidenceItem>;
   /** Persist a partial change to many items at once. */
@@ -70,6 +72,27 @@ export class MockDriveProvider implements DocumentProvider {
 
   async list() {
     return clone(this.items);
+  }
+
+  async create(draft: Omit<EvidenceItem, "id" | "auditTrail">, file?: File) {
+    const created: EvidenceItem = {
+      ...draft,
+      id: `ev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      cloudDriveUrl:
+        draft.cloudDriveUrl ||
+        (file && typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : ""),
+      auditTrail: [
+        {
+          id: `audit-${Math.random().toString(36).slice(2, 10)}`,
+          at: new Date().toISOString(),
+          actor: "A. Whitfield (Counsel)",
+          action: `Uploaded ${draft.fileName}`,
+        },
+      ],
+    };
+    this.items = [...this.items, created];
+    this.connection = { ...this.connection, lastSyncedAt: new Date().toISOString() };
+    return created;
   }
 
   async update(id: string, patch: Partial<EvidenceItem>) {
