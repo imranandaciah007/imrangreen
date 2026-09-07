@@ -36,7 +36,7 @@ export function StatusSelect({
 }) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as EvidenceStatus)}>
-      <SelectTrigger size="sm" className={cn("h-7 w-full min-w-[172px] border-border/70 bg-card text-xs", className)}>
+      <SelectTrigger className={cn("h-7 w-full min-w-[172px] border-border/70 bg-card text-xs", className)}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
