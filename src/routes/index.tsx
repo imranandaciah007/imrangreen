@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { CloudCog, Command, Scale } from "lucide-react";
+import { CircleDot, CloudCog, Command, Plus, Scale } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,7 @@ import { FilterToolbar } from "@/components/evidence/FilterToolbar";
 import { KanbanBoard } from "@/components/evidence/KanbanBoard";
 import { KpiBar } from "@/components/evidence/KpiBar";
 import { InspectorDrawer } from "@/components/evidence/InspectorDrawer";
+import { UploadDialog } from "@/components/evidence/UploadDialog";
 import { EvidenceStoreProvider, useEvidence } from "@/lib/evidence/store";
 
 const title = "Exhibit Vault — Green Card Evidence Command Center";
@@ -39,21 +40,39 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const { connection, loading } = useEvidence();
   const [connectOpen, setConnectOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b border-navy/40 bg-navy text-navy-foreground">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 py-2.5">
-          <Scale className="size-5 opacity-80" />
+      <header className="sticky top-0 z-30 border-b border-navy/40 bg-navy text-navy-foreground shadow-sm">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 py-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-navy-foreground/20 bg-navy-foreground/10">
+            <Scale className="size-4.5 opacity-90" />
+          </span>
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold tracking-tight">Exhibit Vault</h1>
-            <p className="truncate font-mono text-[10px] text-navy-foreground/65">
+            <h1 className="flex items-center gap-2 truncate text-sm font-semibold tracking-tight">
+              Exhibit Vault
+              <span className="rounded border border-navy-foreground/25 px-1.5 py-px font-mono text-[9px] font-medium tracking-widest text-navy-foreground/70 uppercase">
+                Counsel
+              </span>
+            </h1>
+            <p className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-[10px] text-navy-foreground/65">
+              <CircleDot
+                className={`size-2.5 ${connection?.connected ? "text-success" : "text-destructive"}`}
+              />
               {connection?.connected
                 ? `${connection.providerName} · ${connection.folderPath}`
                 : "No storage connected"}
             </p>
           </div>
           <div className="ml-auto flex items-center gap-1.5">
+            <Button
+              size="sm"
+              className="h-8 bg-navy-foreground text-xs font-semibold text-navy hover:bg-navy-foreground/90"
+              onClick={() => setUploadOpen(true)}
+            >
+              <Plus className="size-3.5" /> Add document
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -69,7 +88,7 @@ function Dashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] space-y-4 p-4">
+      <main className="mx-auto max-w-[1600px] space-y-4 p-4 lg:p-6">
         {loading ? (
           <p className="py-20 text-center text-sm text-muted-foreground">Loading evidence index…</p>
         ) : (
@@ -105,6 +124,7 @@ function Dashboard() {
       <InspectorDrawer />
       <CommandPalette onConnectDrive={() => setConnectOpen(true)} />
       <ConnectDriveDialog open={connectOpen} onOpenChange={setConnectOpen} />
+      <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
     </div>
   );
 }

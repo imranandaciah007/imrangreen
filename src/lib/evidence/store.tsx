@@ -47,6 +47,7 @@ interface EvidenceContextValue {
   inspectorId: string | null;
   openInspector: (id: string | null) => void;
   updateItem: (id: string, patch: Partial<EvidenceItem>, message?: string) => void;
+  addItem: (draft: Omit<EvidenceItem, "id" | "auditTrail">, file?: File) => Promise<EvidenceItem>;
   bulkUpdate: (patch: Partial<EvidenceItem>, message: string) => void;
   bulkAssignPrefix: (prefix: string) => void;
   bulkAddTag: (tag: Tag) => void;
@@ -137,6 +138,13 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     },
     [applyPatch],
   );
+
+  const addItem = useCallback(async (draft: Omit<EvidenceItem, "id" | "auditTrail">, file?: File) => {
+    const created = await documentProvider.create(draft, file);
+    setItems((prev) => [...prev, created]);
+    toast.success(`${created.exhibitId} added`, { description: created.title });
+    return created;
+  }, []);
 
   const bulkUpdate = useCallback(
     (patch: Partial<EvidenceItem>, message: string) => {
@@ -277,6 +285,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     inspectorId,
     openInspector: setInspectorId,
     updateItem,
+    addItem,
     bulkUpdate,
     bulkAssignPrefix,
     bulkAddTag,

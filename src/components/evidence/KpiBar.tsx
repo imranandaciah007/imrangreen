@@ -15,8 +15,8 @@ function Kpi({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-panel">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-lg border border-border bg-card p-3.5 shadow-panel transition-shadow hover:shadow-md">
+      <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
         {icon}
         {label}
       </div>
