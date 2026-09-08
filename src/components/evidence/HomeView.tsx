@@ -40,8 +40,7 @@ function Metric({
 
 export function HomeView() {
   const { stats, caseSettings, tasks, events } = useEvidence();
-  const gbp = (n: number) =>
-    `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const openTasks = tasks.filter((t) => !t.done).slice(0, 4);
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
 

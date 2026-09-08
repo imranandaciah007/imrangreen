@@ -7,10 +7,10 @@ import { STAGES, stageForStatus, statusForStage, type Stage } from "@/lib/eviden
 import { StatusBadge, TagChip } from "./status-ui";
 
 const stageHint: Record<Stage, string> = {
-  Draft: "Collected, not yet processed",
-  "Needs Translation": "Awaiting certified translation",
-  "Legal Review": "With counsel for sufficiency review",
-  "Ready for Master Binder": "Cleared for the final packet",
+  New: "Just added, not yet checked",
+  "Needs confirmation": "Details or supporting evidence to confirm",
+  Reviewed: "Checked by Imran or Aciah",
+  Ready: "Ready for the case packet",
 };
 
 export function KanbanBoard() {
@@ -22,7 +22,10 @@ export function KanbanBoard() {
         const rows = filtered.filter((item) => stageForStatus(item.status) === stage);
         const pages = rows.reduce((sum, r) => sum + r.pageCount, 0);
         return (
-          <div key={stage} className="flex flex-col rounded-lg border border-border bg-secondary/50 shadow-panel">
+          <div
+            key={stage}
+            className="flex flex-col rounded-lg border border-border bg-secondary/50 shadow-panel"
+          >
             <div className="border-b border-border px-3 py-2">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-xs font-semibold tracking-tight text-foreground">{stage}</h3>
@@ -42,9 +45,16 @@ export function KanbanBoard() {
                     key={item.id}
                     className="rounded-md border border-border bg-card p-2.5 transition-shadow hover:shadow-panel"
                   >
-                    <button onClick={() => openInspector(item.id)} className="block w-full text-left">
-                      <span className="font-mono text-[10px] font-semibold text-info">{item.exhibitId}</span>
-                      <span className="mt-0.5 block text-xs leading-snug font-medium text-foreground">{item.title}</span>
+                    <button
+                      onClick={() => openInspector(item.id)}
+                      className="block w-full text-left"
+                    >
+                      <span className="font-mono text-[10px] font-semibold text-info">
+                        {item.exhibitId}
+                      </span>
+                      <span className="mt-0.5 block text-xs leading-snug font-medium text-foreground">
+                        {item.title}
+                      </span>
                       <span className="mt-1 flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
                         <FileText className="size-3" />
                         {item.pageCount} pgs · {formatBytes(item.fileSizeBytes)}
@@ -93,7 +103,9 @@ export function KanbanBoard() {
                 );
               })}
               {rows.length === 0 && (
-                <p className="px-1 py-6 text-center text-[11px] text-muted-foreground">Nothing in this stage.</p>
+                <p className="px-1 py-6 text-center text-[11px] text-muted-foreground">
+                  Nothing in this stage.
+                </p>
               )}
             </div>
           </div>

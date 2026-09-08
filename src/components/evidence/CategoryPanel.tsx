@@ -13,11 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { useEvidence } from "@/lib/evidence/store";
 import { cn } from "@/lib/utils";
 
-export function CategoryPanel({
-  onUploadTo,
-}: {
-  onUploadTo: (category: string) => void;
-}) {
+export function CategoryPanel({ onUploadTo }: { onUploadTo: (category: string) => void }) {
   const { categories, stats, filters, setFilters, addCategory, renameCategory, deleteCategory } =
     useEvidence();
   const [newName, setNewName] = useState("");

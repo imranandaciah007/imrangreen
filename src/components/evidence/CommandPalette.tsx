@@ -10,11 +10,11 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { useEvidence } from "@/lib/evidence/store";
-import { CATEGORIES, STATUSES } from "@/lib/evidence/types";
+import { STATUSES } from "@/lib/evidence/types";
 
 export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void }) {
   const [open, setOpen] = useState(false);
-  const { items, openInspector, setFilters, resetFilters } = useEvidence();
+  const { items, categories, openInspector, setFilters, resetFilters } = useEvidence();
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -44,7 +44,9 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
             >
               <span className="font-mono text-[10px] text-info">{item.exhibitId}</span>
               <span className="truncate">{item.title}</span>
-              <span className="ml-auto font-mono text-[10px] text-muted-foreground">{item.status}</span>
+              <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+                {item.status}
+              </span>
             </CommandItem>
           ))}
         </CommandGroup>
@@ -62,7 +64,7 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
               Filter status: {s}
             </CommandItem>
           ))}
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <CommandItem
               key={c}
               value={`filter category ${c}`}

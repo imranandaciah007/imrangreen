@@ -12,10 +12,22 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useEvidence } from "@/lib/evidence/store";
 
-export function ConnectDriveDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+export function ConnectDriveDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
   const { connection, connectDrive } = useEvidence();
   const [provider, setProvider] = useState("Google Drive");
   const [apiKey, setApiKey] = useState("");
@@ -30,8 +42,9 @@ export function ConnectDriveDialog({ open, onOpenChange }: { open: boolean; onOp
             <CloudCog className="size-4" /> Connect evidence folder
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Placeholder connection screen. The dashboard reads through a storage abstraction layer, so a live
-            Google Drive, OneDrive, or S3 sync can replace the mock source without changing this UI.
+            Placeholder connection screen. The dashboard reads through a storage abstraction layer,
+            so a live Google Drive, OneDrive, or S3 sync can replace the mock source without
+            changing this UI.
           </DialogDescription>
         </DialogHeader>
 
@@ -79,13 +92,18 @@ export function ConnectDriveDialog({ open, onOpenChange }: { open: boolean; onOp
             />
           </div>
           <p className="rounded-md border border-border bg-secondary/60 p-2 text-[11px] text-muted-foreground">
-            Currently reading from <span className="font-mono">mock-google-drive</span> — 40 sample records, no
-            network calls.
+            Currently reading from <span className="font-mono">mock-google-drive</span> — 40 sample
+            records, no network calls.
           </p>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="text-xs">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="text-xs"
+          >
             Cancel
           </Button>
           <Button
