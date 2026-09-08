@@ -187,8 +187,15 @@ export function EvidenceTable() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={columns.length + 2} className="px-3 py-10 text-center text-muted-foreground">
-                  No exhibits match the current filters.
+                <td colSpan={columns.length + 2} className="px-3 py-12 text-center text-muted-foreground">
+                  {items.length === 0 ? (
+                    <span className="text-xs">
+                      No documents yet — connect your drive folder to sync, or use{" "}
+                      <span className="font-semibold text-foreground">Add document</span> to file one manually.
+                    </span>
+                  ) : (
+                    "No exhibits match the current filters."
+                  )}
                 </td>
               </tr>
             )}
