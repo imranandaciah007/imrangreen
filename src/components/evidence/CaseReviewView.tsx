@@ -48,6 +48,7 @@ export function CaseReviewView({
     openInspector,
     profile,
     resolveConflict,
+    markAllReady,
   } = useEvidence();
 
   const uncategorised = items.filter((i) => !(i.categories?.length ? i.categories : [i.category]).filter(Boolean).length).length;
@@ -96,6 +97,9 @@ export function CaseReviewView({
     <div className="space-y-4">
       <Button className="h-11 w-full" onClick={onBuildPacket}>
         Build case packet
+      </Button>
+      <Button variant="outline" className="h-11 w-full" onClick={markAllReady}>
+        Mark every document as Ready
       </Button>
       <div>
         <h2 className="text-sm font-semibold text-foreground">Case review</h2>
