@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { CircleDot, CloudCog, Plus, ShieldCheck } from "lucide-react";
+import { CircleDot, CloudCog, MessagesSquare, Plus, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
