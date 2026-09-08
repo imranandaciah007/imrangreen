@@ -43,11 +43,17 @@ import {
   PAYERS,
   PEOPLE,
   PROFILES,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  TASK_TEMPLATES,
   type EventStatus,
   type ExpenseCategory,
   type FinanceKind,
   type FinanceLineItem,
+  type TaskPriority,
+  type TaskStatus,
 } from "@/lib/evidence/types";
+
 
 const today = () => new Date().toISOString().slice(0, 10);
 
