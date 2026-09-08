@@ -1,5 +1,14 @@
-import { useEffect, useState } from "react";
-import { CalendarPlus, CheckSquare, Coins, UploadCloud } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  CalendarPlus,
+  CheckSquare,
+  Coins,
+  Mic,
+  MicOff,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,10 +31,19 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { EvidencePicker } from "@/components/evidence/EvidencePicker";
 import { Textarea } from "@/components/ui/textarea";
+import { structureEvent } from "@/lib/ai.functions";
 import { useEvidence } from "@/lib/evidence/store";
-import { FINANCE_KINDS, PEOPLE, PROFILES, type FinanceKind } from "@/lib/evidence/types";
+import {
+  EVENT_STATUSES,
+  FINANCE_KINDS,
+  PEOPLE,
+  PROFILES,
+  type EventStatus,
+  type FinanceKind,
+} from "@/lib/evidence/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
+
 
 export function AddSheet({
   open,
@@ -254,24 +272,158 @@ export function EventDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { addEvent, addTask, categories, profile } = useEvidence();
+  const { addEvent, addTask, addFinance, categories, profile } = useEvidence();
+  const [sentence, setSentence] = useState("");
+  const [thinking, setThinking] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [missing, setMissing] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(today());
-  const [category, setCategory] = useState(categories[0] ?? "Other");
+  const [cats, setCats] = useState<string[]>([]);
   const [people, setPeople] = useState<string[]>(["Aciah"]);
   const [description, setDescription] = useState("");
+  const [effectOnAciah, setEffectOnAciah] = useState("");
+  const [effectOnFamily, setEffectOnFamily] = useState("");
+  const [followUp, setFollowUp] = useState("");
+  const [status, setStatus] = useState<EventStatus>("Recorded");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState<"GBP" | "USD">("GBP");
   const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const recognition = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setSentence("");
+    setMissing([]);
     setEvidenceIds([]);
     setTitle("");
     setDate(today());
-    setCategory(categories[0] ?? "Other");
+    setCats(categories[0] ? [categories[0]] : []);
     setPeople(["Aciah"]);
     setDescription("");
+    setEffectOnAciah("");
+    setEffectOnFamily("");
+    setFollowUp("");
+    setStatus("Recorded");
+    setAmount("");
+    setCurrency("GBP");
   }, [open, categories]);
+
+  function dictate() {
+    const w = window as unknown as {
+      SpeechRecognition?: new () => never;
+      webkitSpeechRecognition?: new () => never;
+    };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) {
+      toast.error("Dictation is not supported in this browser");
+      return;
+    }
+    if (listening) {
+      recognition.current?.stop();
+      setListening(false);
+      return;
+    }
+    const rec = new Ctor() as unknown as {
+      lang: string;
+      interimResults: boolean;
+      start: () => void;
+      stop: () => void;
+      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+      onend: () => void;
+      onerror: () => void;
+    };
+    rec.lang = "en-GB";
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      let text = "";
+      for (let i = 0; i < e.results.length; i += 1) text += `${e.results[i]![0]!.transcript} `;
+      setSentence((prev) => `${prev} ${text}`.trim());
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognition.current = rec;
+    rec.start();
+    setListening(true);
+  }
+
+  async function structure() {
+    if (!sentence.trim()) return;
+    setThinking(true);
+    try {
+      const out = await structureEvent({
+        data: {
+          text: sentence.trim(),
+          today: today(),
+          allowedCategories: categories,
+          allowedPeople: [...PEOPLE],
+        },
+      });
+      if (out.title) setTitle(out.title);
+      if (out.date && /^\d{4}-\d{2}-\d{2}$/.test(out.date)) setDate(out.date);
+      const valid = out.categories.filter((c) => categories.includes(c));
+      if (valid.length) setCats(valid);
+      if (out.people.length) setPeople(out.people);
+      if (out.description) setDescription(out.description);
+      if (out.effectOnAciah) setEffectOnAciah(out.effectOnAciah);
+      if (out.effectOnFamily) setEffectOnFamily(out.effectOnFamily);
+      if (out.followUp) setFollowUp(out.followUp);
+      if (out.amount > 0) setAmount(String(out.amount));
+      if (out.currency === "USD" || out.currency === "GBP") setCurrency(out.currency);
+      setMissing(out.missing);
+      toast.success("Turned into an event — check anything highlighted");
+    } catch (error) {
+      toast.error("Could not read that", {
+        description: error instanceof Error ? error.message.slice(0, 140) : undefined,
+      });
+    } finally {
+      setThinking(false);
+    }
+  }
+
+  function save() {
+    if (!title.trim()) return;
+    const category = cats[0] ?? categories[0] ?? "Other";
+    const money = Number(amount) || 0;
+    addEvent({
+      date,
+      title: title.trim(),
+      category,
+      categories: cats.length ? cats : [category],
+      people,
+      description: description.trim(),
+      effectOnAciah: effectOnAciah.trim(),
+      effectOnFamily: effectOnFamily.trim(),
+      followUp: followUp.trim(),
+      status,
+      financialImpact: money || undefined,
+      financialCurrency: money ? currency : undefined,
+      evidenceIds,
+    });
+    if (money > 0) {
+      addFinance({
+        date,
+        label: title.trim(),
+        kind: "Other",
+        amount: money,
+        currency,
+        recurring: false,
+        notes: "Created from a hardship event",
+        evidenceIds,
+      });
+    }
+    if (followUp.trim()) {
+      addTask({
+        title: followUp.trim(),
+        category,
+        dueDate: "",
+        done: false,
+        assignedTo: profile,
+      });
+    }
+    onOpenChange(false);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -279,11 +431,45 @@ export function EventDialog({
         <DialogHeader>
           <DialogTitle className="text-base">Add hardship event</DialogTitle>
           <DialogDescription className="text-xs">
-            Something that happened and its effect — a missed appointment, a hospital visit, a
-            cancelled trip.
+            Say or type one sentence and let the app structure it — nothing is invented.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          <div className="space-y-1.5 rounded-lg border border-border bg-secondary/40 p-2.5">
+            <Label className="text-xs">Describe it in a sentence</Label>
+            <Textarea
+              value={sentence}
+              onChange={(e) => setSentence(e.target.value)}
+              rows={3}
+              placeholder="Aciah missed her midwife appointment on 3 Sep because she had no childcare"
+              className="text-xs"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 text-xs"
+                onClick={dictate}
+              >
+                {listening ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+                {listening ? "Stop" : "Dictate"}
+              </Button>
+              <Button
+                type="button"
+                className="h-10 text-xs"
+                disabled={thinking || !sentence.trim()}
+                onClick={() => void structure()}
+              >
+                <Sparkles className="size-4" /> {thinking ? "Working…" : "Turn into event"}
+              </Button>
+            </div>
+            {missing.length > 0 && (
+              <p className="text-[11px] text-warning-foreground/90">
+                Not stated in your note — please check: {missing.join(", ")}
+              </p>
+            )}
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-xs">What happened?</Label>
             <Input
@@ -304,19 +490,42 @@ export function EventDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Category</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Label className="text-xs">Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as EventStatus)}>
                 <SelectTrigger className="h-11 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c} value={c} className="text-xs">
-                      {c}
+                  {EVENT_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s} className="text-xs">
+                      {s}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Hardship categories</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() =>
+                    setCats((prev) =>
+                      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
+                    )
+                  }
+                  className={`min-h-9 rounded-full border px-3 text-xs ${
+                    cats.includes(c)
+                      ? "border-navy bg-navy text-navy-foreground"
+                      : "border-border bg-card text-muted-foreground"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
             </div>
           </div>
           <div className="space-y-1.5">
@@ -347,8 +556,60 @@ export function EventDialog({
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={4}
+              rows={3}
               className="text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Effect on Aciah</Label>
+            <Textarea
+              value={effectOnAciah}
+              onChange={(e) => setEffectOnAciah(e.target.value)}
+              rows={2}
+              placeholder="The hardship this caused Aciah, as fact"
+              className="text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Effect on Jibril / family (optional)</Label>
+            <Textarea
+              value={effectOnFamily}
+              onChange={(e) => setEffectOnFamily(e.target.value)}
+              rows={2}
+              className="text-xs"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cost (optional)</Label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="h-11 font-mono text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Currency</Label>
+              <Select value={currency} onValueChange={(v) => setCurrency(v as "GBP" | "USD")}>
+                <SelectTrigger className="h-11 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GBP">GBP</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Follow-up action (optional)</Label>
+            <Input
+              value={followUp}
+              onChange={(e) => setFollowUp(e.target.value)}
+              placeholder="Request GP letter confirming the appointment"
+              className="h-11 text-xs"
             />
           </div>
           <div className="space-y-1.5">
@@ -378,7 +639,7 @@ export function EventDialog({
                       title: title.trim()
                         ? `Collect evidence for: ${title.trim()}`
                         : "Collect supporting evidence",
-                      category,
+                      category: cats[0] ?? "",
                       dueDate: "",
                       done: false,
                       assignedTo: profile,
@@ -395,21 +656,7 @@ export function EventDialog({
           <Button variant="outline" className="h-11" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button
-            className="h-11"
-            onClick={() => {
-              if (!title.trim()) return;
-              addEvent({
-                date,
-                title: title.trim(),
-                category,
-                people,
-                description: description.trim(),
-                evidenceIds,
-              });
-              onOpenChange(false);
-            }}
-          >
+          <Button className="h-11" onClick={save}>
             Save event
           </Button>
         </DialogFooter>
@@ -423,6 +670,7 @@ export function EventDialog({
     </Dialog>
   );
 }
+
 
 export function TaskDialog({
   open,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, FileUp, Save, UploadCloud } from "lucide-react";
+import { AlertTriangle, Camera, FileUp, Save, Sparkles, UploadCloud } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { extractUploadedFile, type ExtractionResult } from "@/lib/ai.functions";
 import { formatBytes } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import {
@@ -42,6 +43,20 @@ function fileTypeOf(name: string): FileType {
   if (ext === "jpg" || ext === "jpeg") return "JPG";
   return "PDF";
 }
+
+/** Reads a picked file as base64 so the AI can read it before it reaches Drive. */
+function toBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(new Error("Could not read the file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 
 function Chip({
   active,
@@ -79,7 +94,7 @@ export function UploadDialog({
   initialCategory?: string | undefined;
   editItem?: EvidenceItem | null;
 }) {
-  const { addItem, updateItem, items, categories } = useEvidence();
+  const { addItem, updateItem, items, categories, addEvent, addTask, profile } = useEvidence();
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const editing = !!editItem;
@@ -98,12 +113,25 @@ export function UploadDialog({
   const [dateOfDocument, setDateOfDocument] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [affectsAciah, setAffectsAciah] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [ai, setAi] = useState<ExtractionResult | null>(null);
+  const [uncertain, setUncertain] = useState<{ field: string; options: string[] }[]>([]);
+  const [duplicate, setDuplicate] = useState<EvidenceItem | null>(null);
+  const [duplicateAck, setDuplicateAck] = useState(false);
+  const [alsoEvent, setAlsoEvent] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
     setFile(null);
+    setAi(null);
+    setAiRunning(false);
+    setUncertain([]);
+    setDuplicate(null);
+    setDuplicateAck(false);
+    setAlsoEvent(false);
     if (editItem) {
       setTitle(editItem.title);
       setExhibitId(editItem.exhibitId);
@@ -116,6 +144,7 @@ export function UploadDialog({
       setDateOfDocument(editItem.dateOfDocument.slice(0, 10));
       setTags([...editItem.tags]);
       setNotes(editItem.notes);
+      setAffectsAciah(editItem.affectsAciah ?? "");
     } else {
       setTitle("");
       setExhibitId("");
@@ -128,6 +157,7 @@ export function UploadDialog({
       setDateOfDocument("");
       setTags([]);
       setNotes("");
+      setAffectsAciah("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editItem?.id, initialCategory]);
@@ -141,11 +171,90 @@ export function UploadDialog({
     return `Exhibit ${letter}-${n}`;
   }, [items, primary, categories]);
 
+  /** Possible duplicate: same file name, or same size and same document date. */
+  function findDuplicate(next: File, date: string) {
+    const name = next.name.toLowerCase();
+    return (
+      items.find(
+        (i) =>
+          i.id !== editItem?.id &&
+          (i.fileName.toLowerCase() === name ||
+            (i.fileSizeBytes === next.size && next.size > 0) ||
+            (!!date && i.dateOfDocument.slice(0, 10) === date && i.fileType === fileTypeOf(name))),
+      ) ?? null
+    );
+  }
+
+  async function runAi(next: File) {
+    setAiRunning(true);
+    try {
+      const base64 = await toBase64(next);
+      const result = await extractUploadedFile({
+        data: {
+          base64,
+          fileName: next.name,
+          mimeType: next.type || "application/pdf",
+          allowedCategories: categories,
+          allowedPeople: [...PEOPLE],
+          allowedSourceTypes: [...SOURCE_TYPES],
+          knownTitle: "",
+        },
+      });
+      setAi(result);
+      setUncertain(result.uncertain);
+      const a = result.agreed;
+      if (a.title) setTitle(a.title);
+      if (a.documentDate && /^\d{4}-\d{2}-\d{2}$/.test(a.documentDate))
+        setDateOfDocument(a.documentDate);
+      if (a.people?.length) setPeople(a.people);
+      if (a.categories?.length) {
+        const valid = a.categories.filter((c) => categories.includes(c));
+        if (valid.length) setCats(valid);
+      }
+      if (a.sourceType && (SOURCE_TYPES as readonly string[]).includes(a.sourceType))
+        setSourceType(a.sourceType as SourceType);
+      if (a.pageCount) setPageCount(String(a.pageCount));
+      if (result.summary) setNotes((prev) => prev || result.summary);
+      setStatus(result.uncertain.length ? "Needs confirmation" : "Reviewed");
+      const dup = findDuplicate(next, a.documentDate ?? "");
+      setDuplicate(dup);
+    } catch (err) {
+      setError(err instanceof Error ? err.message.slice(0, 180) : "AI could not read this file.");
+    } finally {
+      setAiRunning(false);
+    }
+  }
+
   function pick(next: File | null) {
     if (!next) return;
     setFile(next);
     setError(null);
+    setAi(null);
+    setUncertain([]);
+    setDuplicate(null);
+    setDuplicateAck(false);
     if (!title) setTitle(next.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "));
+    void runAi(next);
+  }
+
+  function resolveUncertain(field: string, value: string | null) {
+    if (value) {
+      if (field === "title") setTitle(value);
+      if (field === "documentDate") setDateOfDocument(value);
+      if (field === "pageCount") setPageCount(value);
+      if (field === "sourceType" && (SOURCE_TYPES as readonly string[]).includes(value))
+        setSourceType(value as SourceType);
+      if (field === "people")
+        setPeople(value.split(",").map((v) => v.trim()).filter(Boolean));
+      if (field === "categories")
+        setCats(
+          value
+            .split(",")
+            .map((v) => v.trim())
+            .filter((c) => categories.includes(c)),
+        );
+    }
+    setUncertain((prev) => prev.filter((u) => u.field !== field));
   }
 
   function toggle<T>(list: T[], value: T, set: (next: T[]) => void) {
@@ -161,9 +270,16 @@ export function UploadDialog({
       setError("Give the document a readable title.");
       return;
     }
+    if (duplicate && !duplicateAck) {
+      setError(
+        `Possible duplicate of ${duplicate.exhibitId} — choose “Keep both” below or cancel.`,
+      );
+      return;
+    }
     setSaving(true);
     try {
       const chosen = cats.length ? cats : [primary];
+      const docDate = dateOfDocument || new Date().toISOString().slice(0, 10);
       const common = {
         exhibitId: exhibitId.trim() || suggestedExhibit,
         title: title.trim(),
@@ -173,11 +289,27 @@ export function UploadDialog({
         sourceType,
         people,
         pageCount: Math.max(1, Number(pageCount) || 1),
-        status,
-        dateOfDocument: dateOfDocument || new Date().toISOString().slice(0, 10),
+        status: uncertain.length ? ("Needs confirmation" as EvidenceStatus) : status,
+        dateOfDocument: docDate,
         tags,
         notes: notes.trim(),
+        affectsAciah: affectsAciah.trim() || undefined,
         needsTranslation: status === "Translation needed",
+        duplicateSuspected: duplicate ? true : undefined,
+        duplicateOfId: duplicate?.id,
+        ...(ai
+          ? {
+              aiExtraction: {
+                ranAt: ai.ranAt,
+                contentRead: ai.contentRead,
+                summary: ai.summary,
+                language: ai.language,
+                applied: Object.keys(ai.agreed),
+                uncertain,
+                passes: ai.passes as unknown as Record<string, unknown>[],
+              },
+            }
+          : {}),
       };
 
       if (editing && editItem) {
@@ -201,7 +333,7 @@ export function UploadDialog({
           `${common.exhibitId} updated`,
         );
       } else if (file) {
-        await addItem(
+        const created = await addItem(
           {
             ...common,
             fileName: file.name,
@@ -214,12 +346,35 @@ export function UploadDialog({
           },
           file,
         );
+        if (alsoEvent) {
+          addEvent({
+            date: docDate,
+            title: common.title,
+            category: common.category,
+            categories: chosen,
+            people,
+            description: notes.trim(),
+            effectOnAciah: affectsAciah.trim(),
+            status: "Recorded",
+            evidenceIds: [created.id],
+          });
+        }
+        if (people.includes("Jibril") && !affectsAciah.trim()) {
+          addTask({
+            title: `Note how "${common.title}" affects Aciah`,
+            category: common.category,
+            dueDate: "",
+            done: false,
+            assignedTo: profile,
+          });
+        }
       }
       onOpenChange(false);
     } finally {
       setSaving(false);
     }
   }
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -297,6 +452,98 @@ export function UploadDialog({
               onChange={(e) => pick(e.target.files?.[0] ?? null)}
             />
           </div>
+
+          {(aiRunning || ai) && (
+            <div className="rounded-lg border border-border bg-secondary/40 p-3">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                <Sparkles className="size-3.5" />
+                {aiRunning
+                  ? "Reading the document twice…"
+                  : uncertain.length === 0
+                    ? "Verified by double scan"
+                    : `${uncertain.length} field(s) need your confirmation`}
+              </p>
+              {ai && !ai.contentRead && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  The file content could not be read — check the details below yourself.
+                </p>
+              )}
+              {ai?.summary && <p className="mt-1.5 text-xs text-foreground/85">{ai.summary}</p>}
+              {uncertain.length > 0 && (
+                <ul className="mt-2 space-y-2">
+                  {uncertain.map((u) => (
+                    <li
+                      key={u.field}
+                      className="rounded-md border border-warning/50 bg-warning/10 p-2"
+                    >
+                      <p className="text-[11px] font-medium text-foreground">
+                        Which {u.field} is correct?
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {u.options.map((opt) => (
+                          <Button
+                            key={opt}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-9 max-w-full text-[11px]"
+                            onClick={() => resolveUncertain(u.field, opt)}
+                          >
+                            <span className="truncate">{opt}</span>
+                          </Button>
+                        ))}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-9 text-[11px] text-muted-foreground"
+                          onClick={() => resolveUncertain(u.field, null)}
+                        >
+                          Neither
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {duplicate && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                <AlertTriangle className="size-3.5" /> Possible duplicate of {duplicate.exhibitId} —{" "}
+                {duplicate.title}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-9 text-[11px]"
+                  onClick={() => {
+                    setDuplicateAck(true);
+                    setDuplicate(null);
+                    setError(null);
+                  }}
+                >
+                  Keep both
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-9 text-[11px]"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel this upload
+                </Button>
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Nothing is ever deleted automatically.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs">Title</Label>
@@ -426,14 +673,40 @@ export function UploadDialog({
             />
           </div>
 
+          {(people.includes("Jibril") || people.includes("Other family")) && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">How does this affect Aciah?</Label>
+              <Textarea
+                value={affectsAciah}
+                onChange={(e) => setAffectsAciah(e.target.value)}
+                rows={2}
+                placeholder="Only what you can state as fact — e.g. Aciah is Jibril's sole carer during the separation."
+                className="text-xs"
+              />
+            </div>
+          )}
+
+          {!editing && (
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={alsoEvent}
+                onChange={(e) => setAlsoEvent(e.target.checked)}
+                className="size-4"
+              />
+              Also add this to the hardship timeline
+            </label>
+          )}
+
           {error && <p className="text-xs font-medium text-destructive">{error}</p>}
+
         </div>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" className="h-11" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button className="h-11" disabled={saving} onClick={() => void submit()}>
+          <Button className="h-11" disabled={saving || aiRunning} onClick={() => void submit()}>
             {editing ? "Save changes" : "Add evidence"}
           </Button>
         </DialogFooter>

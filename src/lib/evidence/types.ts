@@ -102,7 +102,10 @@ export interface AiExtraction {
   applied: string[];
   /** Fields the passes disagreed on — the user must confirm these. */
   uncertain: { field: string; options: string[] }[];
+  /** Raw output of both scans, kept for auditability. */
+  passes?: Record<string, unknown>[] | undefined;
 }
+
 
 
 export interface EvidenceItem {
@@ -133,6 +136,10 @@ export interface EvidenceItem {
   aiExtraction?: AiExtraction | undefined;
 
   notes: string;
+  /** For evidence about Jibril or others: how this affects Aciah (user-approved). */
+  affectsAciah?: string | undefined;
+  /** Id of the exhibit this may duplicate (never deleted automatically). */
+  duplicateOfId?: string | undefined;
   createdBy: string;
   lastEditedBy: string;
   createdAt: string;
@@ -140,19 +147,33 @@ export interface EvidenceItem {
   auditTrail: AuditEntry[];
 }
 
+export const EVENT_STATUSES = ["Recorded", "Needs evidence", "Confirmed", "Resolved"] as const;
+export type EventStatus = (typeof EVENT_STATUSES)[number];
+
 export interface HardshipEvent {
   id: string;
   date: string;
   title: string;
   category: Category;
+  /** An event can sit in several hardship categories. */
+  categories?: Category[] | undefined;
   people: string[];
   description: string;
+  /** Primary effect on Aciah, the qualifying relative. */
+  effectOnAciah?: string | undefined;
+  /** Secondary effect on Jibril or the wider family. */
+  effectOnFamily?: string | undefined;
+  followUp?: string | undefined;
+  status?: EventStatus | undefined;
+  financialImpact?: number | undefined;
+  financialCurrency?: "GBP" | "USD" | undefined;
   evidenceIds: string[];
   createdBy: string;
   lastEditedBy: string;
   createdAt: string;
   updatedAt: string;
 }
+
 
 export const FINANCE_KINDS = [
   "Travel / Flights",

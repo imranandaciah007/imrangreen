@@ -183,77 +183,292 @@ export const extractDocument = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<ExtractionResult> => {
     const base64 = data.driveFileId ? await fetchDriveBytes(data.driveFileId) : null;
+    return twoPass({ ...data, base64 });
+  });
 
-    const basePrompt = [
-      "You are helping index evidence for a US I-601 extreme-hardship waiver case.",
-      "The couple: Imran (UK, applicant) and Aciah (US citizen spouse, the qualifying relative). Their son is Jibril.",
-      `File name: ${data.fileName}`,
-      data.knownTitle ? `Existing label: ${data.knownTitle}` : "",
-      base64
-        ? "Read the attached document content and extract the facts."
-        : "The file content is not available, so infer only from the file name and say so in the summary.",
-      `Choose categories only from: ${data.allowedCategories.join(" | ")}`,
-      `Choose people only from: ${data.allowedPeople.join(" | ")}`,
-      `Choose sourceType only from: ${data.allowedSourceTypes.join(" | ")}`,
-      "Never invent names, dates or facts. If something is not stated, leave it empty.",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    const [a, b] = await Promise.all([
-      runPass({
-        prompt: `${basePrompt}\nPass 1: extract carefully.`,
-        fileName: data.fileName,
-        mimeType: data.mimeType,
-        base64,
-      }),
-      runPass({
-        prompt: `${basePrompt}\nPass 2: independently verify. Be conservative: prefer empty values over guesses.`,
-        fileName: data.fileName,
-        mimeType: data.mimeType,
-        base64,
-      }),
-    ]);
-
-    const agreed: Partial<ExtractionPass> = {};
-    const uncertain: { field: string; options: string[] }[] = [];
-
-    const pushScalar = (field: keyof ExtractionPass, x: string, y: string) => {
-      if (x && y && x.toLowerCase() === y.toLowerCase()) {
-        (agreed as Record<string, unknown>)[field] = x;
-      } else if (x || y) {
-        uncertain.push({ field, options: [x, y].filter(Boolean) as string[] });
-      }
-    };
-
-    pushScalar("title", a.title, b.title);
-    pushScalar("documentDate", a.documentDate, b.documentDate);
-    pushScalar("sourceType", a.sourceType, b.sourceType);
-
-    if (samePass(a.people, b.people) && a.people.length) agreed.people = a.people;
-    else if (a.people.length || b.people.length)
-      uncertain.push({
-        field: "people",
-        options: [a.people.join(", "), b.people.join(", ")].filter(Boolean),
-      });
-
-    if (samePass(a.categories, b.categories) && a.categories.length) agreed.categories = a.categories;
-    else if (a.categories.length || b.categories.length)
-      uncertain.push({
-        field: "categories",
-        options: [a.categories.join(", "), b.categories.join(", ")].filter(Boolean),
-      });
-
-    if (a.pageCount === b.pageCount) agreed.pageCount = a.pageCount;
-    else uncertain.push({ field: "pageCount", options: [String(a.pageCount), String(b.pageCount)] });
-
+/**
+ * Same two-pass read, for a file the user has just picked on the device (before it reaches
+ * Drive). The bytes are sent as base64 and never stored server-side.
+ */
+export const extractUploadedFile = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
     return {
-      agreed,
-      uncertain,
-      summary: a.summary || b.summary,
-      language: a.language || b.language,
-      passes: [a, b],
-      ranAt: new Date().toISOString(),
-      contentRead: Boolean(base64),
+      base64: String(d["base64"] ?? ""),
+      fileName: String(d["fileName"] ?? "document"),
+      mimeType: String(d["mimeType"] ?? "application/pdf"),
+      allowedCategories: normList(d["allowedCategories"]),
+      allowedPeople: normList(d["allowedPeople"]),
+      allowedSourceTypes: normList(d["allowedSourceTypes"]),
+      knownTitle: String(d["knownTitle"] ?? ""),
+    };
+  })
+  .handler(async ({ data }): Promise<ExtractionResult> =>
+    twoPass({ ...data, base64: data.base64 || null }),
+  );
+
+async function twoPass(data: {
+  base64: string | null;
+  fileName: string;
+  mimeType: string;
+  allowedCategories: string[];
+  allowedPeople: string[];
+  allowedSourceTypes: string[];
+  knownTitle: string;
+}): Promise<ExtractionResult> {
+  const base64 = data.base64;
+
+  const basePrompt = [
+    "You are helping index evidence for a US I-601 extreme-hardship waiver case.",
+    "The couple: Imran (UK, applicant) and Aciah (US citizen spouse, the qualifying relative). Their son is Jibril.",
+    `File name: ${data.fileName}`,
+    data.knownTitle ? `Existing label: ${data.knownTitle}` : "",
+    base64
+      ? "Read the attached document content and extract the facts."
+      : "The file content is not available, so infer only from the file name and say so in the summary.",
+    `Choose categories only from: ${data.allowedCategories.join(" | ")}`,
+    `Choose people only from: ${data.allowedPeople.join(" | ")}`,
+    `Choose sourceType only from: ${data.allowedSourceTypes.join(" | ")}`,
+    "Never invent names, dates or facts. If something is not stated, leave it empty.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const [a, b] = await Promise.all([
+    runPass({
+      prompt: `${basePrompt}\nPass 1: extract carefully.`,
+      fileName: data.fileName,
+      mimeType: data.mimeType,
+      base64,
+    }),
+    runPass({
+      prompt: `${basePrompt}\nPass 2: independently verify. Be conservative: prefer empty values over guesses.`,
+      fileName: data.fileName,
+      mimeType: data.mimeType,
+      base64,
+    }),
+  ]);
+
+  const agreed: Partial<ExtractionPass> = {};
+  const uncertain: { field: string; options: string[] }[] = [];
+
+  const pushScalar = (field: keyof ExtractionPass, x: string, y: string) => {
+    if (x && y && x.toLowerCase() === y.toLowerCase()) {
+      (agreed as Record<string, unknown>)[field] = x;
+    } else if (x || y) {
+      uncertain.push({ field, options: [x, y].filter(Boolean) as string[] });
+    }
+  };
+
+  pushScalar("title", a.title, b.title);
+  pushScalar("documentDate", a.documentDate, b.documentDate);
+  pushScalar("sourceType", a.sourceType, b.sourceType);
+
+  if (samePass(a.people, b.people) && a.people.length) agreed.people = a.people;
+  else if (a.people.length || b.people.length)
+    uncertain.push({
+      field: "people",
+      options: [a.people.join(", "), b.people.join(", ")].filter(Boolean),
+    });
+
+  if (samePass(a.categories, b.categories) && a.categories.length) agreed.categories = a.categories;
+  else if (a.categories.length || b.categories.length)
+    uncertain.push({
+      field: "categories",
+      options: [a.categories.join(", "), b.categories.join(", ")].filter(Boolean),
+    });
+
+  if (a.pageCount === b.pageCount) agreed.pageCount = a.pageCount;
+  else uncertain.push({ field: "pageCount", options: [String(a.pageCount), String(b.pageCount)] });
+
+  return {
+    agreed,
+    uncertain,
+    summary: a.summary || b.summary,
+    language: a.language || b.language,
+    passes: [a, b],
+    ranAt: new Date().toISOString(),
+    contentRead: Boolean(base64),
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Plain-text helper calls (event structuring, Ask My Evidence)
+ * ------------------------------------------------------------------ */
+
+async function runJson(prompt: string, schema: unknown, name: string) {
+  const lovableKey = process.env["LOVABLE_API_KEY"];
+  if (!lovableKey) throw new Error("AI is not configured for this project.");
+  const res = await fetch(GATEWAY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
+    body: JSON.stringify({
+      model: MODEL,
+      reasoning: { effort: "low" },
+      input: [{ role: "user", content: [{ type: "input_text", text: prompt }] }],
+      text: { format: { type: "json_schema", name, strict: true, schema } },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`AI request failed [${res.status}]: ${body.slice(0, 400)}`);
+  }
+  const json = (await res.json()) as {
+    output?: { content?: { type?: string; text?: string }[] }[];
+    output_text?: string;
+  };
+  let text = json.output_text ?? "";
+  if (!text) {
+    for (const part of json.output ?? []) {
+      for (const c of part.content ?? []) if (c.type === "output_text" && c.text) text += c.text;
+    }
+  }
+  return JSON.parse(text) as Record<string, unknown>;
+}
+
+const EVENT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "title",
+    "date",
+    "categories",
+    "people",
+    "description",
+    "effectOnAciah",
+    "effectOnFamily",
+    "followUp",
+    "amount",
+    "currency",
+    "missing",
+  ],
+  properties: {
+    title: { type: "string" },
+    date: { type: "string", description: "YYYY-MM-DD, empty string if not stated" },
+    categories: { type: "array", items: { type: "string" } },
+    people: { type: "array", items: { type: "string" } },
+    description: { type: "string", description: "Factual restatement only" },
+    effectOnAciah: { type: "string", description: "Only if stated or clearly implied, else empty" },
+    effectOnFamily: { type: "string" },
+    followUp: { type: "string", description: "Suggested follow-up action, else empty" },
+    amount: { type: "number", description: "0 if no money mentioned" },
+    currency: { type: "string", description: "GBP, USD or empty" },
+    missing: {
+      type: "array",
+      items: { type: "string" },
+      description: "Field names that are not stated and should be asked for",
+    },
+  },
+} as const;
+
+export interface StructuredEvent {
+  title: string;
+  date: string;
+  categories: string[];
+  people: string[];
+  description: string;
+  effectOnAciah: string;
+  effectOnFamily: string;
+  followUp: string;
+  amount: number;
+  currency: string;
+  missing: string[];
+}
+
+/** Turn a typed or dictated sentence into a structured hardship event. Never invents facts. */
+export const structureEvent = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    return {
+      text: String(d["text"] ?? ""),
+      today: String(d["today"] ?? new Date().toISOString().slice(0, 10)),
+      allowedCategories: normList(d["allowedCategories"]),
+      allowedPeople: normList(d["allowedPeople"]),
+    };
+  })
+  .handler(async ({ data }): Promise<StructuredEvent> => {
+    const parsed = await runJson(
+      [
+        "Turn this note into a structured hardship event for a US I-601 extreme-hardship waiver case.",
+        "Aciah is the US citizen spouse (qualifying relative), Imran is the applicant, Jibril is their son.",
+        `Today is ${data.today}. Family separation began 2026-08-18.`,
+        `Choose categories only from: ${data.allowedCategories.join(" | ")}`,
+        `Choose people only from: ${data.allowedPeople.join(" | ")}`,
+        "Do not invent dates, amounts, diagnoses or effects. Leave anything not stated empty and list its field name in `missing`.",
+        `Note: ${data.text}`,
+      ].join("\n"),
+      EVENT_SCHEMA,
+      "hardship_event",
+    );
+    return {
+      title: String(parsed["title"] ?? "").trim(),
+      date: String(parsed["date"] ?? "").slice(0, 10),
+      categories: normList(parsed["categories"]),
+      people: normList(parsed["people"]),
+      description: String(parsed["description"] ?? "").trim(),
+      effectOnAciah: String(parsed["effectOnAciah"] ?? "").trim(),
+      effectOnFamily: String(parsed["effectOnFamily"] ?? "").trim(),
+      followUp: String(parsed["followUp"] ?? "").trim(),
+      amount: Number(parsed["amount"]) || 0,
+      currency: String(parsed["currency"] ?? "").trim(),
+      missing: normList(parsed["missing"]),
     };
   });
+
+const ASK_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["answer", "recordIds", "gaps"],
+  properties: {
+    answer: { type: "string", description: "Plain factual answer built only from the records" },
+    recordIds: {
+      type: "array",
+      items: { type: "string" },
+      description: "Ids of the records that support the answer",
+    },
+    gaps: {
+      type: "array",
+      items: { type: "string" },
+      description: "What is missing from the stored records to answer fully",
+    },
+  },
+} as const;
+
+export interface AskAnswer {
+  answer: string;
+  recordIds: string[];
+  gaps: string[];
+}
+
+/** Answers a question using only the case records passed in from the app. */
+export const askEvidence = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    return {
+      question: String(d["question"] ?? ""),
+      records: String(d["records"] ?? ""),
+    };
+  })
+  .handler(async ({ data }): Promise<AskAnswer> => {
+    if (!data.records.trim()) {
+      return { answer: "There are no records stored in the case yet.", recordIds: [], gaps: [] };
+    }
+    const parsed = await runJson(
+      [
+        "Answer the question using ONLY the case records listed below. This is a US I-601 extreme-hardship waiver case for Imran and Aciah (US citizen spouse); Jibril is their son. Separation began 2026-08-18.",
+        "Never add facts, dates, diagnoses or amounts that are not in the records. If the records do not answer the question, say so plainly and list what is missing in `gaps`.",
+        "Cite the record ids you used in `recordIds`.",
+        `Question: ${data.question}`,
+        "Records:",
+        data.records.slice(0, 120_000),
+      ].join("\n"),
+      ASK_SCHEMA,
+      "ask_evidence",
+    );
+    return {
+      answer: String(parsed["answer"] ?? "").trim(),
+      recordIds: normList(parsed["recordIds"]),
+      gaps: normList(parsed["gaps"]),
+    };
+  });
+
