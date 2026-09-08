@@ -156,10 +156,7 @@ export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
                     {f.recurring ? " · monthly" : ""} · edited {formatDateTime(f.updatedAt)} by{" "}
                     {f.lastEditedBy}
                   </p>
-                  <LinkedEvidenceChips
-                    ids={f.evidenceIds ?? []}
-                    onEdit={() => setLinkFor(f.id)}
-                  />
+                  <LinkedEvidenceChips ids={f.evidenceIds ?? []} onEdit={() => setLinkFor(f.id)} />
                 </div>
                 <div className="shrink-0 text-right">
                   <span className="block font-mono text-sm font-semibold">

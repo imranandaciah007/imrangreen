@@ -43,14 +43,20 @@ export function TimelineView({
   const separation = caseSettings.separationStartDate;
   const elapsed = monthsBetween(separation, new Date());
 
-  const sinceEvents = useMemo(() => events.filter((e) => e.date >= separation), [events, separation]);
+  const sinceEvents = useMemo(
+    () => events.filter((e) => e.date >= separation),
+    [events, separation],
+  );
   const filtered = useMemo(() => {
     return [...events]
       .filter((e) =>
         range === "since" ? e.date >= separation : range === "before" ? e.date < separation : true,
       )
       .filter((e) => (person ? (e.people ?? []).includes(person) : true))
-      .filter((e) => (category ? e.category === category : true))
+      .filter((e) =>
+        category ? (e.categories?.length ? e.categories : [e.category]).includes(category) : true,
+      )
+
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [events, range, person, category, separation]);
 
@@ -172,11 +178,10 @@ export function TimelineView({
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground">{e.title}</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">{e.category}</p>
-                {e.description && <p className="mt-1 text-xs text-foreground/80">{e.description}</p>}
-                <LinkedEvidenceChips
-                  ids={e.evidenceIds ?? []}
-                  onEdit={() => setLinkFor(e.id)}
-                />
+                {e.description && (
+                  <p className="mt-1 text-xs text-foreground/80">{e.description}</p>
+                )}
+                <LinkedEvidenceChips ids={e.evidenceIds ?? []} onEdit={() => setLinkFor(e.id)} />
                 <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
                   {(e.people ?? []).join(", ")} · Last edited {formatDateTime(e.updatedAt)} by{" "}
                   {e.lastEditedBy}

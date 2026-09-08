@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { CircleDot, CloudCog, Plus, ShieldCheck } from "lucide-react";
+import { CircleDot, CloudCog, MessagesSquare, Plus, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BottomNav, mainTabs, type MainTab } from "@/components/evidence/BottomNav";
 import { CategoryPanel } from "@/components/evidence/CategoryPanel";
+import { AskEvidenceDialog } from "@/components/evidence/AskEvidence";
 import { CommandPalette } from "@/components/evidence/CommandPalette";
 import { ConnectDriveDialog } from "@/components/evidence/ConnectDriveDialog";
 import { EvidenceTable } from "@/components/evidence/EvidenceTable";
@@ -60,6 +61,7 @@ function CaseApp() {
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const [uploadCategory, setUploadCategory] = useState<string | undefined>(undefined);
   const [editItem, setEditItem] = useState<EvidenceItem | null>(null);
 
@@ -107,6 +109,14 @@ function CaseApp() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 border-navy-foreground/25 bg-transparent text-xs text-navy-foreground hover:bg-navy-foreground/12 hover:text-navy-foreground"
+            onClick={() => setAskOpen(true)}
+          >
+            <MessagesSquare className="size-3.5" /> Ask
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -226,6 +236,7 @@ function CaseApp() {
       />
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
       <EventDialog open={eventOpen} onOpenChange={setEventOpen} />
+      <AskEvidenceDialog open={askOpen} onOpenChange={setAskOpen} />
       <TaskDialog open={taskOpen} onOpenChange={setTaskOpen} />
       <BottomNav tab={tab} onTab={setTab} onAdd={() => setAddOpen(true)} />
     </div>

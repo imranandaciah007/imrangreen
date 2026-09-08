@@ -229,7 +229,10 @@ export function EvidenceTable({ onEdit }: { onEdit: (item: EvidenceItem) => void
                   )}
                 </td>
                 <td className="max-w-0 px-2 py-1.5">
-                  <button onClick={() => openInspector(item.id)} className="block w-full min-w-0 text-left">
+                  <button
+                    onClick={() => openInspector(item.id)}
+                    className="block w-full min-w-0 text-left"
+                  >
                     <span className="block truncate font-medium text-foreground">{item.title}</span>
                     <span className="block truncate font-mono text-[10px] text-muted-foreground">
                       {item.fileName} · {item.fileType} · edited {formatDateTime(item.updatedAt)} by{" "}

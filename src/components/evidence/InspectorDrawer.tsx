@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  CheckSquare,
   ExternalLink,
   FileText,
   History,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { formatBytes, formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { TAGS, type EvidenceItem } from "@/lib/evidence/types";
+import { toast } from "sonner";
 import { StatusSelect, TagChip } from "./status-ui";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -48,6 +50,8 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
     extractingIds,
     confirmExtractionField,
     dismissExtractionField,
+    addTask,
+    profile,
   } = useEvidence();
   const item = items.find((i) => i.id === inspectorId) ?? null;
   const [notes, setNotes] = useState("");
@@ -118,6 +122,23 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                   <Sparkles className="size-3.5" />
                   {extractingIds.includes(item.id) ? "Reading…" : "Read with AI"}
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-xs"
+                  onClick={() => {
+                    addTask({
+                      title: `Follow up: ${item.title}`,
+                      category: item.category,
+                      dueDate: "",
+                      done: false,
+                      assignedTo: profile,
+                    });
+                    toast.success("Task created", { description: `Follow up: ${item.title}` });
+                  }}
+                >
+                  <CheckSquare className="size-3.5" /> Create task
+                </Button>
               </div>
 
               <div className="rounded-lg border border-border bg-secondary/40 p-3">
@@ -126,8 +147,8 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                 </p>
                 {!item.aiExtraction ? (
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    Not read yet. “Read with AI” scans the document twice and only fills in what both
-                    scans agree on — anything uncertain is asked below.
+                    Not read yet. “Read with AI” scans the document twice and only fills in what
+                    both scans agree on — anything uncertain is asked below.
                   </p>
                 ) : (
                   <div className="mt-2 space-y-2">
@@ -147,9 +168,7 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                       </p>
                     )}
                     {item.aiExtraction.uncertain.length === 0 ? (
-                      <p className="text-[11px] text-muted-foreground">
-                        Nothing left to confirm.
-                      </p>
+                      <p className="text-[11px] text-muted-foreground">Nothing left to confirm.</p>
                     ) : (
                       <ul className="space-y-2">
                         {item.aiExtraction.uncertain.map((u) => (
@@ -188,9 +207,6 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                   </div>
                 )}
               </div>
-
-
-
 
               <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-secondary/60 text-muted-foreground">
                 <FileText className="size-8 opacity-50" />

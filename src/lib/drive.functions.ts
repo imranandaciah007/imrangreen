@@ -27,8 +27,7 @@ export const listDriveFiles = createServerFn({ method: "GET" }).handler(async ()
   for (let page = 0; page < 20; page += 1) {
     const params = new URLSearchParams({
       q: "trashed = false",
-      fields:
-        "nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,parents)",
+      fields: "nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,parents)",
       pageSize: "1000",
       orderBy: "modifiedTime desc",
     });

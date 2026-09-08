@@ -30,7 +30,6 @@ import {
   type Tag,
 } from "./types";
 
-
 export type SortKey =
   "exhibitId" | "title" | "category" | "status" | "pageCount" | "dateOfDocument" | "fileSizeBytes";
 
@@ -121,7 +120,6 @@ interface EvidenceContextValue {
   confirmExtractionField: (id: string, field: string, value: string) => void;
   dismissExtractionField: (id: string, field: string) => void;
 
-
   connection: ProviderConnection | null;
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
   exhibitGroups: string[];
@@ -177,7 +175,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [profileChosen, setProfileChosen] = useState(false);
   const [extractingIds, setExtractingIds] = useState<string[]>([]);
   const hydrated = useRef(false);
-
 
   useEffect(() => {
     let cancelled = false;
@@ -546,7 +543,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     toast.success("Expense deleted");
   }, []);
 
-
   const addTask = useCallback(
     (draft: NewRecord<CaseTask>) => {
       setTasks((prev) => [...prev, { ...stamp(draft), id: rid("task") }]);
@@ -621,6 +617,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         language: result.language,
         applied,
         uncertain: result.uncertain,
+        passes: result.passes as unknown as Record<string, unknown>[] | undefined,
       };
       patch.status = result.uncertain.length > 0 ? "Needs confirmation" : "Reviewed";
       if (result.summary && !item.notes.trim()) patch.notes = result.summary;
@@ -690,26 +687,30 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     });
   }, [applyPatch, categories, items, runOne, selectedIds]);
 
-  const applyConfirmed = useCallback(
-    (item: EvidenceItem, field: string, value: string) => {
-      const patch: Partial<EvidenceItem> = {};
-      if (field === "title") patch.title = value;
-      if (field === "documentDate") patch.dateOfDocument = value;
-      if (field === "sourceType" && (SOURCE_TYPES as readonly string[]).includes(value))
-        patch.sourceType = value as SourceType;
-      if (field === "pageCount") patch.pageCount = Math.max(1, Number(value) || 1);
-      if (field === "people") patch.people = value.split(",").map((v) => v.trim()).filter(Boolean);
-      if (field === "categories") {
-        const list = value.split(",").map((v) => v.trim()).filter(Boolean);
-        if (list.length) {
-          patch.categories = list;
-          patch.category = list[0]!;
-        }
+  const applyConfirmed = useCallback((item: EvidenceItem, field: string, value: string) => {
+    const patch: Partial<EvidenceItem> = {};
+    if (field === "title") patch.title = value;
+    if (field === "documentDate") patch.dateOfDocument = value;
+    if (field === "sourceType" && (SOURCE_TYPES as readonly string[]).includes(value))
+      patch.sourceType = value as SourceType;
+    if (field === "pageCount") patch.pageCount = Math.max(1, Number(value) || 1);
+    if (field === "people")
+      patch.people = value
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+    if (field === "categories") {
+      const list = value
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      if (list.length) {
+        patch.categories = list;
+        patch.category = list[0]!;
       }
-      return patch;
-    },
-    [],
-  );
+    }
+    return patch;
+  }, []);
 
   const resolveField = useCallback(
     (id: string, field: string, value: string | null) => {
@@ -720,14 +721,12 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       patch.aiExtraction = {
         ...item.aiExtraction,
         uncertain: remaining,
-        applied: value ? [...item.aiExtraction.applied, `${field} (confirmed)`] : item.aiExtraction.applied,
+        applied: value
+          ? [...item.aiExtraction.applied, `${field} (confirmed)`]
+          : item.aiExtraction.applied,
       };
       if (remaining.length === 0 && item.status === "Needs confirmation") patch.status = "Reviewed";
-      applyPatch(
-        [id],
-        patch,
-        value ? `Confirmed ${field}: ${value}` : `Left ${field} as it was`,
-      );
+      applyPatch([id], patch, value ? `Confirmed ${field}: ${value}` : `Left ${field} as it was`);
     },
     [applyConfirmed, applyPatch, items],
   );
@@ -740,8 +739,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     (id: string, field: string) => resolveField(id, field, null),
     [resolveField],
   );
-
-
 
   const connectDrive = useCallback(
     (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => {
