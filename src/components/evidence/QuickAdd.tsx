@@ -1,3 +1,4 @@
+import { BookOpenText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   CalendarPlus,
@@ -64,6 +65,7 @@ export function AddSheet({
   onExpense,
   onEvent,
   onTask,
+  onDiary,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -71,12 +73,14 @@ export function AddSheet({
   onExpense: () => void;
   onEvent: () => void;
   onTask: () => void;
+  onDiary: () => void;
 }) {
   const actions = [
     { label: "Upload evidence", icon: UploadCloud, run: onUpload },
     { label: "Add expense", icon: Coins, run: onExpense },
     { label: "Add hardship event", icon: CalendarPlus, run: onEvent },
     { label: "Add task", icon: CheckSquare, run: onTask },
+    { label: "Import hardship diary", icon: BookOpenText, run: onDiary },
   ];
 
   return (

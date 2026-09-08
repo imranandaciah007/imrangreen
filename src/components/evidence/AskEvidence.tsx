@@ -49,6 +49,7 @@ export function AskEvidenceDialog({
         `tags=${i.tags.join("/")}`,
         i.affectsAciah ? `affectsAciah=${i.affectsAciah}` : "",
         i.notes ? `notes=${i.notes.slice(0, 400)}` : "",
+        i.isMasterDiary ? "sourceKind=hardship diary narrative (not independently confirmed)" : "",
       ]
         .filter(Boolean)
         .join(" | "),
@@ -62,6 +63,9 @@ export function AskEvidenceDialog({
         `people=${(e.people ?? []).join("/")}`,
         e.effectOnAciah ? `effectOnAciah=${e.effectOnAciah}` : "",
         e.description ? `detail=${e.description.slice(0, 400)}` : "",
+        e.diarySource
+          ? `sourceKind=hardship diary narrative, diary page ${e.diarySource.pages.join(",")}${(e.evidenceIds ?? []).length ? " (also has linked evidence)" : " (no independent evidence linked)"}`
+          : "",
         `evidence=${(e.evidenceIds ?? []).join(",")}`,
       ]
         .filter(Boolean)
@@ -69,7 +73,9 @@ export function AskEvidenceDialog({
     );
     const fin = finances.map(
       (f) =>
-        `EXPENSE ${f.id} | date=${f.date} | label=${f.label} | amount=${f.amount} ${f.currency} | kind=${f.kind} | evidence=${(f.evidenceIds ?? []).join(",")}`,
+        `EXPENSE ${f.id} | date=${f.date} | label=${f.label} | amount=${f.amount} ${f.currency} | kind=${f.kind} | evidence=${(f.evidenceIds ?? []).join(",")}${
+          f.amountMissing ? " | amountMissing=true" : ""
+        }${f.diarySource ? ` | sourceKind=hardship diary narrative, diary page ${f.diarySource.pages.join(",")}` : ""}`,
     );
     const tsk = tasks.map(
       (t) => `TASK ${t.id} | title=${t.title} | done=${t.done} | owner=${t.assignedTo}`,

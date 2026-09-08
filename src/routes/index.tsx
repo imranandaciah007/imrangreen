@@ -29,6 +29,7 @@ import { KanbanBoard } from "@/components/evidence/KanbanBoard";
 import { ProfileGate } from "@/components/evidence/ProfileGate";
 import { AddSheet, EventDialog, ExpenseDialog, TaskDialog } from "@/components/evidence/QuickAdd";
 import { TimelineView } from "@/components/evidence/TimelineView";
+import { DiaryImportDialog } from "@/components/evidence/DiaryImportDialog";
 import { UploadDialog } from "@/components/evidence/UploadDialog";
 import { EvidenceStoreProvider, useEvidence } from "@/lib/evidence/store";
 import { PROFILES, type EvidenceItem, type Profile } from "@/lib/evidence/types";
@@ -66,6 +67,7 @@ function CaseApp() {
   const [taskOpen, setTaskOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [packetOpen, setPacketOpen] = useState(false);
+  const [diaryOpen, setDiaryOpen] = useState(false);
   const [uploadCategory, setUploadCategory] = useState<string | undefined>(undefined);
   const [editItem, setEditItem] = useState<EvidenceItem | null>(null);
 
@@ -247,7 +249,9 @@ function CaseApp() {
         onExpense={() => setExpenseOpen(true)}
         onEvent={() => setEventOpen(true)}
         onTask={() => setTaskOpen(true)}
+        onDiary={() => setDiaryOpen(true)}
       />
+      <DiaryImportDialog open={diaryOpen} onOpenChange={setDiaryOpen} />
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
       <EventDialog open={eventOpen} onOpenChange={setEventOpen} />
       <PacketBuilder open={packetOpen} onOpenChange={setPacketOpen} />
