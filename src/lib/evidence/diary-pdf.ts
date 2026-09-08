@@ -73,7 +73,9 @@ function installPdfCompatibility() {
         if (input instanceof ArrayBuffer) return input.slice(0);
         if (ArrayBuffer.isView(input)) {
           const view = input as ArrayBufferView;
-          const copied = view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
+          const bytes = new Uint8Array(view.byteLength);
+          bytes.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+          const copied = bytes.buffer;
           if (input instanceof DataView) return new DataView(copied);
           const Constructor = input.constructor as new (buffer: ArrayBuffer) => unknown;
           return new Constructor(copied);
