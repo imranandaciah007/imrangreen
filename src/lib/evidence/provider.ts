@@ -1,4 +1,4 @@
-import type { CaseTask, EvidenceItem, FinancialEntry, HardshipEvent } from "./types";
+import type { CaseTask, EvidenceItem, FinancialEntry, HardshipEvent, IncomeSettings } from "./types";
 
 /**
  * Storage abstraction layer.
