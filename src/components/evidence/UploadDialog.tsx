@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { FileUp, Loader2, Paperclip, Tags, UploadCloud } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FileUp, Loader2, Paperclip, Save, Tags, UploadCloud } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,10 +23,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatBytes } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import {
-  CATEGORIES,
   STATUSES,
   TAGS,
   type Category,
+  type EvidenceItem,
   type EvidenceStatus,
   type FileType,
   type Tag,
@@ -44,19 +44,24 @@ function fileTypeOf(name: string): FileType {
 export function UploadDialog({
   open,
   onOpenChange,
+  initialCategory,
+  editItem,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  initialCategory?: string | undefined;
+  editItem?: EvidenceItem | null;
 }) {
-  const { addItem, items } = useEvidence();
+  const { addItem, updateItem, items, categories } = useEvidence();
   const inputRef = useRef<HTMLInputElement>(null);
+  const editing = !!editItem;
 
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("");
   const [exhibitId, setExhibitId] = useState("");
-  const [category, setCategory] = useState<Category>(CATEGORIES[0]);
+  const [category, setCategory] = useState<Category>(initialCategory ?? categories[0] ?? "General");
   const [subCategory, setSubCategory] = useState("");
   const [status, setStatus] = useState<EvidenceStatus>("Draft");
   const [pageCount, setPageCount] = useState("1");
@@ -65,24 +70,41 @@ export function UploadDialog({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // Load the dialog state whenever it opens (fresh upload or edit).
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setFile(null);
+    if (editItem) {
+      setTitle(editItem.title);
+      setExhibitId(editItem.exhibitId);
+      setCategory(editItem.category);
+      setSubCategory(editItem.subCategory);
+      setStatus(editItem.status);
+      setPageCount(String(editItem.pageCount));
+      setDateOfDocument(editItem.dateOfDocument.slice(0, 10));
+      setTags([...editItem.tags]);
+      setNotes(editItem.notes);
+    } else {
+      setTitle("");
+      setExhibitId("");
+      setCategory(initialCategory ?? categories[0] ?? "General");
+      setSubCategory("");
+      setStatus("Draft");
+      setPageCount("1");
+      setDateOfDocument("");
+      setTags([]);
+      setNotes("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editItem?.id, initialCategory]);
+
   const suggestedExhibit = useMemo(() => {
     const n = items.filter((i) => i.category === category).length + 1;
-    const letter = String.fromCharCode(65 + CATEGORIES.indexOf(category));
+    const idx = Math.max(0, categories.indexOf(category));
+    const letter = String.fromCharCode(65 + (idx % 26));
     return `Exhibit ${letter}-${n}`;
-  }, [items, category]);
-
-  function reset() {
-    setFile(null);
-    setTitle("");
-    setExhibitId("");
-    setSubCategory("");
-    setStatus("Draft");
-    setPageCount("1");
-    setDateOfDocument("");
-    setTags([]);
-    setNotes("");
-    setError(null);
-  }
+  }, [items, category, categories]);
 
   function pick(next: File | null) {
     if (!next) return;
@@ -92,7 +114,7 @@ export function UploadDialog({
   }
 
   async function submit() {
-    if (!file) {
+    if (!editing && !file) {
       setError("Attach a document file first.");
       return;
     }
@@ -102,26 +124,50 @@ export function UploadDialog({
     }
     setSaving(true);
     try {
-      await addItem(
-        {
-          exhibitId: exhibitId.trim() || suggestedExhibit,
-          fileName: file.name,
-          title: title.trim(),
-          category,
-          subCategory: subCategory.trim() || "General",
-          fileType: fileTypeOf(file.name),
-          fileSizeBytes: file.size,
-          pageCount: Math.max(1, Number(pageCount) || 1),
-          status,
-          dateOfDocument: dateOfDocument || new Date().toISOString().slice(0, 10),
-          tags,
-          cloudDriveUrl: "",
-          translationFileUrl: undefined,
-          notes: notes.trim(),
-        },
-        file,
-      );
-      reset();
+      const common = {
+        exhibitId: exhibitId.trim() || suggestedExhibit,
+        title: title.trim(),
+        category,
+        subCategory: subCategory.trim() || "General",
+        pageCount: Math.max(1, Number(pageCount) || 1),
+        status,
+        dateOfDocument: dateOfDocument || new Date().toISOString().slice(0, 10),
+        tags,
+        notes: notes.trim(),
+      };
+
+      if (editing && editItem) {
+        updateItem(
+          editItem.id,
+          {
+            ...common,
+            ...(file
+              ? {
+                  fileName: file.name,
+                  fileType: fileTypeOf(file.name),
+                  fileSizeBytes: file.size,
+                  cloudDriveUrl:
+                    typeof URL !== "undefined" && URL.createObjectURL
+                      ? URL.createObjectURL(file)
+                      : editItem.cloudDriveUrl,
+                }
+              : {}),
+          },
+          `${common.exhibitId} updated`,
+        );
+      } else if (file) {
+        await addItem(
+          {
+            ...common,
+            fileName: file.name,
+            fileType: fileTypeOf(file.name),
+            fileSizeBytes: file.size,
+            cloudDriveUrl: "",
+            translationFileUrl: undefined,
+          },
+          file,
+        );
+      }
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -129,21 +175,17 @@ export function UploadDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) reset();
-        onOpenChange(v);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <UploadCloud className="size-4" /> Add evidence document
+            {editing ? <Save className="size-4" /> : <UploadCloud className="size-4" />}
+            {editing ? "Edit evidence document" : "Add evidence document"}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            The file, exhibit number, category and tags are filed together and the summary bar
-            updates immediately.
+            {editing
+              ? "Change any detail, or attach a replacement file. The summary bar updates immediately."
+              : "The file, exhibit number, category and tags are filed together and the summary bar updates immediately."}
           </DialogDescription>
         </DialogHeader>
 
@@ -171,6 +213,16 @@ export function UploadDialog({
                 <p className="font-mono text-xs font-semibold text-foreground">{file.name}</p>
                 <p className="text-[11px] text-muted-foreground">
                   {fileTypeOf(file.name)} · {formatBytes(file.size)} · click to replace
+                </p>
+              </>
+            ) : editing && editItem ? (
+              <>
+                <p className="font-mono text-xs font-semibold text-foreground">
+                  {editItem.fileName}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {editItem.fileType} · {formatBytes(editItem.fileSizeBytes)} · click to replace the
+                  file
                 </p>
               </>
             ) : (
@@ -214,12 +266,12 @@ export function UploadDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Category</Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
+              <Select value={category} onValueChange={(v) => setCategory(v)}>
                 <SelectTrigger className="text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => (
+                  {categories.map((c) => (
                     <SelectItem key={c} value={c} className="text-xs">
                       {c}
                     </SelectItem>
@@ -328,7 +380,7 @@ export function UploadDialog({
             ) : (
               <Paperclip className="size-3.5" />
             )}
-            File document
+            {editing ? "Save changes" : "File document"}
           </Button>
         </DialogFooter>
       </DialogContent>
