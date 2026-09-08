@@ -237,8 +237,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
   const categories = useMemo(() => {
     const set = new Set<Category>([...CATEGORIES, ...customCategories, ...items.map((i) => i.category)]);
-    return Array.from(set);
-  }, [customCategories, items]);
+    const used = new Set(items.map((i) => i.category));
+    return Array.from(set).filter((c) => used.has(c) || !hiddenCategories.includes(c));
+  }, [customCategories, hiddenCategories, items]);
+
 
   const addCategory = useCallback(
     (name: string) => {
