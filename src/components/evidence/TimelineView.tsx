@@ -50,7 +50,12 @@ export function TimelineView({
         range === "since" ? e.date >= separation : range === "before" ? e.date < separation : true,
       )
       .filter((e) => (person ? (e.people ?? []).includes(person) : true))
-      .filter((e) => (category ? e.category === category : true))
+      .filter((e) =>
+        category
+          ? (e.categories?.length ? e.categories : [e.category]).includes(category)
+          : true,
+      )
+
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [events, range, person, category, separation]);
 
