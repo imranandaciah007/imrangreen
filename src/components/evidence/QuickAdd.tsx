@@ -1026,11 +1026,16 @@ export function TaskDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { addTask, categories, profile } = useEvidence();
+  const { addTask, categories, profile, items } = useEvidence();
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [category, setCategory] = useState("");
   const [assignedTo, setAssignedTo] = useState<string>(profile);
+  const [status, setStatus] = useState<TaskStatus>("To do");
+  const [priority, setPriority] = useState<TaskPriority>("Normal");
+  const [notes, setNotes] = useState("");
+  const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -1038,11 +1043,15 @@ export function TaskDialog({
     setDueDate("");
     setCategory("");
     setAssignedTo(profile);
+    setStatus("To do");
+    setPriority("Normal");
+    setNotes("");
+    setEvidenceIds([]);
   }, [open, profile]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">Add task</DialogTitle>
           <DialogDescription className="text-xs">
@@ -1050,6 +1059,21 @@ export function TaskDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Quick pick</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {TASK_TEMPLATES.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTitle(t)}
+                  className="rounded-full border border-border bg-secondary/50 px-2.5 py-1.5 text-[11px] text-foreground"
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Task</Label>
             <Input
@@ -1084,6 +1108,36 @@ export function TaskDialog({
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
+                <SelectTrigger className="h-11 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s} className="text-xs">
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Priority</Label>
+              <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+                <SelectTrigger className="h-11 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_PRIORITIES.map((s) => (
+                    <SelectItem key={s} value={s} className="text-xs">
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Category (optional)</Label>
@@ -1106,6 +1160,30 @@ export function TaskDialog({
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Notes (optional)</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Linked evidence</Label>
+            <Button
+              variant="outline"
+              className="h-11 w-full justify-start text-xs"
+              onClick={() => setPickerOpen(true)}
+            >
+              {evidenceIds.length
+                ? `${evidenceIds.length} linked (${evidenceIds
+                    .map((id) => items.find((i) => i.id === id)?.exhibitId)
+                    .filter(Boolean)
+                    .join(", ")})`
+                : "Link evidence"}
+            </Button>
+          </div>
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" className="h-11" onClick={() => onOpenChange(false)}>
@@ -1115,14 +1193,31 @@ export function TaskDialog({
             className="h-11"
             onClick={() => {
               if (!title.trim()) return;
-              addTask({ title: title.trim(), dueDate, category, assignedTo, done: false });
+              addTask({
+                title: title.trim(),
+                dueDate,
+                category,
+                assignedTo,
+                done: status === "Complete",
+                status,
+                priority,
+                notes: notes.trim(),
+                evidenceIds,
+              });
               onOpenChange(false);
             }}
           >
             Save task
           </Button>
         </DialogFooter>
+        <EvidencePicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          selected={evidenceIds}
+          onChange={setEvidenceIds}
+        />
       </DialogContent>
     </Dialog>
   );
 }
+
