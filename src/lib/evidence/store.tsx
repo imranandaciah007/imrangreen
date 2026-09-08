@@ -209,7 +209,96 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     [selectedIds],
   );
 
+  const deleteItem = useCallback((id: string) => {
+    setItems((prev) => {
+      const gone = prev.find((i) => i.id === id);
+      if (gone) toast.success(`${gone.exhibitId} deleted`, { description: gone.title });
+      return prev.filter((i) => i.id !== id);
+    });
+    setSelectedIds((prev) => prev.filter((s) => s !== id));
+    setInspectorId((prev) => (prev === id ? null : prev));
+    void documentProvider.remove([id]);
+  }, []);
+
+  const bulkDelete = useCallback(() => {
+    if (selectedIds.length === 0) {
+      toast.error("Select at least one exhibit first");
+      return;
+    }
+    const ids = [...selectedIds];
+    setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
+    setSelectedIds([]);
+    setInspectorId((prev) => (prev && ids.includes(prev) ? null : prev));
+    void documentProvider.remove(ids);
+    toast.success(`${ids.length} exhibit(s) deleted`);
+  }, [selectedIds]);
+
+  const categories = useMemo(() => {
+    const set = new Set<Category>([...CATEGORIES, ...customCategories, ...items.map((i) => i.category)]);
+    return Array.from(set);
+  }, [customCategories, items]);
+
+  const addCategory = useCallback(
+    (name: string) => {
+      const clean = name.trim();
+      if (!clean) return;
+      if (categories.some((c) => c.toLowerCase() === clean.toLowerCase())) {
+        toast.error(`"${clean}" already exists`);
+        return;
+      }
+      setCustomCategories((prev) => [...prev, clean]);
+      toast.success(`Category "${clean}" added`);
+    },
+    [categories],
+  );
+
+  const renameCategory = useCallback((from: string, to: string) => {
+    const clean = to.trim();
+    if (!clean || clean === from) return;
+    setCustomCategories((prev) => {
+      const next = prev.filter((c) => c !== from);
+      return [...next, clean];
+    });
+    setItems((prev) =>
+      prev.map((item) =>
+        item.category === from
+          ? {
+              ...item,
+              category: clean,
+              auditTrail: [...item.auditTrail, auditEntry(`Category renamed to ${clean}`)],
+            }
+          : item,
+      ),
+    );
+    setFiltersState((prev) => ({
+      ...prev,
+      categories: prev.categories.map((c) => (c === from ? clean : c)),
+    }));
+    toast.success(`Category renamed to "${clean}"`);
+  }, []);
+
+  const deleteCategory = useCallback(
+    (name: string) => {
+      const used = items.filter((i) => i.category === name).length;
+      if (used > 0) {
+        toast.error(`"${name}" still holds ${used} document(s)`, {
+          description: "Move or delete those documents first.",
+        });
+        return;
+      }
+      setCustomCategories((prev) => prev.filter((c) => c !== name));
+      setFiltersState((prev) => ({ ...prev, categories: prev.categories.filter((c) => c !== name) }));
+      if (CATEGORIES.includes(name)) {
+        toast.success(`"${name}" hidden`, { description: "Built-in categories reappear on reload." });
+      } else {
+        toast.success(`Category "${name}" deleted`);
+      }
+    },
+    [items],
+  );
+
   const connectDrive = useCallback(
+
     (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => {
       void documentProvider.connect(config).then((conn) => {
         setConnection(conn);
