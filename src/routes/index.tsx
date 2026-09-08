@@ -137,7 +137,9 @@ function CaseApp() {
                   <CircleDot
                     className={`size-2.5 shrink-0 ${connection?.connected ? "text-success" : "text-destructive"}`}
                   />
-                  {connection?.connected ? "Drive connected" : "Drive disconnected"}
+                  {connection?.lastSyncedAt
+                    ? `Drive synced ${new Date(connection.lastSyncedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`
+                    : "Drive not synced"}
                 </p>
               </div>
             </div>
@@ -158,8 +160,8 @@ function CaseApp() {
                 size="icon"
                 className="hidden size-10 sm:inline-flex"
                 onClick={() => setConnectOpen(true)}
-                aria-label="Google Drive"
-                title="Google Drive"
+                aria-label="Sync Drive"
+                title="Sync Drive"
               >
                 <CloudCog className="size-4" />
               </Button>
@@ -187,16 +189,21 @@ function CaseApp() {
           <p className="py-20 text-center text-sm text-muted-foreground">Loading case…</p>
         ) : (
           <>
-            {!connection?.connected && (
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
-                <span className="min-w-0 font-semibold text-foreground">
-                  Google Drive is not connected — files added now are held on this device only.
-                </span>
-                <Button size="sm" className="h-9 shrink-0" onClick={() => setConnectOpen(true)}>
-                  Connect
-                </Button>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 shadow-sm">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold text-foreground">
+                  {connection?.lastSyncedAt ? "Drive is up to date" : "Bring in your Drive evidence"}
+                </p>
+                <p className="truncate text-[10px] font-medium text-muted-foreground">
+                  Last synced: {connection?.lastSyncedAt
+                    ? new Date(connection.lastSyncedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+                    : "Never"}
+                </p>
               </div>
-            )}
+              <Button size="sm" className="h-10 shrink-0" onClick={() => setConnectOpen(true)}>
+                <CloudCog className="size-4" /> Sync Drive
+              </Button>
+            </div>
 
             {tab === "home" && (
               <HomeView onNavigate={(t) => setTab(t)} onBuildPacket={() => setPacketOpen(true)} />
