@@ -1250,7 +1250,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       ...detectGaps(items, events, finances, tasks, categories),
       ...detectDiaryGaps(diaryImports, items),
     ],
-    [items, events, finances, tasks, categories],
+    [items, events, finances, tasks, categories, diaryImports],
   );
 
   const coverage = useMemo(
