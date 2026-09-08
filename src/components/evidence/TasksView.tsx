@@ -1,4 +1,5 @@
-import { CheckCircle2, Clock, ListTodo, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, BellRing, CheckCircle2, Clock, ListTodo, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,13 @@ import {
 import { formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { TASK_STATUSES, taskStatus, type CaseTask, type TaskStatus } from "@/lib/evidence/types";
+import {
+  NOTIFICATION_PERMISSION_EVENT,
+  notificationPermission,
+  reminderFromInput,
+  reminderInputValue,
+  requestReminderPermission,
+} from "@/lib/task-reminders";
 
 const COLUMNS: { status: TaskStatus; icon: typeof ListTodo }[] = [
   { status: "To do", icon: ListTodo },
@@ -22,6 +30,18 @@ const COLUMNS: { status: TaskStatus; icon: typeof ListTodo }[] = [
 export function TasksView({ onAddTask }: { onAddTask: () => void }) {
   const { tasks, updateTask, deleteTask, items, events, finances, openInspector } = useEvidence();
   const today = new Date().toISOString().slice(0, 10);
+  const [permission, setPermission] = useState(notificationPermission());
+
+  useEffect(() => {
+    const refresh = () => setPermission(notificationPermission());
+    window.addEventListener(NOTIFICATION_PERMISSION_EVENT, refresh);
+    return () => window.removeEventListener(NOTIFICATION_PERMISSION_EVENT, refresh);
+  }, []);
+
+  async function enableNotifications() {
+    const next = await requestReminderPermission();
+    setPermission(next);
+  }
 
   function linked(task: CaseTask) {
     const parts: string[] = [];
@@ -50,6 +70,28 @@ export function TasksView({ onAddTask }: { onAddTask: () => void }) {
           <Plus className="size-4" /> Add task
         </Button>
       </div>
+
+      {tasks.some((task) => !task.done) && permission !== "granted" && (
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-info/30 bg-info/10 p-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+              <Bell className="size-4 text-info" /> Turn on task notifications
+            </p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">
+              {permission === "denied"
+                ? "Notifications are blocked in this device's settings."
+                : permission === "unsupported"
+                  ? "This browser does not support local notifications. Reminders still appear here."
+                  : "GC will remind you at the time saved on each open task."}
+            </p>
+          </div>
+          {permission === "default" && (
+            <Button size="sm" className="h-10 shrink-0" onClick={() => void enableNotifications()}>
+              Enable
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-3 lg:grid-cols-3">
         {COLUMNS.map(({ status, icon: Icon }) => {
@@ -147,6 +189,24 @@ export function TasksView({ onAddTask }: { onAddTask: () => void }) {
                             </SelectContent>
                           </Select>
                         </div>
+                        {status !== "Complete" && (
+                          <label className="mt-2 block">
+                            <span className="mb-1 flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
+                              <BellRing className="size-3" /> Reminder
+                            </span>
+                            <input
+                              type="datetime-local"
+                              value={reminderInputValue(task.reminderAt)}
+                              onChange={(event) =>
+                                updateTask(task.id, {
+                                  reminderAt: reminderFromInput(event.target.value),
+                                  reminderNotifiedAt: undefined,
+                                })
+                              }
+                              className="h-10 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                            />
+                          </label>
+                        )}
                         <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
                           Last edited: {formatDateTime(task.updatedAt)}
                         </p>

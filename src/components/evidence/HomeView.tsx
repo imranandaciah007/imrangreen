@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  BellRing,
   CalendarClock,
   ChevronRight,
   CheckSquare,
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatDate } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
+import { isOpenTask } from "@/lib/task-reminders";
 
 function Metric({
   label,
@@ -57,7 +59,11 @@ export function HomeView({
 }) {
   const { stats, caseSettings, tasks, events, gaps } = useEvidence();
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  const openTasks = tasks.filter((t) => !t.done).slice(0, 4);
+  const openTasks = tasks.filter(isOpenTask).slice(0, 4);
+  const upcomingReminders = tasks
+    .filter((task) => isOpenTask(task) && task.reminderAt)
+    .sort((a, b) => String(a.reminderAt).localeCompare(String(b.reminderAt)))
+    .slice(0, 3);
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
 
   return (
@@ -109,6 +115,32 @@ export function HomeView({
           icon={<Coins className="size-3.5" />}
         />
       </div>
+
+      <Button
+        variant="ghost"
+        className="h-auto w-full items-start justify-start rounded-xl border border-border bg-card p-4 text-left shadow-panel hover:bg-accent/30"
+        onClick={() => onNavigate("review")}
+      >
+        <BellRing className="mt-0.5 size-5 shrink-0 text-primary" />
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-base font-extrabold text-foreground">Task reminders</span>
+          {upcomingReminders.length === 0 ? (
+            <span className="mt-1 block text-xs font-normal text-muted-foreground">No open reminders.</span>
+          ) : (
+            <span className="mt-1 grid gap-1">
+              {upcomingReminders.map((task) => (
+                <span key={task.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 text-xs">
+                  <span className="truncate font-bold text-foreground">{task.title}</span>
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                    {new Date(String(task.reminderAt)).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                  </span>
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
+        <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+      </Button>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,.55fr)]">
         <section className="rounded-xl border border-border bg-card p-4 shadow-panel sm:p-5">
