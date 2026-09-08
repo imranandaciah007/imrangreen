@@ -621,6 +621,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         language: result.language,
         applied,
         uncertain: result.uncertain,
+        passes: result.passes as unknown as Record<string, unknown>[] | undefined,
+
       };
       patch.status = result.uncertain.length > 0 ? "Needs confirmation" : "Reviewed";
       if (result.summary && !item.notes.trim()) patch.notes = result.summary;
