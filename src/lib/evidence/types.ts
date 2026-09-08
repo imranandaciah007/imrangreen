@@ -145,11 +145,40 @@ export interface EvidenceItem {
   affectsAciah?: string | undefined;
   /** Id of the exhibit this may duplicate (never deleted automatically). */
   duplicateOfId?: string | undefined;
+  /** Stable packet exhibit number, assigned when a packet version is generated. */
+  packetExhibitNo?: string | undefined;
+  /** Kept in the vault but left out of the generated packet. */
+  excludeFromPacket?: boolean | undefined;
   createdBy: string;
   lastEditedBy: string;
   createdAt: string;
   updatedAt: string;
   auditTrail: AuditEntry[];
+}
+
+/** Immutable record of one generated case packet. */
+export interface PacketVersion {
+  id: string;
+  version: number;
+  generatedAt: string;
+  generatedBy: string;
+  sourceLastEditedAt: string | null;
+  exhibitCount: number;
+  pageCount: number;
+  sections: string[];
+  totals: {
+    documented: number;
+    sentToAciah: number;
+    jibril: number;
+    medical: number;
+    housing: number;
+    immigration: number;
+  };
+  timelineEventCount: number;
+  unresolvedIssues: number;
+  driveFolder: string;
+  files: { name: string; driveFileId?: string | undefined; webViewLink?: string | undefined }[];
+  exhibitMap: { evidenceId: string; number: string; pages: string }[];
 }
 
 export const EVENT_STATUSES = ["Recorded", "Needs evidence", "Confirmed", "Resolved"] as const;

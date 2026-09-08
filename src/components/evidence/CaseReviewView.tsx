@@ -29,7 +29,13 @@ const COVERAGE_STYLE: Record<string, string> = {
   "Needs supporting evidence": "border-destructive/40 bg-destructive/10 text-foreground",
 };
 
-export function CaseReviewView({ onAddTask }: { onAddTask: () => void }) {
+export function CaseReviewView({
+  onAddTask,
+  onBuildPacket,
+}: {
+  onAddTask: () => void;
+  onBuildPacket: () => void;
+}) {
   const {
     stats,
     gaps,
@@ -88,6 +94,9 @@ export function CaseReviewView({ onAddTask }: { onAddTask: () => void }) {
 
   return (
     <div className="space-y-4">
+      <Button className="h-11 w-full" onClick={onBuildPacket}>
+        Build case packet
+      </Button>
       <div>
         <h2 className="text-sm font-semibold text-foreground">Case review</h2>
         <p className="text-[11px] text-muted-foreground">

@@ -13,6 +13,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BottomNav, mainTabs, type MainTab } from "@/components/evidence/BottomNav";
 import { CaseReviewView } from "@/components/evidence/CaseReviewView";
+import { PacketBuilder } from "@/components/evidence/PacketBuilder";
 import { CategoryPanel } from "@/components/evidence/CategoryPanel";
 
 import { AskEvidenceDialog } from "@/components/evidence/AskEvidence";
@@ -64,6 +65,7 @@ function CaseApp() {
   const [eventOpen, setEventOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
+  const [packetOpen, setPacketOpen] = useState(false);
   const [uploadCategory, setUploadCategory] = useState<string | undefined>(undefined);
   const [editItem, setEditItem] = useState<EvidenceItem | null>(null);
 
@@ -169,7 +171,9 @@ function CaseApp() {
               </div>
             )}
 
-            {tab === "home" && <HomeView onNavigate={(t) => setTab(t)} />}
+            {tab === "home" && (
+              <HomeView onNavigate={(t) => setTab(t)} onBuildPacket={() => setPacketOpen(true)} />
+            )}
 
             {tab === "timeline" && (
               <TimelineView
@@ -180,7 +184,12 @@ function CaseApp() {
 
             {tab === "finances" && <FinancesView onAddExpense={() => setExpenseOpen(true)} />}
 
-            {tab === "review" && <CaseReviewView onAddTask={() => setTaskOpen(true)} />}
+            {tab === "review" && (
+              <CaseReviewView
+                onAddTask={() => setTaskOpen(true)}
+                onBuildPacket={() => setPacketOpen(true)}
+              />
+            )}
 
 
             {tab === "vault" && (
@@ -241,6 +250,7 @@ function CaseApp() {
       />
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
       <EventDialog open={eventOpen} onOpenChange={setEventOpen} />
+      <PacketBuilder open={packetOpen} onOpenChange={setPacketOpen} />
       <AskEvidenceDialog open={askOpen} onOpenChange={setAskOpen} />
       <TaskDialog open={taskOpen} onOpenChange={setTaskOpen} />
       <BottomNav tab={tab} onTab={setTab} onAdd={() => setAddOpen(true)} />

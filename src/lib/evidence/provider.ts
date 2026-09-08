@@ -1,4 +1,11 @@
-import type { CaseTask, EvidenceItem, FinancialEntry, HardshipEvent, IncomeSettings } from "./types";
+import type {
+  CaseTask,
+  EvidenceItem,
+  FinancialEntry,
+  HardshipEvent,
+  IncomeSettings,
+  PacketVersion,
+} from "./types";
 
 /**
  * Storage abstraction layer.
@@ -21,6 +28,7 @@ export interface CaseRecords {
   tasks: CaseTask[];
   categories: string[];
   income?: IncomeSettings | undefined;
+  packets?: PacketVersion[] | undefined;
 }
 
 export interface DocumentProvider {
