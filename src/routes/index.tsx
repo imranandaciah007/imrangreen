@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { CircleDot, CloudCog, MessagesSquare, Plus, ShieldCheck } from "lucide-react";
+import { Bell, ChevronDown, HelpCircle, Plus, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -85,12 +85,10 @@ function CaseApp() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 lg:grid lg:grid-cols-[88px_minmax(0,1fr)] lg:pb-0">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[88px] flex-col items-center border-r border-sidebar-border bg-sidebar px-2 py-5 lg:flex">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary font-display text-lg font-extrabold text-primary-foreground shadow-panel">
-          GC
-        </div>
-        <nav className="mt-7 flex w-full flex-col gap-2" aria-label="Primary navigation">
+    <div className="case-shell min-h-screen bg-background pb-24 lg:grid lg:grid-cols-[228px_minmax(0,1fr)] lg:pb-0">
+      <aside className="case-sidebar fixed inset-y-0 left-0 z-40 hidden w-[228px] flex-col lg:flex">
+        <div className="case-brand"><span>GC</span><strong>CASE PORTAL</strong></div>
+        <nav className="mt-7 flex w-full flex-col gap-1.5 px-3" aria-label="Primary navigation">
           {mainTabs.map((item) => {
             const Icon = item.icon;
             const active = tab === item.id;
@@ -100,10 +98,10 @@ function CaseApp() {
                 variant="ghost"
                 onClick={() => setTab(item.id)}
                 aria-current={active ? "page" : undefined}
-                className={`h-14 w-full flex-col gap-1 px-1 text-[10px] font-bold ${
+                className={`case-side-link h-11 w-full justify-start gap-3 px-4 text-sm font-extrabold ${
                   active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                    ? "case-side-link-active"
+                    : "text-white/60 hover:bg-white/5 hover:text-white"
                 }`}
               >
                 <Icon className="size-5" />
@@ -112,62 +110,42 @@ function CaseApp() {
             );
           })}
         </nav>
-        <Button
-          size="icon"
-          className="mt-auto size-12 rounded-xl shadow-panel"
-          onClick={() => setAddOpen(true)}
-          aria-label="Add to case"
-          title="Add to case"
-        >
-          <Plus className="size-5" />
-        </Button>
+        <div className="case-sidebar-help"><HelpCircle /><strong>Need help?</strong><span>View our guide or contact support.</span><button>Get Support</button></div>
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
-        <header className="sticky top-0 z-30 border-b border-border bg-card/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-          <div className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 sm:flex sm:px-5 lg:min-h-20 lg:px-8">
+        <header className="case-topbar sticky top-0 z-30 pt-[env(safe-area-inset-top)]">
+          <div className="flex min-h-[76px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-9">
             <div className="flex min-w-0 items-center gap-3 sm:flex-1">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary font-display text-sm font-extrabold text-primary-foreground lg:hidden">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary font-display text-sm font-black text-navy lg:hidden">
                 GC
               </span>
               <div className="min-w-0">
-                <h1 className="truncate font-display text-base font-extrabold text-foreground sm:text-lg">
+                <h1 className="truncate font-display text-base font-black text-white sm:text-lg">
                   {caseSettings.caseName}
                 </h1>
-                <p className="mt-0.5 flex items-center gap-1.5 truncate text-[10px] font-bold text-muted-foreground">
-                  <CircleDot
-                    className={`size-2.5 shrink-0 ${connection?.connected ? "text-success" : "text-destructive"}`}
-                  />
-                  {connection?.lastSyncedAt
-                    ? `Drive synched ${new Date(connection.lastSyncedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`
-                    : "Drive not synched"}
+                <p className="mt-0.5 truncate text-[10px] font-bold text-white/50">
+                  Private Evidence Management System
                 </p>
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <div className="ml-auto hidden max-w-sm flex-1 items-center rounded-lg border border-white/10 bg-white/5 px-3 text-white/60 md:flex">
+              <Search className="size-4" /><button onClick={() => setAskOpen(true)} className="h-10 flex-1 text-left text-xs">Search evidence, tasks, notes...</button><kbd>⌘K</kbd>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
-                className="size-10"
+                className="size-10 text-white hover:bg-white/10 hover:text-white"
                 onClick={() => setAskOpen(true)}
                 aria-label="Ask my evidence"
                 title="Ask my evidence"
               >
-                <MessagesSquare className="size-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="hidden size-10 sm:inline-flex"
-                onClick={() => setConnectOpen(true)}
-                aria-label="Synch Drive"
-                title="Synch Drive"
-              >
-                <CloudCog className="size-4" />
+                <Bell className="size-4" />
               </Button>
               <Select value={profile} onValueChange={(v) => setProfile(v as Profile)}>
-                <SelectTrigger className="h-10 w-[92px] text-xs font-bold sm:w-[108px]">
+                <SelectTrigger className="h-10 w-[108px] border-white/10 bg-white/5 text-xs font-bold text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -178,36 +156,18 @@ function CaseApp() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button className="hidden h-10 sm:inline-flex" onClick={() => setAddOpen(true)}>
-                <Plus className="size-4" /> Add
-              </Button>
+              <ChevronDown className="hidden size-3 text-white/50" />
             </div>
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1480px] space-y-4 p-3 sm:p-5 lg:p-8">
+        <main className="mx-auto max-w-[1480px] space-y-4 p-3 sm:p-6 lg:p-9">
         {loading ? (
           <p className="py-20 text-center text-sm text-muted-foreground">Loading case…</p>
         ) : (
           <>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 shadow-sm">
-              <div className="min-w-0">
-                <p className="truncate text-xs font-bold text-foreground">
-                  {connection?.lastSyncedAt ? "Drive is up to date" : "Bring in your Drive evidence"}
-                </p>
-                <p className="truncate text-[10px] font-medium text-muted-foreground">
-                  Last synched: {connection?.lastSyncedAt
-                    ? new Date(connection.lastSyncedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
-                    : "Never"}
-                </p>
-              </div>
-              <Button size="sm" className="h-10 shrink-0" onClick={() => setConnectOpen(true)}>
-                <CloudCog className="size-4" /> Synch Drive
-              </Button>
-            </div>
-
             {tab === "home" && (
-              <HomeView onNavigate={(t) => setTab(t)} onBuildPacket={() => setPacketOpen(true)} />
+              <HomeView onNavigate={(t) => setTab(t)} onUpload={() => openUpload()} onAddTask={() => setTaskOpen(true)} onBuildPacket={() => setPacketOpen(true)} />
             )}
 
             {tab === "timeline" && (
