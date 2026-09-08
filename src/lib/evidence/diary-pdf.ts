@@ -27,14 +27,50 @@ export class PdfReaderInitializationError extends Error {
 
 const READER_ATTEMPTS = 3;
 
+/**
+ * Older iPhone/iPad browsers are missing a few newer JavaScript helpers the PDF
+ * reader expects. Adding them before the reader loads keeps the diary readable
+ * on phones as well as desktops.
+ */
+function installPdfCompatibility() {
+  const P = Promise as unknown as {
+    withResolvers?: () => { promise: Promise<unknown>; resolve: unknown; reject: unknown };
+  };
+  if (typeof P.withResolvers !== "function") {
+    P.withResolvers = function withResolvers() {
+      let resolve!: (value?: unknown) => void;
+      let reject!: (reason?: unknown) => void;
+      const promise = new Promise((res, rej) => {
+        resolve = res as typeof resolve;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+  }
+  const O = Object as unknown as { groupBy?: unknown };
+  if (typeof O.groupBy !== "function") {
+    O.groupBy = function groupBy<T>(items: Iterable<T>, keyOf: (item: T, index: number) => string) {
+      const out: Record<string, T[]> = Object.create(null);
+      let i = 0;
+      for (const item of items) {
+        const key = String(keyOf(item, i));
+        (out[key] ??= []).push(item);
+        i += 1;
+      }
+      return out;
+    };
+  }
+}
+
 async function initialisePdfReader(onRetry?: (attempt: number, total: number) => void) {
   let lastError: unknown;
+  installPdfCompatibility();
 
   for (let attempt = 1; attempt <= READER_ATTEMPTS; attempt += 1) {
     try {
       const [pdfjs, worker] = await Promise.all([
-        import("pdfjs-dist"),
-        import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+        import("pdfjs-dist/legacy/build/pdf.mjs"),
+        import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url"),
       ]);
       const workerSrc = (worker as { default?: string }).default;
       if (typeof pdfjs.getDocument !== "function" || !workerSrc) {
@@ -54,6 +90,7 @@ async function initialisePdfReader(onRetry?: (attempt: number, total: number) =>
   console.error("PDF reader initialization failed", lastError);
   throw new PdfReaderInitializationError();
 }
+
 
 /** Small stable fingerprint used to spot text that has already been imported. */
 export function hashText(text: string) {
