@@ -288,6 +288,10 @@ export interface FinancialEntry {
   excluded?: boolean | undefined;
   /** Monthly repeats are only generated up to a date the user confirms. */
   recurringUntil?: string | undefined;
+  createdBy: string;
+  lastEditedBy: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** UK income and fixed commitments — a factual summary, not a legal conclusion. */
