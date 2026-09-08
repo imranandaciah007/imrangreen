@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/diary-extract")({
           const { getDocumentProxy } = await import("unpdf");
           const pdf = await getDocumentProxy(bytes);
           if (pdf.numPages > MAX_PAGES) {
-            await pdf.destroy();
+            await pdf.cleanup();
             return jsonError(`This PDF has ${pdf.numPages} pages; the import limit is ${MAX_PAGES}.`, 413);
           }
 
@@ -57,7 +57,7 @@ export const Route = createFileRoute("/api/diary-extract")({
             pages.push({ page: pageNumber, text });
             page.cleanup();
           }
-          await pdf.destroy();
+          await pdf.cleanup();
 
           const chunks = chunkPages(pages);
           if (chunks.length === 0) {
