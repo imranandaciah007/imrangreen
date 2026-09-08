@@ -8,7 +8,7 @@
 - [x] Verify every primary navigation and action path
 - [x] Make Drive sync a one-step action with confirmation and last-sync status
 - [x] Add persistent local reminders and dashboard visibility for every open task
-- [x] Make the hardship diary PDF reader reliable on iPhone and advance after the final page
+- [x] Replace iPhone PDF reading with server-side diary extraction and preserve page references
 
 ## External limitation
 - Real Drive upload of originals depends on Drive write access; originals remain unchanged.

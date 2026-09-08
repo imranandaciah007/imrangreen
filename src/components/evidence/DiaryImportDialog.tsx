@@ -25,11 +25,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { analyseDiaryChunk, type DiaryChunkResult } from "@/lib/diary.functions";
-import {
-  chunkPages,
-  PdfReaderInitializationError,
-  readDiaryPages,
-} from "@/lib/evidence/diary-pdf";
+import type { DiaryChunk } from "@/lib/evidence/diary-pdf";
 import {
   planDiaryImport,
   type DiaryPlan,
@@ -39,7 +35,50 @@ import {
 import { useEvidence } from "@/lib/evidence/store";
 import { EXPENSE_CATEGORIES, PEOPLE } from "@/lib/evidence/types";
 
-type Phase = "pick" | "reading" | "reader-error" | "analysing" | "review" | "done";
+type Phase =
+  | "pick"
+  | "uploading"
+  | "extracting"
+  | "analysing"
+  | "cross-checking"
+  | "review"
+  | "error"
+  | "done";
+
+interface DiaryExtractionResponse {
+  pageCount: number;
+  chunks: DiaryChunk[];
+}
+
+function uploadDiaryForExtraction(
+  file: File,
+  onUploadProgress: (loaded: number, total: number) => void,
+  onUploaded: () => void,
+) {
+  return new Promise<DiaryExtractionResponse>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", "/api/diary-extract");
+    request.responseType = "json";
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) onUploadProgress(event.loaded, event.total);
+    });
+    request.upload.addEventListener("load", onUploaded);
+    request.addEventListener("load", () => {
+      const body = request.response as { error?: unknown } | DiaryExtractionResponse | null;
+      if (request.status >= 200 && request.status < 300 && body && "chunks" in body) {
+        resolve(body);
+        return;
+      }
+      const message = body && "error" in body ? String(body.error) : `Upload failed (${request.status}).`;
+      reject(new Error(message));
+    });
+    request.addEventListener("error", () => reject(new Error("The PDF upload was interrupted.")));
+    request.addEventListener("abort", () => reject(new Error("The PDF upload was cancelled.")));
+    const form = new FormData();
+    form.append("file", file, file.name);
+    request.send(form);
+  });
+}
 
 export function DiaryImportDialog({
   open,
@@ -64,7 +103,7 @@ export function DiaryImportDialog({
   const [makeTasks, setMakeTasks] = useState(true);
   const [failures, setFailures] = useState(0);
   const [summary, setSummary] = useState<ReturnType<typeof describe> | null>(null);
-  const [readerError, setReaderError] = useState("");
+  const [importError, setImportError] = useState("");
 
   const previousKeys = useMemo(() => diaryImports.flatMap((d) => d.recordKeys), [diaryImports]);
   const previousHashes = useMemo(
@@ -81,31 +120,30 @@ export function DiaryImportDialog({
     setFailures(0);
     setSkipped(0);
     setSummary(null);
-    setReaderError("");
+    setImportError("");
   }
 
   async function run(selected: File) {
     setFile(selected);
-    setReaderError("");
-    setPhase("reading");
+    setImportError("");
+    setPhase("uploading");
+    setProgress({ done: 0, total: selected.size, label: "Uploading PDF" });
     try {
-      const pages = await readDiaryPages(
+      const extraction = await uploadDiaryForExtraction(
         selected,
-        (done, total) =>
-          setProgress({ done, total, label: `Reading page ${done} of ${total}` }),
-        (attempt, total) =>
-          setProgress({
-            done: attempt,
-            total,
-            label: `PDF reader did not start — retrying automatically (${attempt} of ${total})`,
-          }),
+        (done, total) => setProgress({ done, total, label: "Uploading PDF" }),
+        () => {
+          setPhase("extracting");
+          setProgress({ done: 0, total: 0, label: "Extracting pages" });
+        },
       );
-      setPagesAnalysed(pages.length);
-      const allChunks = chunkPages(pages);
+      setPagesAnalysed(extraction.pageCount);
+      const allChunks = extraction.chunks;
       const fresh = allChunks.filter((c) => !previousHashes.has(c.hash));
       setSkipped(allChunks.length - fresh.length);
       setChunkHashes(allChunks.map((c) => c.hash));
       setPhase("analysing");
+      setProgress({ done: 0, total: fresh.length, label: "Analysing diary" });
 
       const results: DiaryChunkResult[] = [];
       let failed = 0;
@@ -135,13 +173,15 @@ export function DiaryImportDialog({
             setProgress({
               done,
               total,
-              label: `Double-checking pages — section ${done} of ${total}`,
+              label: `Analysing diary — section ${done} of ${total}`,
             });
           }
         }
       });
       await Promise.all(workers);
       setFailures(failed);
+      setPhase("cross-checking");
+      setProgress({ done: total, total, label: "Cross-checking" });
 
       const built = planDiaryImport(results, {
         items,
@@ -158,17 +198,10 @@ export function DiaryImportDialog({
       setPhase("review");
     } catch (error) {
       console.error(error);
-      if (error instanceof PdfReaderInitializationError) {
-        setReaderError(
-          "The PDF reader could not start after three attempts. Your file has not been changed. Retry below, or reload the app and try again.",
-        );
-        setPhase("reader-error");
-        return;
-      }
-      toast.error("Could not read the diary", {
-        description: error instanceof Error ? error.message.slice(0, 160) : "Please try again.",
-      });
-      setPhase("pick");
+      const message = error instanceof Error ? error.message : "The server could not extract this PDF.";
+      setImportError(message);
+      setPhase("error");
+      toast.error("Could not import the diary", { description: message.slice(0, 200) });
     }
   }
 
@@ -300,7 +333,7 @@ export function DiaryImportDialog({
           </div>
         )}
 
-        {(phase === "reading" || phase === "analysing") && (
+        {(["uploading", "extracting", "analysing", "cross-checking"] as Phase[]).includes(phase) && (
           <div className="space-y-3 py-6 text-center">
             <Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" />
             <p className="text-sm font-medium">{progress.label || "Working…"}</p>
@@ -309,20 +342,21 @@ export function DiaryImportDialog({
               className="h-2"
             />
             <p className="text-[11px] text-muted-foreground">
-              {phase === "reading"
-                ? "Reading the diary on this device."
-                : "Each section is read twice and the two readings are compared."}
+              {phase === "uploading" && "Sending an unchanged copy securely for processing."}
+              {phase === "extracting" && "The server is reading each page and preserving its page number."}
+              {phase === "analysing" && "Each section is being read twice."}
+              {phase === "cross-checking" && "Comparing both readings before review."}
             </p>
           </div>
         )}
 
-        {phase === "reader-error" && (
+        {phase === "error" && (
           <div className="space-y-3">
             <div className="flex items-start gap-2 rounded-md border border-destructive/35 bg-destructive/10 p-3">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
               <div>
-                <p className="text-sm font-semibold">PDF reader unavailable</p>
-                <p className="mt-1 text-xs text-muted-foreground">{readerError}</p>
+                <p className="text-sm font-semibold">Diary extraction failed</p>
+                <p className="mt-1 text-xs text-muted-foreground">{importError}</p>
               </div>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -333,7 +367,7 @@ export function DiaryImportDialog({
                   if (file) void run(file);
                 }}
               >
-                Retry PDF reader
+                Retry import
               </Button>
               <Button variant="outline" className="h-11" onClick={() => reset()}>
                 Choose another PDF
@@ -344,6 +378,7 @@ export function DiaryImportDialog({
 
         {phase === "review" && plan && stats && (
           <>
+            <p className="text-xs font-semibold text-emerald-700">Ready to review</p>
             <ScrollArea className="max-h-[52vh] pr-3">
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
