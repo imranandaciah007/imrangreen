@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiDiaryExtractRouteImport } from './routes/api/diary-extract'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDiaryExtractRoute = ApiDiaryExtractRouteImport.update({
+  id: '/api/diary-extract',
+  path: '/api/diary-extract',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/diary-extract': typeof ApiDiaryExtractRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/diary-extract': typeof ApiDiaryExtractRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/diary-extract': typeof ApiDiaryExtractRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/diary-extract'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/diary-extract'
+  id: '__root__' | '/' | '/api/diary-extract'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiDiaryExtractRoute: typeof ApiDiaryExtractRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/diary-extract': {
+      id: '/api/diary-extract'
+      path: '/api/diary-extract'
+      fullPath: '/api/diary-extract'
+      preLoaderRoute: typeof ApiDiaryExtractRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiDiaryExtractRoute: ApiDiaryExtractRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

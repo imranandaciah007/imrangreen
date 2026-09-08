@@ -23,9 +23,6 @@ export default defineConfig({
         "react-dom/client",
         "react/jsx-runtime",
         "react/jsx-dev-runtime",
-        "pdfjs-dist",
-        "pdfjs-dist/legacy/build/pdf.mjs",
-        "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
       ],
     },
     resolve: {
