@@ -291,12 +291,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         return;
       }
       setCustomCategories((prev) => prev.filter((c) => c !== name));
+      setHiddenCategories((prev) => (prev.includes(name) ? prev : [...prev, name]));
       setFiltersState((prev) => ({ ...prev, categories: prev.categories.filter((c) => c !== name) }));
-      if (CATEGORIES.includes(name)) {
-        toast.success(`"${name}" hidden`, { description: "Built-in categories reappear on reload." });
-      } else {
-        toast.success(`Category "${name}" deleted`);
-      }
+      toast.success(`Category "${name}" removed`);
+
     },
     [items],
   );
