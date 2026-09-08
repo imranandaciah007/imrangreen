@@ -7,10 +7,10 @@ import { STAGES, stageForStatus, statusForStage, type Stage } from "@/lib/eviden
 import { StatusBadge, TagChip } from "./status-ui";
 
 const stageHint: Record<Stage, string> = {
-  Draft: "Collected, not yet processed",
-  "Needs Translation": "Awaiting certified translation",
-  "Legal Review": "With counsel for sufficiency review",
-  "Ready for Master Binder": "Cleared for the final packet",
+  New: "Just added, not yet checked",
+  "Needs confirmation": "Details or supporting evidence to confirm",
+  Reviewed: "Checked by Imran or Aciah",
+  Ready: "Ready for the case packet",
 };
 
 export function KanbanBoard() {
