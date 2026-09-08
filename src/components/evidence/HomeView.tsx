@@ -1,17 +1,17 @@
 import {
   AlertTriangle,
   CalendarClock,
+  ChevronRight,
   CheckSquare,
-  CircleHelp,
   Coins,
   FileStack,
   FileText,
-  Layers,
   ShieldCheck,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { formatDate, formatDateTime } from "@/lib/evidence/format";
+import { formatDate } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 
 function Metric({
@@ -27,23 +27,24 @@ function Metric({
   icon: React.ReactNode;
   onClick?: (() => void) | undefined;
 }) {
-  const Tag = onClick ? "button" : "div";
   return (
-    <Tag
-      {...(onClick ? { type: "button" as const, onClick } : {})}
-      className={`rounded-xl border border-border bg-card p-3.5 text-left shadow-panel ${
-        onClick ? "transition-colors hover:border-primary/60 hover:bg-accent/40" : ""
-      }`}
+    <Button
+      type="button"
+      variant="ghost"
+      onClick={onClick}
+      className="h-auto min-h-28 w-full flex-col items-stretch justify-between rounded-lg border border-border bg-card p-4 text-left shadow-panel transition-all hover:border-primary/40 hover:bg-accent/30"
     >
-      <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-        {icon}
-        <span className="truncate">{label}</span>
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-xs font-extrabold text-muted-foreground">{label}</span>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
+          {icon}
+        </span>
       </div>
-      <div className="mt-1.5 font-mono text-2xl leading-none font-semibold text-foreground">
-        {value}
+      <div>
+        <div className="font-display text-3xl leading-none font-extrabold text-foreground">{value}</div>
+        {hint && <div className="mt-1 text-[11px] font-medium text-muted-foreground">{hint}</div>}
       </div>
-      {hint && <div className="mt-1 text-[11px] text-muted-foreground">{hint}</div>}
-    </Tag>
+    </Button>
   );
 }
 
@@ -60,22 +61,25 @@ export function HomeView({
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
 
   return (
-    <div className="space-y-4">
-      <button
-        type="button"
-        onClick={onBuildPacket}
-        className="flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3.5 text-left transition-colors hover:bg-primary/15"
-      >
-        <FileText className="size-5 shrink-0 text-primary" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-foreground">Build case packet</span>
-          <span className="block text-[11px] text-muted-foreground">
-            Check the case, number the exhibits and export the bundle
+    <div className="space-y-4 sm:space-y-5">
+      <section className="grid gap-3 rounded-xl border border-border bg-card p-4 shadow-panel sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <FileText className="size-5" />
           </span>
-        </span>
-      </button>
+          <div className="min-w-0">
+            <h2 className="font-display text-lg font-extrabold text-foreground">Case packet</h2>
+            <p className="text-xs text-muted-foreground">
+              Review gaps, number exhibits and prepare the current case bundle.
+            </p>
+          </div>
+        </div>
+        <Button className="h-10 w-full sm:w-auto" onClick={onBuildPacket}>
+          Open packet builder <ChevronRight className="size-4" />
+        </Button>
+      </section>
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4 xl:gap-4">
         <Metric
           label="Exhibits"
           onClick={() => onNavigate("vault")}
@@ -98,107 +102,63 @@ export function HomeView({
           icon={<AlertTriangle className="size-3.5" />}
         />
         <Metric
-          label={`Cost since ${formatDate(caseSettings.separationStartDate)}`}
+          label="Separation costs"
           onClick={() => onNavigate("finances")}
           value={gbp(stats.financialImpact)}
-          hint="Recorded separation costs"
+          hint={`Since ${formatDate(caseSettings.separationStartDate)}`}
           icon={<Coins className="size-3.5" />}
-        />
-        <Metric
-          label="Timeline events"
-          onClick={() => onNavigate("timeline")}
-          value={String(stats.timelineEvents)}
-          icon={<CalendarClock className="size-3.5" />}
-        />
-        <Metric
-          label="Open tasks"
-          onClick={() => onNavigate("review")}
-          value={String(stats.openTasks)}
-          icon={<CheckSquare className="size-3.5" />}
-        />
-        <Metric
-          label="Total pages"
-          value={stats.totalPages.toLocaleString()}
-          icon={<Layers className="size-3.5" />}
-        />
-        <Metric
-          label="Last edited"
-          value={stats.lastEditedAt ? formatDate(stats.lastEditedAt) : "—"}
-          hint={stats.lastEditedAt ? formatDateTime(stats.lastEditedAt) : "Nothing recorded yet"}
-          icon={<CircleHelp className="size-3.5" />}
         />
       </div>
 
-      <section className="rounded-xl border border-border bg-card p-3.5 shadow-panel">
-        <h2 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-          Hardship coverage
-        </h2>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          How completely each category is organised and reviewed. This is an organisation measure
-          only — it says nothing about the outcome of the case.
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2.5 md:grid-cols-2 xl:grid-cols-3">
-          {stats.byCategory.map((row) => (
-            <div key={row.category}>
-              <div className="flex items-baseline justify-between gap-2 text-[11px]">
-                <span className="truncate font-medium text-foreground">{row.category}</span>
-                <span className="shrink-0 font-mono text-muted-foreground">
-                  {row.ready}/{row.total}
-                </span>
-              </div>
-              <Progress value={row.percent} className="mt-1 h-1.5" />
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,.55fr)]">
+        <section className="rounded-xl border border-border bg-card p-4 shadow-panel sm:p-5">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <div className="min-w-0">
+              <h2 className="font-display text-base font-extrabold text-foreground">Hardship coverage</h2>
+              <p className="truncate text-[11px] text-muted-foreground">Organisation and review status by category</p>
             </div>
-          ))}
-        </div>
-      </section>
+            <Button variant="ghost" size="sm" onClick={() => onNavigate("review")}>Review</Button>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-2">
+            {stats.byCategory.slice(0, 8).map((row) => (
+              <div key={row.category}>
+                <div className="flex items-baseline justify-between gap-2 text-xs">
+                  <span className="min-w-0 truncate font-bold text-foreground">{row.category}</span>
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{row.ready}/{row.total}</span>
+                </div>
+                <Progress value={row.percent} className="mt-1.5 h-1.5" />
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <section
-          className="cursor-pointer rounded-xl border border-border bg-card p-3.5 shadow-panel"
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+        <Button
+          variant="ghost"
+          className="h-auto min-h-36 w-full flex-col items-stretch justify-start rounded-xl border border-border bg-card p-4 text-left shadow-panel hover:bg-accent/30"
           onClick={() => onNavigate("review")}
         >
-          <h2 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-            Open tasks
-          </h2>
+          <div className="flex items-center justify-between"><h2 className="font-display text-base font-extrabold">Open tasks</h2><CheckSquare className="size-4 text-destructive" /></div>
           {openTasks.length === 0 ? (
-            <p className="mt-2 text-xs text-muted-foreground">Nothing outstanding.</p>
+            <p className="mt-3 text-xs text-muted-foreground">Nothing outstanding.</p>
           ) : (
-            <ul className="mt-2 space-y-2">
-              {openTasks.map((t) => (
-                <li key={t.id} className="text-xs text-foreground">
-                  {t.title}
-                  <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">
-                    {t.assignedTo}
-                    {t.dueDate ? ` · due ${formatDate(t.dueDate)}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3 space-y-2">{openTasks.slice(0, 3).map((t) => <p key={t.id} className="truncate text-xs font-semibold">{t.title}</p>)}</div>
           )}
-        </section>
+        </Button>
 
-        <section
-          className="cursor-pointer rounded-xl border border-border bg-card p-3.5 shadow-panel"
+        <Button
+          variant="ghost"
+          className="h-auto min-h-36 w-full flex-col items-stretch justify-start rounded-xl border border-border bg-card p-4 text-left shadow-panel hover:bg-accent/30"
           onClick={() => onNavigate("timeline")}
         >
-          <h2 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-            Latest timeline entries
-          </h2>
+          <div className="flex items-center justify-between"><h2 className="font-display text-base font-extrabold">Recent timeline</h2><CalendarClock className="size-4 text-primary" /></div>
           {recentEvents.length === 0 ? (
-            <p className="mt-2 text-xs text-muted-foreground">No events recorded yet.</p>
+            <p className="mt-3 text-xs text-muted-foreground">No events recorded yet.</p>
           ) : (
-            <ul className="mt-2 space-y-2">
-              {recentEvents.map((e) => (
-                <li key={e.id} className="text-xs text-foreground">
-                  {e.title}
-                  <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">
-                    {formatDate(e.date)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3 space-y-2">{recentEvents.slice(0, 3).map((e) => <p key={e.id} className="truncate text-xs font-semibold">{e.title} <span className="font-mono text-[10px] text-muted-foreground">{formatDate(e.date)}</span></p>)}</div>
           )}
-        </section>
+        </Button>
+        </div>
       </div>
     </div>
   );

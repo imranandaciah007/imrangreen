@@ -25,8 +25,8 @@ export function BottomNav({
   const right = tabs.slice(2);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-6 items-end px-1 pt-1">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_var(--border)] backdrop-blur-xl lg:hidden">
+      <div className="mx-auto grid max-w-md grid-cols-6 items-end px-1 pt-1.5">
         {left.map((t) => (
           <TabButton key={t.id} t={t} active={tab === t.id} onClick={() => onTab(t.id)} />
         ))}
@@ -34,7 +34,7 @@ export function BottomNav({
           <button
             onClick={onAdd}
             aria-label="Add"
-            className="-mt-5 flex size-14 items-center justify-center rounded-full bg-navy text-navy-foreground shadow-lg active:scale-95"
+            className="-mt-5 flex size-14 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-panel transition-transform active:scale-95"
           >
             <Plus className="size-7" />
           </button>
@@ -61,8 +61,8 @@ function TabButton({
     <button
       onClick={onClick}
       className={cn(
-        "flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-medium",
-        active ? "text-navy" : "text-muted-foreground",
+        "flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-bold",
+        active ? "bg-accent/70 text-primary" : "text-muted-foreground",
       )}
     >
       <Icon className={cn("size-5", active && "stroke-[2.4]")} />

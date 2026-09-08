@@ -84,91 +84,116 @@ function CaseApp() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 lg:pb-0">
-      <header className="sticky top-0 z-30 border-b border-navy/40 bg-navy pt-[env(safe-area-inset-top)] text-navy-foreground shadow-sm">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 py-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-navy-foreground/20 bg-navy-foreground/10">
-            <ShieldCheck className="size-4.5 opacity-90" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-semibold tracking-tight">
-              {caseSettings.caseName}
-            </h1>
-            <p className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-[10px] text-navy-foreground/65">
-              <CircleDot
-                className={`size-2.5 ${connection?.connected ? "text-success" : "text-destructive"}`}
-              />
-              {connection?.connected
-                ? `Google Drive · ${connection.folderPath}`
-                : "Google Drive not connected"}
-            </p>
-          </div>
-          <Select value={profile} onValueChange={(v) => setProfile(v as Profile)}>
-            <SelectTrigger className="h-9 w-[104px] border-navy-foreground/25 bg-transparent text-xs text-navy-foreground">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PROFILES.map((p) => (
-                <SelectItem key={p} value={p} className="text-xs">
-                  {p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 border-navy-foreground/25 bg-transparent text-xs text-navy-foreground hover:bg-navy-foreground/12 hover:text-navy-foreground"
-            onClick={() => setAskOpen(true)}
-          >
-            <MessagesSquare className="size-3.5" /> Ask
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 border-navy-foreground/25 bg-transparent text-xs text-navy-foreground hover:bg-navy-foreground/12 hover:text-navy-foreground"
-            onClick={() => setConnectOpen(true)}
-          >
-            <CloudCog className="size-3.5" /> Drive
-          </Button>
-          <Button
-            size="sm"
-            className="hidden h-9 bg-navy-foreground text-xs font-semibold text-navy hover:bg-navy-foreground/90 lg:inline-flex"
-            onClick={() => setAddOpen(true)}
-          >
-            <Plus className="size-3.5" /> Add
-          </Button>
+    <div className="min-h-screen bg-background pb-24 lg:grid lg:grid-cols-[88px_minmax(0,1fr)] lg:pb-0">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[88px] flex-col items-center border-r border-sidebar-border bg-sidebar px-2 py-5 lg:flex">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary font-display text-lg font-extrabold text-primary-foreground shadow-panel">
+          GC
         </div>
-
-        <nav className="mx-auto hidden max-w-[1600px] gap-1 px-4 pb-2 lg:flex">
-          {mainTabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                tab === t.id
-                  ? "bg-navy-foreground text-navy"
-                  : "text-navy-foreground/75 hover:bg-navy-foreground/10"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <nav className="mt-7 flex w-full flex-col gap-2" aria-label="Primary navigation">
+          {mainTabs.map((item) => {
+            const Icon = item.icon;
+            const active = tab === item.id;
+            return (
+              <Button
+                key={item.id}
+                variant="ghost"
+                onClick={() => setTab(item.id)}
+                aria-current={active ? "page" : undefined}
+                className={`h-14 w-full flex-col gap-1 px-1 text-[10px] font-bold ${
+                  active
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                }`}
+              >
+                <Icon className="size-5" />
+                {item.label}
+              </Button>
+            );
+          })}
         </nav>
-      </header>
+        <Button
+          size="icon"
+          className="mt-auto size-12 rounded-xl shadow-panel"
+          onClick={() => setAddOpen(true)}
+          aria-label="Add to case"
+          title="Add to case"
+        >
+          <Plus className="size-5" />
+        </Button>
+      </aside>
 
-      <main className="mx-auto max-w-[1600px] space-y-4 p-3 lg:p-6">
+      <div className="min-w-0 lg:col-start-2">
+        <header className="sticky top-0 z-30 border-b border-border bg-card/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+          <div className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 sm:flex sm:px-5 lg:min-h-20 lg:px-8">
+            <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary font-display text-sm font-extrabold text-primary-foreground lg:hidden">
+                GC
+              </span>
+              <div className="min-w-0">
+                <h1 className="truncate font-display text-base font-extrabold text-foreground sm:text-lg">
+                  {caseSettings.caseName}
+                </h1>
+                <p className="mt-0.5 flex items-center gap-1.5 truncate text-[10px] font-bold text-muted-foreground">
+                  <CircleDot
+                    className={`size-2.5 shrink-0 ${connection?.connected ? "text-success" : "text-destructive"}`}
+                  />
+                  {connection?.connected ? "Drive connected" : "Drive disconnected"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-10"
+                onClick={() => setAskOpen(true)}
+                aria-label="Ask my evidence"
+                title="Ask my evidence"
+              >
+                <MessagesSquare className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="hidden size-10 sm:inline-flex"
+                onClick={() => setConnectOpen(true)}
+                aria-label="Google Drive"
+                title="Google Drive"
+              >
+                <CloudCog className="size-4" />
+              </Button>
+              <Select value={profile} onValueChange={(v) => setProfile(v as Profile)}>
+                <SelectTrigger className="h-10 w-[92px] text-xs font-bold sm:w-[108px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROFILES.map((p) => (
+                    <SelectItem key={p} value={p} className="text-xs">
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button className="hidden h-10 sm:inline-flex" onClick={() => setAddOpen(true)}>
+                <Plus className="size-4" /> Add
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-[1480px] space-y-4 p-3 sm:p-5 lg:p-8">
         {loading ? (
           <p className="py-20 text-center text-sm text-muted-foreground">Loading case…</p>
         ) : (
           <>
             {!connection?.connected && (
-              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/12 px-3 py-2.5 text-xs">
-                <span className="font-medium text-foreground">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+                <span className="min-w-0 font-semibold text-foreground">
                   Google Drive is not connected — files added now are held on this device only.
                 </span>
-                <Button size="sm" className="h-9" onClick={() => setConnectOpen(true)}>
-                  Set up Drive
+                <Button size="sm" className="h-9 shrink-0" onClick={() => setConnectOpen(true)}>
+                  Connect
                 </Button>
               </div>
             )}
@@ -224,12 +249,13 @@ function CaseApp() {
               </div>
             )}
 
-            <p className="pt-2 text-center font-mono text-[10px] text-muted-foreground">
+            <p className="pt-2 text-center text-[10px] font-semibold text-muted-foreground">
               {stats.total} exhibits · {stats.totalPages} pages · signed in as {profile}
             </p>
           </>
         )}
-      </main>
+        </main>
+      </div>
 
       <ProfileGate />
       <InspectorDrawer onEdit={openEdit} />

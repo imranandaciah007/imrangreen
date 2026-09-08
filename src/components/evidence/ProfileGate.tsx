@@ -10,12 +10,15 @@ export function ProfileGate() {
   return (
     <Dialog open={!loading && !profileChosen}>
       <DialogContent
-        className="max-w-sm rounded-2xl [&>button]:hidden"
+        className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-sm [&>button]:hidden"
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle className="text-base">Who is using the app?</DialogTitle>
+          <div className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary font-display font-extrabold text-primary-foreground">
+            GC
+          </div>
+          <DialogTitle className="font-display text-lg font-extrabold">Who is using GC?</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
           {caseSettings.caseName}. Your choice is remembered on this device and recorded against
@@ -27,10 +30,10 @@ export function ProfileGate() {
               key={p}
               size="lg"
               variant={p === "Aciah" ? "default" : "outline"}
-              className="h-14 justify-start text-base"
+              className="h-14 justify-start text-base font-bold"
               onClick={() => setProfile(p)}
             >
-              <span className="mr-3 flex size-8 items-center justify-center rounded-full bg-navy text-sm font-semibold text-navy-foreground">
+              <span className="mr-3 flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-extrabold text-primary-foreground">
                 {p[0]}
               </span>
               {p}
