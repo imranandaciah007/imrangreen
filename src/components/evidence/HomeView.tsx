@@ -5,6 +5,7 @@ import {
   CircleHelp,
   Coins,
   FileStack,
+  FileText,
   Layers,
   ShieldCheck,
 } from "lucide-react";
