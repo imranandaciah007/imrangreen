@@ -566,6 +566,181 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const runOne = useCallback(
+    async (item: EvidenceItem, categoryList: Category[]) => {
+      const result = await extractDocument({
+        data: {
+          driveFileId: item.driveFileId ?? "",
+          fileName: item.fileName,
+          mimeType: item.mimeType ?? "application/pdf",
+          allowedCategories: categoryList,
+          allowedPeople: [...PEOPLE],
+          allowedSourceTypes: [...SOURCE_TYPES],
+          knownTitle: item.title,
+        },
+      });
+
+      const patch: Partial<EvidenceItem> = {};
+      const applied: string[] = [];
+      const a = result.agreed;
+      if (a.title) {
+        patch.title = a.title;
+        applied.push("title");
+      }
+      if (a.documentDate && /^\d{4}-\d{2}-\d{2}$/.test(a.documentDate)) {
+        patch.dateOfDocument = a.documentDate;
+        applied.push("date");
+      }
+      if (a.people?.length) {
+        patch.people = a.people;
+        applied.push("people");
+      }
+      if (a.categories?.length) {
+        const valid = a.categories.filter((c) => categoryList.includes(c));
+        if (valid.length) {
+          patch.categories = valid;
+          patch.category = valid[0]!;
+          applied.push("categories");
+        }
+      }
+      if (a.sourceType && (SOURCE_TYPES as readonly string[]).includes(a.sourceType)) {
+        patch.sourceType = a.sourceType as SourceType;
+        applied.push("source type");
+      }
+      if (a.pageCount && a.pageCount > 0) {
+        patch.pageCount = a.pageCount;
+        applied.push("pages");
+      }
+
+      patch.aiExtraction = {
+        ranAt: result.ranAt,
+        contentRead: result.contentRead,
+        summary: result.summary,
+        language: result.language,
+        applied,
+        uncertain: result.uncertain,
+      };
+      patch.status = result.uncertain.length > 0 ? "Needs confirmation" : "Reviewed";
+      if (result.summary && !item.notes.trim()) patch.notes = result.summary;
+
+      applyPatch(
+        [item.id],
+        patch,
+        result.uncertain.length
+          ? `AI read the document — ${result.uncertain.length} field(s) need confirmation`
+          : "AI read the document — verified by double scan",
+      );
+      return result;
+    },
+    [applyPatch],
+  );
+
+  const runExtraction = useCallback(
+    async (id: string) => {
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
+      setExtractingIds((prev) => [...prev, id]);
+      applyPatch([id], { status: "AI processing" }, "AI read started");
+      try {
+        const result = await runOne(item, categories);
+        if (result.uncertain.length) {
+          toast.warning(`${result.uncertain.length} field(s) need your confirmation`, {
+            description: item.fileName,
+          });
+        } else {
+          toast.success("Verified by double scan", { description: item.fileName });
+        }
+      } catch (error) {
+        applyPatch([id], { status: "Needs confirmation" }, "AI read failed");
+        toast.error("AI read failed", {
+          description: error instanceof Error ? error.message.slice(0, 160) : "Please try again.",
+        });
+      } finally {
+        setExtractingIds((prev) => prev.filter((x) => x !== id));
+      }
+    },
+    [applyPatch, categories, items, runOne],
+  );
+
+  const runExtractionForSelected = useCallback(async () => {
+    if (selectedIds.length === 0) {
+      toast.error("Select at least one document first");
+      return;
+    }
+    const queue = items.filter((i) => selectedIds.includes(i.id));
+    toast.info(`Reading ${queue.length} document(s) with AI…`);
+    let ok = 0;
+    let needs = 0;
+    for (const item of queue) {
+      setExtractingIds((prev) => [...prev, item.id]);
+      try {
+        const result = await runOne(item, categories);
+        ok += 1;
+        if (result.uncertain.length) needs += 1;
+      } catch {
+        applyPatch([item.id], { status: "Needs confirmation" }, "AI read failed");
+      } finally {
+        setExtractingIds((prev) => prev.filter((x) => x !== item.id));
+      }
+    }
+    toast.success(`AI read ${ok} document(s)`, {
+      description: needs ? `${needs} need your confirmation` : "All verified by double scan",
+    });
+  }, [applyPatch, categories, items, runOne, selectedIds]);
+
+  const applyConfirmed = useCallback(
+    (item: EvidenceItem, field: string, value: string) => {
+      const patch: Partial<EvidenceItem> = {};
+      if (field === "title") patch.title = value;
+      if (field === "documentDate") patch.dateOfDocument = value;
+      if (field === "sourceType" && (SOURCE_TYPES as readonly string[]).includes(value))
+        patch.sourceType = value as SourceType;
+      if (field === "pageCount") patch.pageCount = Math.max(1, Number(value) || 1);
+      if (field === "people") patch.people = value.split(",").map((v) => v.trim()).filter(Boolean);
+      if (field === "categories") {
+        const list = value.split(",").map((v) => v.trim()).filter(Boolean);
+        if (list.length) {
+          patch.categories = list;
+          patch.category = list[0]!;
+        }
+      }
+      return patch;
+    },
+    [],
+  );
+
+  const resolveField = useCallback(
+    (id: string, field: string, value: string | null) => {
+      const item = items.find((i) => i.id === id);
+      if (!item?.aiExtraction) return;
+      const remaining = item.aiExtraction.uncertain.filter((u) => u.field !== field);
+      const patch: Partial<EvidenceItem> = value ? applyConfirmed(item, field, value) : {};
+      patch.aiExtraction = {
+        ...item.aiExtraction,
+        uncertain: remaining,
+        applied: value ? [...item.aiExtraction.applied, `${field} (confirmed)`] : item.aiExtraction.applied,
+      };
+      if (remaining.length === 0 && item.status === "Needs confirmation") patch.status = "Reviewed";
+      applyPatch(
+        [id],
+        patch,
+        value ? `Confirmed ${field}: ${value}` : `Left ${field} as it was`,
+      );
+    },
+    [applyConfirmed, applyPatch, items],
+  );
+
+  const confirmExtractionField = useCallback(
+    (id: string, field: string, value: string) => resolveField(id, field, value),
+    [resolveField],
+  );
+  const dismissExtractionField = useCallback(
+    (id: string, field: string) => resolveField(id, field, null),
+    [resolveField],
+  );
+
+
+
   const connectDrive = useCallback(
     (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => {
       void documentProvider.connect(config).then((conn) => {
