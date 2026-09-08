@@ -463,6 +463,6 @@ export const analyseDiaryChunk = createServerFn({ method: "POST" })
       appendixRefs: [...refMap.values()],
       uncertainEvents,
       uncertainFinances,
-      passes: [a, b],
+      passes: [JSON.stringify(a), JSON.stringify(b)],
     };
   });
