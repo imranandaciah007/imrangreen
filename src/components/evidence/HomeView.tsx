@@ -49,9 +49,9 @@ function Metric({
 export function HomeView({
   onNavigate,
 }: {
-  onNavigate: (tab: "timeline" | "finances" | "vault") => void;
+  onNavigate: (tab: "timeline" | "finances" | "vault" | "review") => void;
 }) {
-  const { stats, caseSettings, tasks, events } = useEvidence();
+  const { stats, caseSettings, tasks, events, gaps } = useEvidence();
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const openTasks = tasks.filter((t) => !t.done).slice(0, 4);
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
@@ -74,9 +74,9 @@ export function HomeView({
           icon={<ShieldCheck className="size-3.5" />}
         />
         <Metric
-          label="Evidence gaps"
-          onClick={() => onNavigate("vault")}
-          value={String(stats.gaps)}
+          label="Unresolved gaps"
+          onClick={() => onNavigate("review")}
+          value={String(gaps.length)}
           hint={`${stats.missingTranslation} need translation`}
           icon={<AlertTriangle className="size-3.5" />}
         />
@@ -95,7 +95,7 @@ export function HomeView({
         />
         <Metric
           label="Open tasks"
-          onClick={() => onNavigate("timeline")}
+          onClick={() => onNavigate("review")}
           value={String(stats.openTasks)}
           icon={<CheckSquare className="size-3.5" />}
         />
@@ -138,7 +138,7 @@ export function HomeView({
       <div className="grid gap-3 lg:grid-cols-2">
         <section
           className="cursor-pointer rounded-xl border border-border bg-card p-3.5 shadow-panel"
-          onClick={() => onNavigate("timeline")}
+          onClick={() => onNavigate("review")}
         >
           <h2 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
             Open tasks
