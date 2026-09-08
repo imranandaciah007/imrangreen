@@ -367,7 +367,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       totalPages: items.reduce((sum, i) => sum + i.pageCount, 0),
       byCategory,
     };
-  }, [items]);
+  }, [items, categories]);
 
   const value: EvidenceContextValue = {
     loading,
