@@ -347,7 +347,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     const inReview = items.filter(
       (i) => i.status === "Draft" || i.status === "Certified Translation Added",
     ).length;
-    const byCategory = CATEGORIES.map((category) => {
+    const byCategory = categories.map((category) => {
       const rows = items.filter((i) => i.category === category);
       const readyRows = rows.filter((i) => READY_STATUSES.includes(i.status)).length;
       return {
