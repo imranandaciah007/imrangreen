@@ -91,6 +91,20 @@ export interface AuditEntry {
   action: string;
 }
 
+/** Result of an AI text-extraction run on a document. */
+export interface AiExtraction {
+  ranAt: string;
+  /** True when the AI read the actual file content (not just the file name). */
+  contentRead: boolean;
+  summary: string;
+  language: string;
+  /** Fields the two verification passes agreed on and that were applied. */
+  applied: string[];
+  /** Fields the passes disagreed on — the user must confirm these. */
+  uncertain: { field: string; options: string[] }[];
+}
+
+
 export interface EvidenceItem {
   id: string;
   exhibitId: string;
@@ -116,6 +130,8 @@ export interface EvidenceItem {
   needsTranslation?: boolean | undefined;
   duplicateSuspected?: boolean | undefined;
   aiConfidence?: number | undefined;
+  aiExtraction?: AiExtraction | undefined;
+
   notes: string;
   createdBy: string;
   lastEditedBy: string;
