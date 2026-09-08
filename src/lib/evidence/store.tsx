@@ -97,14 +97,24 @@ interface EvidenceContextValue {
 
   events: HardshipEvent[];
   addEvent: (draft: NewRecord<HardshipEvent>) => void;
+  updateEvent: (id: string, patch: Partial<HardshipEvent>) => void;
   deleteEvent: (id: string) => void;
   finances: FinancialEntry[];
   addFinance: (draft: NewRecord<FinancialEntry>) => void;
+  updateFinance: (id: string, patch: Partial<FinancialEntry>) => void;
   deleteFinance: (id: string) => void;
   tasks: CaseTask[];
   addTask: (draft: NewRecord<CaseTask>) => void;
   toggleTask: (id: string) => void;
   deleteTask: (id: string) => void;
+
+  /** AI text-extraction run for one document (two-pass verification). */
+  runExtraction: (id: string) => Promise<void>;
+  runExtractionForSelected: () => Promise<void>;
+  extractingIds: string[];
+  confirmExtractionField: (id: string, field: string, value: string) => void;
+  dismissExtractionField: (id: string, field: string) => void;
+
 
   connection: ProviderConnection | null;
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
