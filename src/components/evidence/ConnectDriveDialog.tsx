@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CloudCog, FolderSync, Loader2, ShieldCheck } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, CloudCog, FolderSync, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ export function ConnectDriveDialog({
   const { connection, connectDrive, importItems, profile } = useEvidence();
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
+  const startedForOpen = useRef(false);
 
   const syncNow = async () => {
     setSyncing(true);
@@ -97,12 +98,23 @@ export function ConnectDriveDialog({
     }
   };
 
+  useEffect(() => {
+    if (!open) {
+      startedForOpen.current = false;
+      return;
+    }
+    if (!startedForOpen.current) {
+      startedForOpen.current = true;
+      void syncNow();
+    }
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <CloudCog className="size-4" /> Google Drive sync
+            <CloudCog className="size-4" /> Synch Drive
           </DialogTitle>
           <DialogDescription className="text-xs">
             Your Google Drive account is linked. Sync scans it, imports each PDF, Word document or
@@ -121,7 +133,17 @@ export function ConnectDriveDialog({
           </div>
 
           {result && (
-            <div className="grid grid-cols-2 gap-2 text-center text-xs">
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/10 p-3">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                <div>
+                  <p className="text-sm font-bold text-foreground">Drive synched successfully</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Your latest Drive files have been checked and the case is up to date.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-center text-xs">
               <div className="rounded-md border border-border p-2">
                 <p className="text-lg font-semibold">{result.added}</p>
                 <p className="text-muted-foreground">New items imported</p>
@@ -138,11 +160,12 @@ export function ConnectDriveDialog({
                 <p className="text-lg font-semibold">{result.unsupported}</p>
                 <p className="text-muted-foreground">Unsupported files skipped</p>
               </div>
+              </div>
             </div>
           )}
 
           <p className="text-[11px] text-muted-foreground">
-            Last synced:{" "}
+            Last synched:{" "}
             {connection?.lastSyncedAt
               ? new Date(connection.lastSyncedAt).toLocaleString()
               : "never"}
@@ -165,7 +188,7 @@ export function ConnectDriveDialog({
             ) : (
               <FolderSync className="size-3.5" />
             )}
-            {syncing ? "Scanning Drive…" : "Sync from Google Drive"}
+            {syncing ? "Synching Drive…" : "Synch Drive again"}
           </Button>
         </DialogFooter>
       </DialogContent>

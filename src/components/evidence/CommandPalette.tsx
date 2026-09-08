@@ -89,13 +89,13 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
         <CommandSeparator />
         <CommandGroup heading="Storage">
           <CommandItem
-            value="connect drive folder google onedrive s3"
+            value="sync drive folder google"
             onSelect={() => {
               onConnectDrive();
               setOpen(false);
             }}
           >
-            Connect drive folder…
+            Synch Drive…
           </CommandItem>
         </CommandGroup>
       </CommandList>
