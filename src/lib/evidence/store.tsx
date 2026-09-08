@@ -51,7 +51,14 @@ interface EvidenceContextValue {
   bulkUpdate: (patch: Partial<EvidenceItem>, message: string) => void;
   bulkAssignPrefix: (prefix: string) => void;
   bulkAddTag: (tag: Tag) => void;
+  deleteItem: (id: string) => void;
+  bulkDelete: () => void;
+  categories: Category[];
+  addCategory: (name: string) => void;
+  renameCategory: (from: string, to: string) => void;
+  deleteCategory: (name: string) => void;
   connection: ProviderConnection | null;
+
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
   exhibitGroups: string[];
   stats: {
