@@ -7,6 +7,7 @@
 - [x] Scale navigation, panels and actions cleanly across phone and desktop
 - [x] Verify every primary navigation and action path
 - [x] Make Drive sync a one-step action with confirmation and last-sync status
+- [x] Add persistent local reminders and dashboard visibility for every open task
 
 ## External limitation
 - Real Drive upload of originals depends on Drive write access; originals remain unchanged.

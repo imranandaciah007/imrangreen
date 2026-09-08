@@ -36,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { extractReceipt, structureEvent, type ReceiptRead } from "@/lib/ai.functions";
 import { cn } from "@/lib/utils";
 import { useEvidence } from "@/lib/evidence/store";
+import { defaultReminderAt, reminderFromInput, reminderInputValue } from "@/lib/task-reminders";
 import {
   BENEFICIARIES,
   EVENT_STATUSES,
@@ -1034,6 +1035,7 @@ export function TaskDialog({
   const { addTask, categories, profile, items } = useEvidence();
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [reminderAt, setReminderAt] = useState(defaultReminderAt());
   const [category, setCategory] = useState("");
   const [assignedTo, setAssignedTo] = useState<string>(profile);
   const [status, setStatus] = useState<TaskStatus>("To do");
@@ -1046,6 +1048,7 @@ export function TaskDialog({
     if (!open) return;
     setTitle("");
     setDueDate("");
+    setReminderAt(defaultReminderAt());
     setCategory("");
     setAssignedTo(profile);
     setStatus("To do");
@@ -1094,7 +1097,10 @@ export function TaskDialog({
               <Input
                 type="date"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={(e) => {
+                  setDueDate(e.target.value);
+                  setReminderAt(defaultReminderAt(e.target.value));
+                }}
                 className="h-11 text-xs"
               />
             </div>
@@ -1143,6 +1149,18 @@ export function TaskDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Reminder</Label>
+            <Input
+              type="datetime-local"
+              value={reminderInputValue(reminderAt)}
+              onChange={(e) => setReminderAt(reminderFromInput(e.target.value) ?? "")}
+              className="h-11 text-xs"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              A notification will appear on this device after notifications are enabled.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Category (optional)</Label>
@@ -1206,6 +1224,7 @@ export function TaskDialog({
                 done: status === "Complete",
                 status,
                 priority,
+                reminderAt: reminderAt || defaultReminderAt(dueDate),
                 notes: notes.trim(),
                 evidenceIds,
               });

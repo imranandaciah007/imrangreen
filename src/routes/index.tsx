@@ -29,6 +29,7 @@ import { KanbanBoard } from "@/components/evidence/KanbanBoard";
 import { ProfileGate } from "@/components/evidence/ProfileGate";
 import { AddSheet, EventDialog, ExpenseDialog, TaskDialog } from "@/components/evidence/QuickAdd";
 import { TimelineView } from "@/components/evidence/TimelineView";
+import { TaskReminderManager } from "@/components/evidence/TaskReminderManager";
 import { DiaryImportDialog } from "@/components/evidence/DiaryImportDialog";
 import { UploadDialog } from "@/components/evidence/UploadDialog";
 import { EvidenceStoreProvider, useEvidence } from "@/lib/evidence/store";
@@ -265,6 +266,7 @@ function CaseApp() {
       </div>
 
       <ProfileGate />
+      <TaskReminderManager />
       <InspectorDrawer onEdit={openEdit} />
       <CommandPalette onConnectDrive={() => setConnectOpen(true)} />
       <ConnectDriveDialog open={connectOpen} onOpenChange={setConnectOpen} />
