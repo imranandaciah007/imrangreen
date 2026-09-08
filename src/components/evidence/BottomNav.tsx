@@ -1,14 +1,15 @@
-import { Coins, Home, ListChecks, Plus, Vault } from "lucide-react";
+import { ClipboardCheck, Coins, Home, ListChecks, Plus, Vault } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export type MainTab = "home" | "timeline" | "finances" | "vault";
+export type MainTab = "home" | "timeline" | "finances" | "vault" | "review";
 
 const tabs: { id: MainTab; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "timeline", label: "Timeline", icon: ListChecks },
   { id: "finances", label: "Finances", icon: Coins },
   { id: "vault", label: "Vault", icon: Vault },
+  { id: "review", label: "Review", icon: ClipboardCheck },
 ];
 
 export function BottomNav({
@@ -20,13 +21,14 @@ export function BottomNav({
   onTab: (t: MainTab) => void;
   onAdd: () => void;
 }) {
-  const [home, timeline, finances, vault] = tabs;
-  const left = [home!, timeline!];
-  const right = [finances!, vault!];
+  const left = tabs.slice(0, 2);
+  const right = tabs.slice(2);
+
+
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-5 items-end px-1 pt-1">
+      <div className="mx-auto grid max-w-md grid-cols-6 items-end px-1 pt-1">
         {left.map((t) => (
           <TabButton key={t.id} t={t} active={tab === t.id} onClick={() => onTab(t.id)} />
         ))}

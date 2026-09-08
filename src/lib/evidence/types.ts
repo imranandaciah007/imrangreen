@@ -132,6 +132,13 @@ export interface EvidenceItem {
   duplicateSuspected?: boolean | undefined;
   aiConfidence?: number | undefined;
   aiExtraction?: AiExtraction | undefined;
+  /** Fields a human has confirmed — AI must never silently overwrite these. */
+  confirmedFields?: string[] | undefined;
+  /** Later AI runs that disagree with a human-confirmed field, awaiting a decision. */
+  aiConflicts?:
+    | { field: string; existing: string; aiValue: string; ranAt: string }[]
+    | undefined;
+
 
   notes: string;
   /** For evidence about Jibril or others: how this affects Aciah (user-approved). */
@@ -329,6 +336,27 @@ export const DEFAULT_INCOME: IncomeSettings = {
 };
 
 
+export const TASK_STATUSES = ["To do", "Waiting", "Complete"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const TASK_PRIORITIES = ["High", "Normal", "Low"] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+/** One-tap task templates for the things this case keeps needing. */
+export const TASK_TEMPLATES = [
+  "Request GP letter",
+  "Request medical records",
+  "Download bank statement",
+  "Find receipt",
+  "Upload transfer evidence",
+  "Request employer letter",
+  "Follow up police/government correspondence",
+  "Add explanation",
+  "Review AI uncertainty",
+  "Obtain translation",
+  "Other",
+] as const;
+
 export interface CaseTask {
   id: string;
   title: string;
@@ -336,11 +364,24 @@ export interface CaseTask {
   dueDate: string;
   done: boolean;
   assignedTo: string;
+  /** To do / Waiting / Complete. Older tasks fall back to done ? Complete : To do. */
+  status?: TaskStatus | undefined;
+  priority?: TaskPriority | undefined;
+  notes?: string | undefined;
+  evidenceIds?: string[] | undefined;
+  eventId?: string | undefined;
+  financeId?: string | undefined;
   createdBy: string;
   lastEditedBy: string;
   createdAt: string;
   updatedAt: string;
 }
+
+export function taskStatus(task: CaseTask): TaskStatus {
+  if (task.status) return task.status;
+  return task.done ? "Complete" : "To do";
+}
+
 
 export function stageForStatus(status: EvidenceStatus): Stage {
   switch (status) {
