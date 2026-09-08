@@ -41,9 +41,17 @@ export function ExhibitIndexView() {
   function exportCsv() {
     const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
     const csv = [
-      ["Exhibit Number", "Description", "Category", "Page Count", "Ready Status"].map(esc).join(","),
+      ["Exhibit Number", "Description", "Category", "Page Count", "Ready Status"]
+        .map(esc)
+        .join(","),
       ...rows.map((r) =>
-        [r.exhibitId, r.title, r.category, r.pageCount, READY_STATUSES.includes(r.status) ? "Ready" : r.status]
+        [
+          r.exhibitId,
+          r.title,
+          r.category,
+          r.pageCount,
+          READY_STATUSES.includes(r.status) ? "Ready" : r.status,
+        ]
           .map(esc)
           .join(","),
       ),
@@ -63,7 +71,9 @@ export function ExhibitIndexView() {
     <div className="rounded-lg border border-border bg-card shadow-panel">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">Table of Exhibits (USCIS format)</h2>
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">
+            Table of Exhibits (USCIS format)
+          </h2>
           <p className="font-mono text-[11px] text-muted-foreground">
             {rows.length} exhibits · {pages} pages · {stats.ready} ready for the master binder
           </p>
@@ -88,7 +98,9 @@ export function ExhibitIndexView() {
               <th className="w-[140px] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider">
                 Exhibit no.
               </th>
-              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider">Description</th>
+              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider">
+                Description
+              </th>
               <th className="w-[200px] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider">
                 Category
               </th>
@@ -106,7 +118,9 @@ export function ExhibitIndexView() {
                 <td className="px-3 py-2 font-mono font-semibold">{r.exhibitId}</td>
                 <td className="px-3 py-2">
                   <span className="block text-foreground">{r.title}</span>
-                  <span className="block font-mono text-[10px] text-muted-foreground">{r.fileName}</span>
+                  <span className="block font-mono text-[10px] text-muted-foreground">
+                    {r.fileName}
+                  </span>
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{r.category}</td>
                 <td className="px-3 py-2 text-right font-mono">{r.pageCount}</td>
@@ -118,7 +132,10 @@ export function ExhibitIndexView() {
           </tbody>
           <tfoot>
             <tr className="bg-navy text-navy-foreground">
-              <td className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider" colSpan={3}>
+              <td
+                className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider"
+                colSpan={3}
+              >
                 Total
               </td>
               <td className="px-3 py-2 text-right font-mono font-semibold">{pages}</td>

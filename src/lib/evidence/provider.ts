@@ -144,7 +144,9 @@ export class LocalCaseProvider implements DocumentProvider {
       id: `ev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       cloudDriveUrl:
         draft.cloudDriveUrl ||
-        (file && typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : ""),
+        (file && typeof URL !== "undefined" && URL.createObjectURL
+          ? URL.createObjectURL(file)
+          : ""),
       createdAt: draft.createdAt || now,
       updatedAt: now,
       auditTrail: [

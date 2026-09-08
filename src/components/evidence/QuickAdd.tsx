@@ -22,12 +22,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useEvidence } from "@/lib/evidence/store";
-import {
-  FINANCE_KINDS,
-  PEOPLE,
-  PROFILES,
-  type FinanceKind,
-} from "@/lib/evidence/types";
+import { FINANCE_KINDS, PEOPLE, PROFILES, type FinanceKind } from "@/lib/evidence/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -55,7 +50,10 @@ export function AddSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <SheetContent
+        side="bottom"
+        className="rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))]"
+      >
         <SheetHeader>
           <SheetTitle className="text-base">Add to the case</SheetTitle>
         </SheetHeader>
@@ -418,7 +416,10 @@ export function TaskDialog({
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Category (optional)</Label>
-            <Select value={category || "none"} onValueChange={(v) => setCategory(v === "none" ? "" : v)}>
+            <Select
+              value={category || "none"}
+              onValueChange={(v) => setCategory(v === "none" ? "" : v)}
+            >
               <SelectTrigger className="h-11 text-xs">
                 <SelectValue />
               </SelectTrigger>

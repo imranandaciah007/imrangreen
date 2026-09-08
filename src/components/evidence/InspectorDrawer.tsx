@@ -129,14 +129,17 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                   value={<span className="font-mono">{formatBytes(item.fileSizeBytes)}</span>}
                 />
                 <Field label="Document date" value={formatDate(item.dateOfDocument)} />
-                <Field label="Added by" value={`${item.createdBy} · ${formatDate(item.createdAt)}`} />
+                <Field
+                  label="Added by"
+                  value={`${item.createdBy} · ${formatDate(item.createdAt)}`}
+                />
                 <Field
                   label="Last edited"
                   value={`${formatDateTime(item.updatedAt)} · ${item.lastEditedBy}`}
                 />
                 <Field
                   label="Drive"
-                  value={item.driveFileId ? item.driveFolder ?? "Stored" : "Not synced to Drive"}
+                  value={item.driveFileId ? (item.driveFolder ?? "Stored") : "Not synced to Drive"}
                 />
               </dl>
 

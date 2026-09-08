@@ -188,11 +188,7 @@ export function FilterToolbar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="max-h-[60vh] overflow-y-auto">
               {categories.map((c) => (
-                <DropdownMenuItem
-                  key={c}
-                  className="text-xs"
-                  onSelect={() => bulkMoveCategory(c)}
-                >
+                <DropdownMenuItem key={c} className="text-xs" onSelect={() => bulkMoveCategory(c)}>
                   {c}
                 </DropdownMenuItem>
               ))}

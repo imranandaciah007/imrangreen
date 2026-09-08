@@ -44,7 +44,9 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
             >
               <span className="font-mono text-[10px] text-info">{item.exhibitId}</span>
               <span className="truncate">{item.title}</span>
-              <span className="ml-auto font-mono text-[10px] text-muted-foreground">{item.status}</span>
+              <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+                {item.status}
+              </span>
             </CommandItem>
           ))}
         </CommandGroup>

@@ -26,13 +26,7 @@ import {
 } from "./types";
 
 export type SortKey =
-  | "exhibitId"
-  | "title"
-  | "category"
-  | "status"
-  | "pageCount"
-  | "dateOfDocument"
-  | "fileSizeBytes";
+  "exhibitId" | "title" | "category" | "status" | "pageCount" | "dateOfDocument" | "fileSizeBytes";
 
 export interface Filters {
   query: string;
@@ -76,7 +70,10 @@ interface EvidenceContextValue {
   openInspector: (id: string | null) => void;
   updateItem: (id: string, patch: Partial<EvidenceItem>, message?: string) => void;
   addItem: (
-    draft: Omit<EvidenceItem, "id" | "auditTrail" | "createdBy" | "lastEditedBy" | "createdAt" | "updatedAt">,
+    draft: Omit<
+      EvidenceItem,
+      "id" | "auditTrail" | "createdBy" | "lastEditedBy" | "createdAt" | "updatedAt"
+    >,
     file?: File,
   ) => Promise<EvidenceItem>;
   bulkUpdate: (patch: Partial<EvidenceItem>, message: string) => void;
@@ -171,7 +168,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       setEvents(records.events ?? []);
       setFinances(records.finances ?? []);
       setTasks(records.tasks ?? []);
-      setCustomCategories((records.categories ?? []).filter((c) => !DEFAULT_CATEGORIES.includes(c)));
+      setCustomCategories(
+        (records.categories ?? []).filter((c) => !DEFAULT_CATEGORIES.includes(c)),
+      );
       const saved = typeof localStorage !== "undefined" ? localStorage.getItem(PROFILE_KEY) : null;
       if (saved === "Imran" || saved === "Aciah") {
         setProfileState(saved);
@@ -306,7 +305,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           };
         });
       });
-      toast.success(`Re-numbered ${selectedIds.length} item(s) under prefix ${prefix.toUpperCase()}`);
+      toast.success(
+        `Re-numbered ${selectedIds.length} item(s) under prefix ${prefix.toUpperCase()}`,
+      );
     },
     [auditEntry, profile, selectedIds],
   );
@@ -424,7 +425,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       }
       setCustomCategories((prev) => prev.filter((c) => c !== name));
       setHiddenCategories((prev) => (prev.includes(name) ? prev : [...prev, name]));
-      setFiltersState((prev) => ({ ...prev, categories: prev.categories.filter((c) => c !== name) }));
+      setFiltersState((prev) => ({
+        ...prev,
+        categories: prev.categories.filter((c) => c !== name),
+      }));
       toast.success(`Category "${name}" removed`);
     },
     [items],
