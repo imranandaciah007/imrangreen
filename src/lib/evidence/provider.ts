@@ -20,6 +20,7 @@ export interface CaseRecords {
   finances: FinancialEntry[];
   tasks: CaseTask[];
   categories: string[];
+  income?: IncomeSettings | undefined;
 }
 
 export interface DocumentProvider {
