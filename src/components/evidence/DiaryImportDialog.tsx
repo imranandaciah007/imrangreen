@@ -26,7 +26,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { analyseDiaryChunk, type DiaryChunkResult } from "@/lib/diary.functions";
 import { chunkPages, readDiaryPages } from "@/lib/evidence/diary-pdf";
-import { planDiaryImport, type DiaryPlan } from "@/lib/evidence/diary-merge";
+import {
+  planDiaryImport,
+  type DiaryPlan,
+  type PlannedEvent,
+  type PlannedFinance,
+} from "@/lib/evidence/diary-merge";
 import { useEvidence } from "@/lib/evidence/store";
 import { EXPENSE_CATEGORIES, PEOPLE } from "@/lib/evidence/types";
 
@@ -435,14 +440,7 @@ export function DiaryImportDialog({
   );
 }
 
-interface Row {
-  key: string;
-  outcome: string;
-  reason: string;
-  matchLabel?: string | undefined;
-  uncertainFields: { field: string; options: string[] }[];
-  draft: { date: string; pages: number[]; passage: string } & Record<string, unknown>;
-}
+type Row = PlannedEvent | PlannedFinance;
 
 function Group({
   title,
@@ -465,8 +463,8 @@ function Group({
       </div>
       <div className="divide-y divide-border">
         {rows.slice(0, 150).map((row) => {
-          const label =
-            (row.draft["title"] as string) || (row.draft["label"] as string) || "Diary entry";
+          const draft = row.draft as { title?: string; label?: string };
+          const label = draft.title || draft.label || "Diary entry";
           return (
             <label key={row.key} className="flex gap-2 px-3 py-2 text-[11px]">
               <Checkbox

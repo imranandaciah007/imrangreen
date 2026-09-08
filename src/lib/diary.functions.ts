@@ -56,7 +56,8 @@ export interface DiaryChunkResult {
   /** Records only one of the two passes found, or where the passes disagreed. */
   uncertainEvents: { draft: DiaryEventDraft; fields: { field: string; options: string[] }[] }[];
   uncertainFinances: { draft: DiaryFinanceDraft; fields: { field: string; options: string[] }[] }[];
-  passes: unknown[];
+  /** Raw JSON of both scans, kept for auditability. */
+  passes: string[];
 }
 
 const EVENT_ITEM = {

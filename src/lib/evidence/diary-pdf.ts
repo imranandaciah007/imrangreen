@@ -52,7 +52,7 @@ export async function readDiaryPages(
     pages.push({ page: n, text });
     onProgress?.(n, doc.numPages);
   }
-  await doc.destroy();
+  await doc.cleanup();
   return pages;
 }
 
