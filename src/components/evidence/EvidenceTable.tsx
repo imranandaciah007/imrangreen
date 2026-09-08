@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, PanelRightOpen } from "lucide-react";
+import { ArrowDown, ArrowUp, PanelRightOpen, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { formatBytes, formatDate } from "@/lib/evidence/format";
+import { formatBytes, formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence, type SortKey } from "@/lib/evidence/store";
-import { StatusSelect, TagChip } from "./status-ui";
+import type { EvidenceItem } from "@/lib/evidence/types";
+import { StatusBadge, StatusSelect, TagChip } from "./status-ui";
 
 const PAGE_SIZE = 25;
 
@@ -21,7 +22,7 @@ const columns: { key: SortKey; label: string; className?: string }[] = [
   { key: "dateOfDocument", label: "Doc date", className: "w-[110px]" },
 ];
 
-export function EvidenceTable() {
+export function EvidenceTable({ onEdit }: { onEdit: (item: EvidenceItem) => void }) {
   const {
     filtered,
     items,
@@ -32,6 +33,7 @@ export function EvidenceTable() {
     setSelected,
     openInspector,
     updateItem,
+    deleteItem,
   } = useEvidence();
   const [page, setPage] = useState(0);
   const [cursor, setCursor] = useState(0);
@@ -80,9 +82,72 @@ export function EvidenceTable() {
     setEditingId(null);
   }
 
+  const emptyState =
+    items.length === 0 ? (
+      <span className="text-xs">
+        Nothing filed yet — connect Google Drive to sync, or use{" "}
+        <span className="font-semibold text-foreground">Add</span> to file something now.
+      </span>
+    ) : (
+      "Nothing matches the current filters."
+    );
+
   return (
-    <div className="rounded-lg border border-border bg-card shadow-panel">
-      <div ref={containerRef} className="max-h-[62vh] overflow-auto">
+    <div className="rounded-xl border border-border bg-card shadow-panel">
+      {/* Mobile cards */}
+      <ul className="divide-y divide-border/70 md:hidden">
+        {rows.map((item) => (
+          <li key={item.id} className="px-3 py-3">
+            <div className="flex items-start gap-2">
+              <Checkbox
+                checked={selectedIds.includes(item.id)}
+                onCheckedChange={() => toggleSelected(item.id)}
+                className="mt-1"
+              />
+              <button onClick={() => openInspector(item.id)} className="min-w-0 flex-1 text-left">
+                <span className="block font-mono text-[10px] text-muted-foreground">
+                  {item.exhibitId} · {formatDate(item.dateOfDocument)}
+                </span>
+                <span className="mt-0.5 block text-sm font-medium text-foreground">
+                  {item.title}
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                  {item.category} · {item.pageCount} pg · {formatBytes(item.fileSizeBytes)}
+                </span>
+                <span className="mt-1.5 block">
+                  <StatusBadge status={item.status} />
+                </span>
+              </button>
+              <div className="flex shrink-0 flex-col gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9"
+                  aria-label="Edit"
+                  onClick={() => onEdit(item)}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 text-destructive"
+                  aria-label="Delete"
+                  onClick={() => deleteItem(item.id)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </div>
+          </li>
+        ))}
+        {rows.length === 0 && (
+          <li className="px-4 py-12 text-center text-muted-foreground">{emptyState}</li>
+        )}
+      </ul>
+
+      {/* Desktop table */}
+      <div ref={containerRef} className="hidden max-h-[62vh] overflow-auto md:block">
         <table className="w-full border-collapse text-xs">
           <thead className="sticky top-0 z-10 bg-navy text-navy-foreground">
             <tr>
@@ -102,7 +167,7 @@ export function EvidenceTable() {
                   key={col.key}
                   onClick={() => toggleSort(col.key)}
                   className={cn(
-                    "cursor-pointer px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wider select-none hover:bg-navy-foreground/10",
+                    "cursor-pointer px-2 py-2 text-left text-[11px] font-semibold tracking-wider uppercase select-none hover:bg-navy-foreground/10",
                     col.className,
                   )}
                 >
@@ -117,7 +182,7 @@ export function EvidenceTable() {
                   </span>
                 </th>
               ))}
-              <th className="w-10 px-2 py-2" />
+              <th className="w-[104px] px-2 py-2" />
             </tr>
           </thead>
           <tbody>
@@ -167,7 +232,8 @@ export function EvidenceTable() {
                   <button onClick={() => openInspector(item.id)} className="block text-left">
                     <span className="block truncate font-medium text-foreground">{item.title}</span>
                     <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                      {item.fileName} · {item.fileType}
+                      {item.fileName} · {item.fileType} · edited {formatDateTime(item.updatedAt)} by{" "}
+                      {item.lastEditedBy}
                     </span>
                   </button>
                   {item.tags.length > 0 && (
@@ -181,7 +247,7 @@ export function EvidenceTable() {
                 <td className="px-2 py-1.5 align-middle">
                   <span className="block truncate text-foreground">{item.category}</span>
                   <span className="block truncate text-[10px] text-muted-foreground">
-                    {item.subCategory}
+                    {item.sourceType}
                   </span>
                 </td>
                 <td className="px-2 py-1.5 align-middle">
@@ -200,14 +266,35 @@ export function EvidenceTable() {
                   {formatDate(item.dateOfDocument)}
                 </td>
                 <td className="px-2 py-1.5 align-middle">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                    onClick={() => openInspector(item.id)}
-                  >
-                    <PanelRightOpen className="size-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      aria-label="Inspect"
+                      onClick={() => openInspector(item.id)}
+                    >
+                      <PanelRightOpen className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      aria-label="Edit"
+                      onClick={() => onEdit(item)}
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-destructive"
+                      aria-label="Delete"
+                      onClick={() => deleteItem(item.id)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -217,15 +304,7 @@ export function EvidenceTable() {
                   colSpan={columns.length + 2}
                   className="px-3 py-12 text-center text-muted-foreground"
                 >
-                  {items.length === 0 ? (
-                    <span className="text-xs">
-                      No documents yet — connect your drive folder to sync, or use{" "}
-                      <span className="font-semibold text-foreground">Add document</span> to file
-                      one manually.
-                    </span>
-                  ) : (
-                    "No exhibits match the current filters."
-                  )}
+                  {emptyState}
                 </td>
               </tr>
             )}
@@ -235,15 +314,14 @@ export function EvidenceTable() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
         <span className="font-mono">
-          Rows {filtered.length === 0 ? 0 : page * PAGE_SIZE + 1}–
-          {Math.min(filtered.length, (page + 1) * PAGE_SIZE)} of {filtered.length} · keys: j/k move,
-          Enter inspect, x select
+          {filtered.length === 0 ? 0 : page * PAGE_SIZE + 1}–
+          {Math.min(filtered.length, (page + 1) * PAGE_SIZE)} of {filtered.length}
         </span>
         <span className="flex items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs"
+            className="h-9 text-xs"
             disabled={page === 0}
             onClick={() => setPage((p) => p - 1)}
           >
@@ -255,7 +333,7 @@ export function EvidenceTable() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs"
+            className="h-9 text-xs"
             disabled={page >= pageCount - 1}
             onClick={() => setPage((p) => p + 1)}
           >
