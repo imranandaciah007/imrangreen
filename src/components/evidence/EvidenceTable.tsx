@@ -22,7 +22,7 @@ const columns: { key: SortKey; label: string; className?: string }[] = [
 ];
 
 export function EvidenceTable() {
-  const { filtered, sort, toggleSort, selectedIds, toggleSelected, setSelected, openInspector, updateItem } =
+  const { filtered, items, sort, toggleSort, selectedIds, toggleSelected, setSelected, openInspector, updateItem } =
     useEvidence();
   const [page, setPage] = useState(0);
   const [cursor, setCursor] = useState(0);
