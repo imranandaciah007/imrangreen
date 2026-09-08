@@ -18,14 +18,22 @@ function Metric({
   value,
   hint,
   icon,
+  onClick,
 }: {
   label: string;
   value: string;
   hint?: string;
   icon: React.ReactNode;
+  onClick?: (() => void) | undefined;
 }) {
+  const Tag = onClick ? "button" : "div";
   return (
-    <div className="rounded-xl border border-border bg-card p-3.5 shadow-panel">
+    <Tag
+      {...(onClick ? { type: "button" as const, onClick } : {})}
+      className={`rounded-xl border border-border bg-card p-3.5 text-left shadow-panel ${
+        onClick ? "transition-colors hover:border-primary/60 hover:bg-accent/40" : ""
+      }`}
+    >
       <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
         {icon}
         <span className="truncate">{label}</span>
@@ -34,11 +42,11 @@ function Metric({
         {value}
       </div>
       {hint && <div className="mt-1 text-[11px] text-muted-foreground">{hint}</div>}
-    </div>
+    </Tag>
   );
 }
 
-export function HomeView() {
+export function HomeView({ onNavigate }: { onNavigate: (tab: "timeline" | "finances" | "vault") => void }) {
   const { stats, caseSettings, tasks, events } = useEvidence();
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const openTasks = tasks.filter((t) => !t.done).slice(0, 4);
@@ -49,35 +57,41 @@ export function HomeView() {
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Metric
           label="Exhibits"
+          onClick={() => onNavigate("vault")}
           value={String(stats.total)}
           hint={`${stats.totalPages.toLocaleString()} pages`}
           icon={<FileStack className="size-3.5" />}
         />
         <Metric
           label="Reviewed & ready"
+          onClick={() => onNavigate("vault")}
           value={String(stats.ready)}
           hint={`${stats.needsConfirmation} need confirmation`}
           icon={<ShieldCheck className="size-3.5" />}
         />
         <Metric
           label="Evidence gaps"
+          onClick={() => onNavigate("vault")}
           value={String(stats.gaps)}
           hint={`${stats.missingTranslation} need translation`}
           icon={<AlertTriangle className="size-3.5" />}
         />
         <Metric
           label={`Cost since ${formatDate(caseSettings.separationStartDate)}`}
+          onClick={() => onNavigate("finances")}
           value={gbp(stats.financialImpact)}
           hint="Recorded separation costs"
           icon={<Coins className="size-3.5" />}
         />
         <Metric
           label="Timeline events"
+          onClick={() => onNavigate("timeline")}
           value={String(stats.timelineEvents)}
           icon={<CalendarClock className="size-3.5" />}
         />
         <Metric
           label="Open tasks"
+          onClick={() => onNavigate("timeline")}
           value={String(stats.openTasks)}
           icon={<CheckSquare className="size-3.5" />}
         />
@@ -118,7 +132,10 @@ export function HomeView() {
       </section>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <section className="rounded-xl border border-border bg-card p-3.5 shadow-panel">
+        <section
+          className="cursor-pointer rounded-xl border border-border bg-card p-3.5 shadow-panel"
+          onClick={() => onNavigate("timeline")}
+        >
           <h2 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
             Open tasks
           </h2>
@@ -139,7 +156,10 @@ export function HomeView() {
           )}
         </section>
 
-        <section className="rounded-xl border border-border bg-card p-3.5 shadow-panel">
+        <section
+          className="cursor-pointer rounded-xl border border-border bg-card p-3.5 shadow-panel"
+          onClick={() => onNavigate("timeline")}
+        >
           <h2 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
             Latest timeline entries
           </h2>

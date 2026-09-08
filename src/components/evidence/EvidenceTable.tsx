@@ -148,7 +148,7 @@ export function EvidenceTable({ onEdit }: { onEdit: (item: EvidenceItem) => void
 
       {/* Desktop table */}
       <div ref={containerRef} className="hidden max-h-[62vh] overflow-auto md:block">
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full table-fixed border-collapse text-xs">
           <thead className="sticky top-0 z-10 bg-navy text-navy-foreground">
             <tr>
               <th className="w-9 px-2 py-2">
@@ -228,8 +228,8 @@ export function EvidenceTable({ onEdit }: { onEdit: (item: EvidenceItem) => void
                     </button>
                   )}
                 </td>
-                <td className="max-w-[420px] px-2 py-1.5">
-                  <button onClick={() => openInspector(item.id)} className="block text-left">
+                <td className="max-w-0 px-2 py-1.5">
+                  <button onClick={() => openInspector(item.id)} className="block w-full min-w-0 text-left">
                     <span className="block truncate font-medium text-foreground">{item.title}</span>
                     <span className="block truncate font-mono text-[10px] text-muted-foreground">
                       {item.fileName} · {item.fileType} · edited {formatDateTime(item.updatedAt)} by{" "}
@@ -244,7 +244,7 @@ export function EvidenceTable({ onEdit }: { onEdit: (item: EvidenceItem) => void
                     </div>
                   )}
                 </td>
-                <td className="px-2 py-1.5 align-middle">
+                <td className="max-w-0 px-2 py-1.5 align-middle">
                   <span className="block truncate text-foreground">{item.category}</span>
                   <span className="block truncate text-[10px] text-muted-foreground">
                     {item.sourceType}

@@ -1,4 +1,13 @@
-import { Check, ChevronDown, FolderInput, Search, Tags, Trash2, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  FolderInput,
+  Search,
+  Sparkles,
+  Tags,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -91,6 +100,8 @@ export function FilterToolbar() {
     bulkAddTag,
     bulkMoveCategory,
     bulkDelete,
+    runExtractionForSelected,
+    extractingIds,
   } = useEvidence();
 
   const activeCount =
@@ -161,6 +172,16 @@ export function FilterToolbar() {
           <span className="font-mono text-[11px] font-semibold text-foreground">
             {selectedIds.length} selected
           </span>
+          <Button
+            size="sm"
+            className="h-9 text-xs"
+            disabled={extractingIds.length > 0}
+            onClick={() => void runExtractionForSelected()}
+          >
+            <Sparkles className="size-3" />
+            {extractingIds.length > 0 ? "Reading…" : "Read with AI"}
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline" className="h-9 text-xs">

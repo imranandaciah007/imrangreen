@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { EvidencePicker } from "@/components/evidence/EvidencePicker";
 import { Textarea } from "@/components/ui/textarea";
 import { useEvidence } from "@/lib/evidence/store";
 import { FINANCE_KINDS, PEOPLE, PROFILES, type FinanceKind } from "@/lib/evidence/types";
@@ -92,9 +93,12 @@ export function ExpenseDialog({
   const [date, setDate] = useState(today());
   const [recurring, setRecurring] = useState(false);
   const [notes, setNotes] = useState("");
+  const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setEvidenceIds([]);
     setLabel("");
     setKind("Travel / Flights");
     setAmount("");
@@ -181,6 +185,24 @@ export function ExpenseDialog({
             This repeats every month
           </label>
           <div className="space-y-1.5">
+            <Label className="text-xs">Receipt or bank evidence</Label>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 w-full justify-start text-xs"
+              onClick={() => setPickerOpen(true)}
+            >
+              {evidenceIds.length === 0
+                ? "Link a receipt or statement (optional)"
+                : `${evidenceIds.length} document(s) linked`}
+            </Button>
+            {evidenceIds.length === 0 && (
+              <p className="text-[11px] text-warning-foreground/90">
+                No evidence linked yet — link one now or add a task to collect it.
+              </p>
+            )}
+          </div>
+          <div className="space-y-1.5">
             <Label className="text-xs">Notes</Label>
             <Textarea
               value={notes}
@@ -206,7 +228,7 @@ export function ExpenseDialog({
                 currency,
                 recurring,
                 notes: notes.trim(),
-                evidenceIds: [],
+                evidenceIds,
               });
               onOpenChange(false);
             }}
@@ -214,6 +236,12 @@ export function ExpenseDialog({
             Save expense
           </Button>
         </DialogFooter>
+        <EvidencePicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          selected={evidenceIds}
+          onChange={setEvidenceIds}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -226,15 +254,18 @@ export function EventDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { addEvent, categories } = useEvidence();
+  const { addEvent, addTask, categories, profile } = useEvidence();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(today());
   const [category, setCategory] = useState(categories[0] ?? "Other");
   const [people, setPeople] = useState<string[]>(["Aciah"]);
   const [description, setDescription] = useState("");
+  const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setEvidenceIds([]);
     setTitle("");
     setDate(today());
     setCategory(categories[0] ?? "Other");
@@ -320,6 +351,45 @@ export function EventDialog({
               className="text-xs"
             />
           </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Supporting evidence</Label>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 w-full justify-start text-xs"
+              onClick={() => setPickerOpen(true)}
+            >
+              {evidenceIds.length === 0
+                ? "Link documents (optional)"
+                : `${evidenceIds.length} document(s) linked`}
+            </Button>
+            {evidenceIds.length === 0 && (
+              <div className="rounded-md border border-warning/50 bg-warning/10 p-2">
+                <p className="text-[11px] text-foreground">
+                  No evidence linked yet — link one now or create a task to collect it.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-1.5 h-8 text-[11px]"
+                  onClick={() =>
+                    addTask({
+                      title: title.trim()
+                        ? `Collect evidence for: ${title.trim()}`
+                        : "Collect supporting evidence",
+                      category,
+                      dueDate: "",
+                      done: false,
+                      assignedTo: profile,
+                    })
+                  }
+                >
+                  Create task to collect it
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" className="h-11" onClick={() => onOpenChange(false)}>
@@ -335,7 +405,7 @@ export function EventDialog({
                 category,
                 people,
                 description: description.trim(),
-                evidenceIds: [],
+                evidenceIds,
               });
               onOpenChange(false);
             }}
@@ -343,6 +413,12 @@ export function EventDialog({
             Save event
           </Button>
         </DialogFooter>
+        <EvidencePicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          selected={evidenceIds}
+          onChange={setEvidenceIds}
+        />
       </DialogContent>
     </Dialog>
   );

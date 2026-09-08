@@ -157,7 +157,7 @@ function CaseApp() {
               </div>
             )}
 
-            {tab === "home" && <HomeView />}
+            {tab === "home" && <HomeView onNavigate={(t) => setTab(t)} />}
 
             {tab === "timeline" && (
               <TimelineView

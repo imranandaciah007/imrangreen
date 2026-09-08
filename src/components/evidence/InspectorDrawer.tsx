@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, FileText, History, Languages, Link2, Pencil, Trash2 } from "lucide-react";
+import {
+  ExternalLink,
+  FileText,
+  History,
+  Languages,
+  Link2,
+  Pencil,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -29,7 +38,17 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => void }) {
-  const { items, inspectorId, openInspector, updateItem, deleteItem } = useEvidence();
+  const {
+    items,
+    inspectorId,
+    openInspector,
+    updateItem,
+    deleteItem,
+    runExtraction,
+    extractingIds,
+    confirmExtractionField,
+    dismissExtractionField,
+  } = useEvidence();
   const item = items.find((i) => i.id === inspectorId) ?? null;
   const [notes, setNotes] = useState("");
 
@@ -90,7 +109,88 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                     </a>
                   </Button>
                 )}
+                <Button
+                  size="sm"
+                  className="h-9 text-xs"
+                  disabled={extractingIds.includes(item.id)}
+                  onClick={() => void runExtraction(item.id)}
+                >
+                  <Sparkles className="size-3.5" />
+                  {extractingIds.includes(item.id) ? "Reading…" : "Read with AI"}
+                </Button>
               </div>
+
+              <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                  <Sparkles className="size-3" /> AI reading
+                </p>
+                {!item.aiExtraction ? (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Not read yet. “Read with AI” scans the document twice and only fills in what both
+                    scans agree on — anything uncertain is asked below.
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      {formatDateTime(item.aiExtraction.ranAt)} ·{" "}
+                      {item.aiExtraction.contentRead
+                        ? "double scan of the file"
+                        : "file not readable — name and folder only"}
+                      {item.aiExtraction.language ? ` · ${item.aiExtraction.language}` : ""}
+                    </p>
+                    {item.aiExtraction.summary && (
+                      <p className="text-xs text-foreground/85">{item.aiExtraction.summary}</p>
+                    )}
+                    {item.aiExtraction.applied.length > 0 && (
+                      <p className="text-[11px] text-success">
+                        Verified by double scan: {item.aiExtraction.applied.join(", ")}
+                      </p>
+                    )}
+                    {item.aiExtraction.uncertain.length === 0 ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Nothing left to confirm.
+                      </p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {item.aiExtraction.uncertain.map((u) => (
+                          <li
+                            key={u.field}
+                            className="rounded-md border border-warning/50 bg-warning/10 p-2"
+                          >
+                            <p className="text-[11px] font-medium text-foreground">
+                              Which {u.field} is correct?
+                            </p>
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {u.options.map((opt) => (
+                                <Button
+                                  key={opt}
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 max-w-full text-[11px]"
+                                  onClick={() => confirmExtractionField(item.id, u.field, opt)}
+                                >
+                                  <span className="truncate">{opt}</span>
+                                </Button>
+                              ))}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-[11px] text-muted-foreground"
+                                onClick={() => dismissExtractionField(item.id, u.field)}
+                              >
+                                Neither — keep as is
+                              </Button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+
+
+
 
               <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-secondary/60 text-muted-foreground">
                 <FileText className="size-8 opacity-50" />
