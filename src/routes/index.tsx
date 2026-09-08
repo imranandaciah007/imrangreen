@@ -12,7 +12,9 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BottomNav, mainTabs, type MainTab } from "@/components/evidence/BottomNav";
+import { CaseReviewView } from "@/components/evidence/CaseReviewView";
 import { CategoryPanel } from "@/components/evidence/CategoryPanel";
+
 import { AskEvidenceDialog } from "@/components/evidence/AskEvidence";
 import { CommandPalette } from "@/components/evidence/CommandPalette";
 import { ConnectDriveDialog } from "@/components/evidence/ConnectDriveDialog";
