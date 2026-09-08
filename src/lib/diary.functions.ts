@@ -415,13 +415,20 @@ export const analyseDiaryChunk = createServerFn({ method: "POST" })
         continue;
       }
       const fields: { field: string; options: string[] }[] = [];
+      // Only facts need to match. Different wording of the same title, or one scan
+      // listing an extra category, is not a disagreement about what happened.
       scalarCheck(fields, "date", x.date, y.date);
-      scalarCheck(fields, "title", x.title, y.title);
       scalarCheck(fields, "appendixRefs", x.appendixRefs.join(", "), y.appendixRefs.join(", "));
-      scalarCheck(fields, "categories", x.categories.join(", "), y.categories.join(", "));
-      scalarCheck(fields, "people", x.people.join(", "), y.people.join(", "));
+      const sharedCats = x.categories.filter((c) => y.categories.includes(c));
+      const sharedPeople = x.people.filter((c) => y.people.includes(c));
       const merged: DiaryEventDraft = {
         ...x,
+        categories: sharedCats.length
+          ? sharedCats
+          : Array.from(new Set([...x.categories, ...y.categories])),
+        people: sharedPeople.length
+          ? sharedPeople
+          : Array.from(new Set([...x.people, ...y.people])),
         date: x.date || y.date,
         effectOnAciah: x.effectOnAciah || y.effectOnAciah,
         effectOnFamily: x.effectOnFamily || y.effectOnFamily,
