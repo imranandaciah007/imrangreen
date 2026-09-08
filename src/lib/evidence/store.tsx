@@ -389,6 +389,13 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     bulkUpdate,
     bulkAssignPrefix,
     bulkAddTag,
+    deleteItem,
+    bulkDelete,
+    categories,
+    addCategory,
+    renameCategory,
+    deleteCategory,
+
     connection,
     connectDrive,
     exhibitGroups,
