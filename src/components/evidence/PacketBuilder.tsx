@@ -137,7 +137,8 @@ export function PacketBuilder({
       mortgage: income.mortgage ?? 0,
       councilTax: income.councilTax ?? 0,
       utilities: income.utilities ?? 0,
-      otherCommitments: income.otherCommitments ?? 0,
+      otherCommitments:
+        (income.debtCommitments ?? 0) + (income.transportWork ?? 0) + (income.otherObligations ?? 0),
     },
   };
 
