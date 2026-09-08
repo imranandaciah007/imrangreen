@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Search, Tags, X } from "lucide-react";
+import { Check, ChevronDown, FolderInput, Search, Tags, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useEvidence } from "@/lib/evidence/store";
-import { CATEGORIES, STATUSES, TAGS, type Tag } from "@/lib/evidence/types";
+import { STATUSES, TAGS } from "@/lib/evidence/types";
 
 function MultiSelect<T extends string>({
   label,
@@ -28,7 +28,7 @@ function MultiSelect<T extends string>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+        <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
           {label}
           {selected.length > 0 && (
             <span className="rounded bg-primary px-1 font-mono text-[10px] text-primary-foreground">
@@ -38,8 +38,10 @@ function MultiSelect<T extends string>({
           <ChevronDown className="size-3.5 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel className="text-[11px] uppercase tracking-wider">{label}</DropdownMenuLabel>
+      <DropdownMenuContent align="start" className="max-h-[60vh] w-72 overflow-y-auto">
+        <DropdownMenuLabel className="text-[11px] tracking-wider uppercase">
+          {label}
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {options.map((option) => {
           const active = selected.includes(option);
@@ -60,7 +62,10 @@ function MultiSelect<T extends string>({
         {selected.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => onChange([])} className="text-xs text-muted-foreground">
+            <DropdownMenuItem
+              onSelect={() => onChange([])}
+              className="text-xs text-muted-foreground"
+            >
               Clear
             </DropdownMenuItem>
           </>
@@ -77,12 +82,15 @@ export function FilterToolbar() {
     resetFilters,
     filtered,
     items,
+    categories,
     exhibitGroups,
     selectedIds,
     clearSelected,
     bulkUpdate,
     bulkAssignPrefix,
     bulkAddTag,
+    bulkMoveCategory,
+    bulkDelete,
   } = useEvidence();
 
   const activeCount =
@@ -94,22 +102,23 @@ export function FilterToolbar() {
     (filters.query ? 1 : 0);
 
   return (
-    <div className="space-y-2 rounded-lg border border-border bg-card p-2.5 shadow-panel">
+    <div className="space-y-2 rounded-xl border border-border bg-card p-2.5 shadow-panel">
+      <div className="relative">
+        <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={filters.query}
+          onChange={(e) => setFilters({ query: e.target.value })}
+          placeholder="Search titles, files, notes, people, tags, dates…"
+          className="h-11 pl-9 text-sm"
+        />
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={filters.query}
-            onChange={(e) => setFilters({ query: e.target.value })}
-            placeholder="Filter exhibits, files, notes, tags…"
-            className="h-8 pl-8 text-xs"
-          />
-        </div>
         <MultiSelect
           label="Category"
-          options={CATEGORIES}
+          options={categories}
           selected={filters.categories}
-          onChange={(categories) => setFilters({ categories })}
+          onChange={(cats) => setFilters({ categories: cats })}
         />
         <MultiSelect
           label="Status"
@@ -117,7 +126,12 @@ export function FilterToolbar() {
           selected={filters.statuses}
           onChange={(statuses) => setFilters({ statuses })}
         />
-        <MultiSelect label="Tags" options={TAGS} selected={filters.tags} onChange={(tags) => setFilters({ tags })} />
+        <MultiSelect
+          label="Tags"
+          options={TAGS}
+          selected={filters.tags}
+          onChange={(tags) => setFilters({ tags })}
+        />
         <MultiSelect
           label="Exhibit group"
           options={exhibitGroups}
@@ -127,16 +141,16 @@ export function FilterToolbar() {
         <Button
           variant={filters.translationOnly ? "default" : "outline"}
           size="sm"
-          className="h-8 text-xs"
+          className="h-9 text-xs"
           onClick={() => setFilters({ translationOnly: !filters.translationOnly })}
         >
-          Translation pending
+          Translation needed
         </Button>
         <span className="ml-auto font-mono text-[11px] text-muted-foreground">
-          {filtered.length} / {items.length} shown
+          {filtered.length} / {items.length}
         </span>
         {activeCount > 0 && (
-          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={resetFilters}>
+          <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={resetFilters}>
             <X className="size-3.5" /> Reset
           </Button>
         )}
@@ -149,13 +163,17 @@ export function FilterToolbar() {
           </span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="h-7 text-xs">
-                Bulk status <ChevronDown className="size-3" />
+              <Button size="sm" variant="outline" className="h-9 text-xs">
+                Status <ChevronDown className="size-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               {STATUSES.map((s) => (
-                <DropdownMenuItem key={s} className="text-xs" onSelect={() => bulkUpdate({ status: s }, `Status → ${s}`)}>
+                <DropdownMenuItem
+                  key={s}
+                  className="text-xs"
+                  onSelect={() => bulkUpdate({ status: s }, `Status → ${s}`)}
+                >
                   {s}
                 </DropdownMenuItem>
               ))}
@@ -164,8 +182,27 @@ export function FilterToolbar() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="h-7 text-xs">
-                Assign exhibit prefix <ChevronDown className="size-3" />
+              <Button size="sm" variant="outline" className="h-9 text-xs">
+                <FolderInput className="size-3" /> Move to <ChevronDown className="size-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-[60vh] overflow-y-auto">
+              {categories.map((c) => (
+                <DropdownMenuItem
+                  key={c}
+                  className="text-xs"
+                  onSelect={() => bulkMoveCategory(c)}
+                >
+                  {c}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="h-9 text-xs">
+                Exhibit prefix <ChevronDown className="size-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
@@ -179,21 +216,34 @@ export function FilterToolbar() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="h-7 text-xs">
-                <Tags className="size-3" /> Bulk tag <ChevronDown className="size-3" />
+              <Button size="sm" variant="outline" className="h-9 text-xs">
+                <Tags className="size-3" /> Tag <ChevronDown className="size-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               {TAGS.map((t) => (
-                <DropdownMenuItem key={t} className="font-mono text-xs" onSelect={() => bulkAddTag(t as Tag)}>
+                <DropdownMenuItem
+                  key={t}
+                  className="font-mono text-xs"
+                  onSelect={() => bulkAddTag(t)}
+                >
                   {t}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearSelected}>
-            Clear selection
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 text-xs text-destructive"
+            onClick={bulkDelete}
+          >
+            <Trash2 className="size-3.5" /> Delete
+          </Button>
+
+          <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={clearSelected}>
+            Clear
           </Button>
         </div>
       )}

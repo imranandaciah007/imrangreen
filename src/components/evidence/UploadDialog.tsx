@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileUp, Loader2, Paperclip, Save, Tags, UploadCloud } from "lucide-react";
+import { Camera, FileUp, Save, UploadCloud } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,13 +23,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatBytes } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import {
+  PEOPLE,
+  SOURCE_TYPES,
   STATUSES,
   TAGS,
   type Category,
   type EvidenceItem,
   type EvidenceStatus,
   type FileType,
-  type Tag,
+  type SourceType,
 } from "@/lib/evidence/types";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +41,31 @@ function fileTypeOf(name: string): FileType {
   if (ext === "png") return "PNG";
   if (ext === "jpg" || ext === "jpeg") return "JPG";
   return "PDF";
+}
+
+function Chip({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "min-h-9 rounded-full border px-3 py-1.5 text-xs transition-colors",
+        active
+          ? "border-navy bg-navy text-navy-foreground"
+          : "border-border bg-card text-muted-foreground hover:bg-secondary",
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function UploadDialog({
@@ -54,6 +81,7 @@ export function UploadDialog({
 }) {
   const { addItem, updateItem, items, categories } = useEvidence();
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const editing = !!editItem;
 
   const [file, setFile] = useState<File | null>(null);
@@ -61,16 +89,17 @@ export function UploadDialog({
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("");
   const [exhibitId, setExhibitId] = useState("");
-  const [category, setCategory] = useState<Category>(initialCategory ?? categories[0] ?? "General");
+  const [cats, setCats] = useState<Category[]>([]);
   const [subCategory, setSubCategory] = useState("");
-  const [status, setStatus] = useState<EvidenceStatus>("Draft");
+  const [sourceType, setSourceType] = useState<SourceType>("Other");
+  const [people, setPeople] = useState<string[]>([]);
+  const [status, setStatus] = useState<EvidenceStatus>("New");
   const [pageCount, setPageCount] = useState("1");
   const [dateOfDocument, setDateOfDocument] = useState("");
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Load the dialog state whenever it opens (fresh upload or edit).
   useEffect(() => {
     if (!open) return;
     setError(null);
@@ -78,8 +107,10 @@ export function UploadDialog({
     if (editItem) {
       setTitle(editItem.title);
       setExhibitId(editItem.exhibitId);
-      setCategory(editItem.category);
+      setCats(editItem.categories?.length ? [...editItem.categories] : [editItem.category]);
       setSubCategory(editItem.subCategory);
+      setSourceType(editItem.sourceType ?? "Other");
+      setPeople([...(editItem.people ?? [])]);
       setStatus(editItem.status);
       setPageCount(String(editItem.pageCount));
       setDateOfDocument(editItem.dateOfDocument.slice(0, 10));
@@ -88,9 +119,11 @@ export function UploadDialog({
     } else {
       setTitle("");
       setExhibitId("");
-      setCategory(initialCategory ?? categories[0] ?? "General");
+      setCats(initialCategory ? [initialCategory] : []);
       setSubCategory("");
-      setStatus("Draft");
+      setSourceType("Other");
+      setPeople(["Aciah"]);
+      setStatus("New");
       setPageCount("1");
       setDateOfDocument("");
       setTags([]);
@@ -99,12 +132,14 @@ export function UploadDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editItem?.id, initialCategory]);
 
+  const primary = cats[0] ?? initialCategory ?? categories[0] ?? "Other";
+
   const suggestedExhibit = useMemo(() => {
-    const n = items.filter((i) => i.category === category).length + 1;
-    const idx = Math.max(0, categories.indexOf(category));
+    const n = items.filter((i) => i.category === primary).length + 1;
+    const idx = Math.max(0, categories.indexOf(primary));
     const letter = String.fromCharCode(65 + (idx % 26));
     return `Exhibit ${letter}-${n}`;
-  }, [items, category, categories]);
+  }, [items, primary, categories]);
 
   function pick(next: File | null) {
     if (!next) return;
@@ -113,9 +148,13 @@ export function UploadDialog({
     if (!title) setTitle(next.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "));
   }
 
+  function toggle<T>(list: T[], value: T, set: (next: T[]) => void) {
+    set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  }
+
   async function submit() {
     if (!editing && !file) {
-      setError("Attach a document file first.");
+      setError("Attach a file, or take a photo of the document.");
       return;
     }
     if (!title.trim()) {
@@ -124,16 +163,21 @@ export function UploadDialog({
     }
     setSaving(true);
     try {
+      const chosen = cats.length ? cats : [primary];
       const common = {
         exhibitId: exhibitId.trim() || suggestedExhibit,
         title: title.trim(),
-        category,
+        category: chosen[0]!,
+        categories: chosen,
         subCategory: subCategory.trim() || "General",
+        sourceType,
+        people,
         pageCount: Math.max(1, Number(pageCount) || 1),
         status,
         dateOfDocument: dateOfDocument || new Date().toISOString().slice(0, 10),
         tags,
         notes: notes.trim(),
+        needsTranslation: status === "Translation needed",
       };
 
       if (editing && editItem) {
@@ -146,6 +190,7 @@ export function UploadDialog({
                   fileName: file.name,
                   fileType: fileTypeOf(file.name),
                   fileSizeBytes: file.size,
+                  mimeType: file.type,
                   cloudDriveUrl:
                     typeof URL !== "undefined" && URL.createObjectURL
                       ? URL.createObjectURL(file)
@@ -162,7 +207,9 @@ export function UploadDialog({
             fileName: file.name,
             fileType: fileTypeOf(file.name),
             fileSizeBytes: file.size,
+            mimeType: file.type,
             cloudDriveUrl: "",
+            driveFolder: "/I601 Evidence/Original Evidence/",
             translationFileUrl: undefined,
           },
           file,
@@ -180,12 +227,10 @@ export function UploadDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             {editing ? <Save className="size-4" /> : <UploadCloud className="size-4" />}
-            {editing ? "Edit evidence document" : "Add evidence document"}
+            {editing ? "Edit evidence" : "Add evidence"}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            {editing
-              ? "Change any detail, or attach a replacement file. The summary bar updates immediately."
-              : "The file, exhibit number, category and tags are filed together and the summary bar updates immediately."}
+            One item can sit in several hardship categories. The original file is never altered.
           </DialogDescription>
         </DialogHeader>
 
@@ -201,97 +246,99 @@ export function UploadDialog({
               setDragging(false);
               pick(e.dataTransfer.files?.[0] ?? null);
             }}
-            onClick={() => inputRef.current?.click()}
             className={cn(
-              "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-secondary/40 px-4 py-7 text-center transition-colors",
+              "rounded-lg border border-dashed border-border bg-secondary/40 p-4 text-center transition-colors",
               dragging && "border-primary bg-primary/6",
             )}
           >
-            <FileUp className="size-5 text-muted-foreground" />
+            <FileUp className="mx-auto size-5 text-muted-foreground" />
             {file ? (
-              <>
-                <p className="font-mono text-xs font-semibold text-foreground">{file.name}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {fileTypeOf(file.name)} · {formatBytes(file.size)} · click to replace
-                </p>
-              </>
+              <p className="mt-1.5 font-mono text-xs font-semibold text-foreground">
+                {file.name} · {formatBytes(file.size)}
+              </p>
             ) : editing && editItem ? (
-              <>
-                <p className="font-mono text-xs font-semibold text-foreground">
-                  {editItem.fileName}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {editItem.fileType} · {formatBytes(editItem.fileSizeBytes)} · click to replace the
-                  file
-                </p>
-              </>
+              <p className="mt-1.5 font-mono text-xs font-semibold text-foreground">
+                {editItem.fileName} · {formatBytes(editItem.fileSizeBytes)}
+              </p>
             ) : (
-              <>
-                <p className="text-xs font-semibold text-foreground">
-                  Drop a file here or click to browse
-                </p>
-                <p className="text-[11px] text-muted-foreground">PDF, DOCX, JPG or PNG</p>
-              </>
+              <p className="mt-1.5 text-xs text-muted-foreground">PDF, DOCX, JPG or PNG</p>
             )}
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11"
+                onClick={() => cameraRef.current?.click()}
+              >
+                <Camera className="size-4" /> Take photo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11"
+                onClick={() => inputRef.current?.click()}
+              >
+                <FileUp className="size-4" /> Choose file
+              </Button>
+            </div>
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => pick(e.target.files?.[0] ?? null)}
+            />
             <input
               ref={inputRef}
               type="file"
-              accept=".pdf,.docx,.doc,.jpg,.jpeg,.png"
+              accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,image/*,application/pdf"
               className="hidden"
               onChange={(e) => pick(e.target.files?.[0] ?? null)}
             />
           </div>
 
+          <div className="space-y-1.5">
+            <Label className="text-xs">Title</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="GP letter — Aciah, anxiety review"
+              className="h-11 text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Hardship categories</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((c) => (
+                <Chip key={c} active={cats.includes(c)} onClick={() => toggle(cats, c, setCats)}>
+                  {c}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-xs">Document title</Label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="2024 Form 1040 Joint Tax Return"
-                className="text-xs"
-              />
-            </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Exhibit ID</Label>
-              <Input
-                value={exhibitId}
-                onChange={(e) => setExhibitId(e.target.value)}
-                placeholder={suggestedExhibit}
-                className="font-mono text-xs"
-              />
-              <p className="text-[10px] text-muted-foreground">
-                Leave blank to use {suggestedExhibit}
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Category</Label>
-              <Select value={category} onValueChange={(v) => setCategory(v)}>
-                <SelectTrigger className="text-xs">
+              <Label className="text-xs">Evidence / source type</Label>
+              <Select value={sourceType} onValueChange={(v) => setSourceType(v as SourceType)}>
+                <SelectTrigger className="h-11 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c} value={c} className="text-xs">
-                      {c}
+                  {SOURCE_TYPES.map((s) => (
+                    <SelectItem key={s} value={s} className="text-xs">
+                      {s}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Sub-category</Label>
-              <Input
-                value={subCategory}
-                onChange={(e) => setSubCategory(e.target.value)}
-                placeholder="Federal tax filing"
-                className="text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Filing status</Label>
+              <Label className="text-xs">Status</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as EvidenceStatus)}>
-                <SelectTrigger className="text-xs">
+                <SelectTrigger className="h-11 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -304,83 +351,90 @@ export function UploadDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Page count</Label>
-              <Input
-                type="number"
-                min={1}
-                value={pageCount}
-                onChange={(e) => setPageCount(e.target.value)}
-                className="font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Date of document</Label>
+              <Label className="text-xs">Document date</Label>
               <Input
                 type="date"
                 value={dateOfDocument}
                 onChange={(e) => setDateOfDocument(e.target.value)}
-                className="text-xs"
+                className="h-11 text-xs"
               />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="flex items-center gap-1.5 text-xs">
-                <Tags className="size-3.5" /> Tags
-              </Label>
-              <div className="flex flex-wrap gap-1.5">
-                {TAGS.map((t) => {
-                  const active = tags.includes(t);
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTags(active ? tags.filter((x) => x !== t) : [...tags, t])}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 font-mono text-[10px] transition-colors",
-                        active
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-secondary text-secondary-foreground hover:bg-secondary/70",
-                      )}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Pages</Label>
+              <Input
+                type="number"
+                min="1"
+                value={pageCount}
+                onChange={(e) => setPageCount(e.target.value)}
+                className="h-11 font-mono text-xs"
+              />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-xs">Counsel notes</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="RFE defense strategy, provenance, translation needs…"
-                className="min-h-20 text-xs"
+            <div className="space-y-1.5">
+              <Label className="text-xs">Exhibit ID</Label>
+              <Input
+                value={exhibitId}
+                onChange={(e) => setExhibitId(e.target.value)}
+                placeholder={suggestedExhibit}
+                className="h-11 font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Sub-category</Label>
+              <Input
+                value={subCategory}
+                onChange={(e) => setSubCategory(e.target.value)}
+                placeholder="e.g. GP records"
+                className="h-11 text-xs"
               />
             </div>
           </div>
 
-          {error && (
-            <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-[11px] font-medium text-destructive">
-              {error}
-            </p>
-          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs">People involved</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {PEOPLE.map((p) => (
+                <Chip
+                  key={p}
+                  active={people.includes(p)}
+                  onClick={() => toggle(people, p, setPeople)}
+                >
+                  {p}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Tags</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {TAGS.map((t) => (
+                <Chip key={t} active={tags.includes(t)} onClick={() => toggle(tags, t, setTags)}>
+                  <span className="font-mono">{t}</span>
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Notes</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              placeholder="Why this matters for Aciah's hardship…"
+              className="text-xs"
+            />
+          </div>
+
+          {error && <p className="text-xs font-medium text-destructive">{error}</p>}
         </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs"
-            onClick={() => onOpenChange(false)}
-          >
+        <DialogFooter className="gap-2">
+          <Button variant="outline" className="h-11" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button size="sm" className="text-xs" onClick={submit} disabled={saving}>
-            {saving ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Paperclip className="size-3.5" />
-            )}
-            {editing ? "Save changes" : "File document"}
+          <Button className="h-11" disabled={saving} onClick={() => void submit()}>
+            {editing ? "Save changes" : "Add evidence"}
           </Button>
         </DialogFooter>
       </DialogContent>
