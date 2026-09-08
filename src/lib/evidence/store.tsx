@@ -12,6 +12,13 @@ import { toast } from "sonner";
 
 import { extractDocument } from "@/lib/ai.functions";
 import { documentProvider, type ProviderConnection } from "./provider";
+import {
+  categoryCoverage,
+  detectGaps,
+  type CaseGap,
+  type CategoryCoverage,
+} from "./review";
+
 
 import {
   CASE_SETTINGS,
@@ -116,8 +123,13 @@ interface EvidenceContextValue {
   deleteFinance: (id: string) => void;
   tasks: CaseTask[];
   addTask: (draft: NewRecord<CaseTask>) => void;
+  updateTask: (id: string, patch: Partial<CaseTask>) => void;
   toggleTask: (id: string) => void;
   deleteTask: (id: string) => void;
+
+  /** Organisation gaps and hardship-coverage labels (never legal predictions). */
+  gaps: CaseGap[];
+  coverage: CategoryCoverage[];
 
   /** AI text-extraction run for one document (two-pass verification). */
   runExtraction: (id: string) => Promise<void>;
@@ -125,6 +137,8 @@ interface EvidenceContextValue {
   extractingIds: string[];
   confirmExtractionField: (id: string, field: string, value: string) => void;
   dismissExtractionField: (id: string, field: string) => void;
+  resolveConflict: (id: string, field: string, accept: boolean) => void;
+
 
   connection: ProviderConnection | null;
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
@@ -614,17 +628,41 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
   const addTask = useCallback(
     (draft: NewRecord<CaseTask>) => {
-      setTasks((prev) => [...prev, { ...stamp(draft), id: rid("task") }]);
+      setTasks((prev) => [
+        ...prev,
+        { ...stamp({ status: "To do", priority: "Normal", ...draft }), id: rid("task") },
+      ]);
       toast.success("Task added", { description: draft.title });
     },
     [stamp],
   );
+  const updateTask = useCallback(
+    (id: string, patch: Partial<CaseTask>) => {
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id !== id) return t;
+          const next = { ...t, ...patch, lastEditedBy: profile, updatedAt: nowIso() };
+          if (patch.status) next.done = patch.status === "Complete";
+          return next;
+        }),
+      );
+    },
+    [profile],
+  );
   const toggleTask = useCallback(
     (id: string) => {
       setTasks((prev) =>
-        prev.map((t) =>
-          t.id === id ? { ...t, done: !t.done, lastEditedBy: profile, updatedAt: nowIso() } : t,
-        ),
+        prev.map((t) => {
+          if (t.id !== id) return t;
+          const done = !t.done;
+          return {
+            ...t,
+            done,
+            status: done ? "Complete" : "To do",
+            lastEditedBy: profile,
+            updatedAt: nowIso(),
+          };
+        }),
       );
     },
     [profile],
@@ -632,6 +670,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const deleteTask = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
 
   const runOne = useCallback(
     async (item: EvidenceItem, categoryList: Category[]) => {
@@ -678,6 +717,26 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         patch.pageCount = a.pageCount;
         applied.push("pages");
       }
+      // Human-confirmed values win: never silently overwrite them.
+      const confirmed = item.confirmedFields ?? [];
+      const conflicts = [...(item.aiConflicts ?? [])];
+      const guard = (field: string, key: keyof EvidenceItem, aiValue: unknown) => {
+        if (!confirmed.includes(field)) return;
+        const existing = String(item[key] ?? "");
+        const incoming = Array.isArray(aiValue) ? aiValue.join(", ") : String(aiValue ?? "");
+        delete patch[key];
+        if (incoming && incoming !== existing) {
+          conflicts.push({ field, existing, aiValue: incoming, ranAt: result.ranAt });
+        }
+      };
+      guard("title", "title", a.title);
+      guard("documentDate", "dateOfDocument", a.documentDate);
+      guard("people", "people", a.people);
+      guard("categories", "categories", a.categories);
+      guard("sourceType", "sourceType", a.sourceType);
+      guard("pageCount", "pageCount", a.pageCount);
+      if (conflicts.length) patch.aiConflicts = conflicts;
+
 
       patch.aiExtraction = {
         ranAt: result.ranAt,
@@ -688,7 +747,11 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         uncertain: result.uncertain,
         passes: result.passes as unknown as Record<string, unknown>[] | undefined,
       };
-      patch.status = result.uncertain.length > 0 ? "Needs confirmation" : "Reviewed";
+      patch.status =
+        result.uncertain.length > 0 || conflicts.length > (item.aiConflicts?.length ?? 0)
+          ? "Needs confirmation"
+          : "Reviewed";
+
       if (result.summary && !item.notes.trim()) patch.notes = result.summary;
 
       applyPatch(
@@ -794,6 +857,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           ? [...item.aiExtraction.applied, `${field} (confirmed)`]
           : item.aiExtraction.applied,
       };
+      if (value) {
+        patch.confirmedFields = Array.from(new Set([...(item.confirmedFields ?? []), field]));
+      }
       if (remaining.length === 0 && item.status === "Needs confirmation") patch.status = "Reviewed";
       applyPatch([id], patch, value ? `Confirmed ${field}: ${value}` : `Left ${field} as it was`);
     },
@@ -808,6 +874,27 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     (id: string, field: string) => resolveField(id, field, null),
     [resolveField],
   );
+
+  /** Keep the human-confirmed value, or accept the AI's value after review. */
+  const resolveConflict = useCallback(
+    (id: string, field: string, accept: boolean) => {
+      const item = items.find((i) => i.id === id);
+      const conflict = item?.aiConflicts?.find((c) => c.field === field);
+      if (!item || !conflict) return;
+      const patch: Partial<EvidenceItem> = accept
+        ? applyConfirmed(item, field, conflict.aiValue)
+        : {};
+      patch.aiConflicts = (item.aiConflicts ?? []).filter((c) => c.field !== field);
+      patch.confirmedFields = Array.from(new Set([...(item.confirmedFields ?? []), field]));
+      applyPatch(
+        [id],
+        patch,
+        accept ? `Accepted AI value for ${field}` : `Kept existing ${field}`,
+      );
+    },
+    [applyConfirmed, applyPatch, items],
+  );
+
 
   const connectDrive = useCallback(
     (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => {
@@ -863,7 +950,18 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     });
   }, [items, filters, sort]);
 
+  const gaps = useMemo(
+    () => detectGaps(items, events, finances, tasks, categories),
+    [items, events, finances, tasks, categories],
+  );
+
+  const coverage = useMemo(
+    () => categoryCoverage(items, events, categories, gaps),
+    [items, events, categories, gaps],
+  );
+
   const stats = useMemo(() => {
+
     const ready = items.filter((i) => READY_STATUSES.includes(i.status)).length;
     const missingTranslation = items.filter((i) => i.status === "Translation needed").length;
     const gaps = items.filter((i) => i.status === "Missing supporting evidence").length;
@@ -951,12 +1049,18 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     tasks,
     addTask,
     toggleTask,
+    updateTask,
+    gaps,
+    coverage,
+
     deleteTask,
     runExtraction,
     runExtractionForSelected,
     extractingIds,
     confirmExtractionField,
     dismissExtractionField,
+    resolveConflict,
+
 
     connection,
     connectDrive,
