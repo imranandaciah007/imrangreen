@@ -1,13 +1,17 @@
-export const CATEGORIES = [
+export const DEFAULT_CATEGORIES: string[] = [
   "Identity/Civil",
   "Financial/Tax",
   "Employment/Letters of Support",
   "Proof of Relationship",
   "Legal/Court Records",
   "Medical/Vaccination",
-] as const;
+];
 
-export type Category = (typeof CATEGORIES)[number];
+/** Kept for convenience; the live list comes from the store (users can add their own). */
+export const CATEGORIES = DEFAULT_CATEGORIES;
+
+export type Category = string;
+
 
 export const STATUSES = [
   "Missing",

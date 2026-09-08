@@ -33,6 +33,9 @@ export interface DocumentProvider {
   update(id: string, patch: Partial<EvidenceItem>): Promise<EvidenceItem>;
   /** Persist a partial change to many items at once. */
   updateMany(ids: string[], patch: Partial<EvidenceItem>): Promise<EvidenceItem[]>;
+  /** Remove items from the folder index. */
+  remove(ids: string[]): Promise<string[]>;
+
 }
 
 function clone(items: EvidenceItem[]): EvidenceItem[] {
@@ -122,6 +125,13 @@ export class MockDriveProvider implements DocumentProvider {
     });
     return updated;
   }
+
+  async remove(ids: string[]) {
+    const set = new Set(ids);
+    this.items = this.items.filter((item) => !set.has(item.id));
+    return ids;
+  }
 }
+
 
 export const documentProvider: DocumentProvider = new MockDriveProvider();

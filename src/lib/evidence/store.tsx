@@ -51,7 +51,14 @@ interface EvidenceContextValue {
   bulkUpdate: (patch: Partial<EvidenceItem>, message: string) => void;
   bulkAssignPrefix: (prefix: string) => void;
   bulkAddTag: (tag: Tag) => void;
+  deleteItem: (id: string) => void;
+  bulkDelete: () => void;
+  categories: Category[];
+  addCategory: (name: string) => void;
+  renameCategory: (from: string, to: string) => void;
+  deleteCategory: (name: string) => void;
   connection: ProviderConnection | null;
+
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
   exhibitGroups: string[];
   stats: {
@@ -90,6 +97,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "exhibitId", dir: "asc" });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [inspectorId, setInspectorId] = useState<string | null>(null);
+  const [customCategories, setCustomCategories] = useState<Category[]>([]);
+  const [hiddenCategories, setHiddenCategories] = useState<Category[]>([]);
+
+
 
   useEffect(() => {
     let cancelled = false;
@@ -200,7 +211,96 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     [selectedIds],
   );
 
+  const deleteItem = useCallback((id: string) => {
+    setItems((prev) => {
+      const gone = prev.find((i) => i.id === id);
+      if (gone) toast.success(`${gone.exhibitId} deleted`, { description: gone.title });
+      return prev.filter((i) => i.id !== id);
+    });
+    setSelectedIds((prev) => prev.filter((s) => s !== id));
+    setInspectorId((prev) => (prev === id ? null : prev));
+    void documentProvider.remove([id]);
+  }, []);
+
+  const bulkDelete = useCallback(() => {
+    if (selectedIds.length === 0) {
+      toast.error("Select at least one exhibit first");
+      return;
+    }
+    const ids = [...selectedIds];
+    setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
+    setSelectedIds([]);
+    setInspectorId((prev) => (prev && ids.includes(prev) ? null : prev));
+    void documentProvider.remove(ids);
+    toast.success(`${ids.length} exhibit(s) deleted`);
+  }, [selectedIds]);
+
+  const categories = useMemo(() => {
+    const set = new Set<Category>([...CATEGORIES, ...customCategories, ...items.map((i) => i.category)]);
+    const used = new Set(items.map((i) => i.category));
+    return Array.from(set).filter((c) => used.has(c) || !hiddenCategories.includes(c));
+  }, [customCategories, hiddenCategories, items]);
+
+
+  const addCategory = useCallback(
+    (name: string) => {
+      const clean = name.trim();
+      if (!clean) return;
+      if (categories.some((c) => c.toLowerCase() === clean.toLowerCase())) {
+        toast.error(`"${clean}" already exists`);
+        return;
+      }
+      setCustomCategories((prev) => [...prev, clean]);
+      toast.success(`Category "${clean}" added`);
+    },
+    [categories],
+  );
+
+  const renameCategory = useCallback((from: string, to: string) => {
+    const clean = to.trim();
+    if (!clean || clean === from) return;
+    setCustomCategories((prev) => {
+      const next = prev.filter((c) => c !== from);
+      return [...next, clean];
+    });
+    setItems((prev) =>
+      prev.map((item) =>
+        item.category === from
+          ? {
+              ...item,
+              category: clean,
+              auditTrail: [...item.auditTrail, auditEntry(`Category renamed to ${clean}`)],
+            }
+          : item,
+      ),
+    );
+    setFiltersState((prev) => ({
+      ...prev,
+      categories: prev.categories.map((c) => (c === from ? clean : c)),
+    }));
+    toast.success(`Category renamed to "${clean}"`);
+  }, []);
+
+  const deleteCategory = useCallback(
+    (name: string) => {
+      const used = items.filter((i) => i.category === name).length;
+      if (used > 0) {
+        toast.error(`"${name}" still holds ${used} document(s)`, {
+          description: "Move or delete those documents first.",
+        });
+        return;
+      }
+      setCustomCategories((prev) => prev.filter((c) => c !== name));
+      setHiddenCategories((prev) => (prev.includes(name) ? prev : [...prev, name]));
+      setFiltersState((prev) => ({ ...prev, categories: prev.categories.filter((c) => c !== name) }));
+      toast.success(`Category "${name}" removed`);
+
+    },
+    [items],
+  );
+
   const connectDrive = useCallback(
+
     (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => {
       void documentProvider.connect(config).then((conn) => {
         setConnection(conn);
@@ -247,7 +347,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     const inReview = items.filter(
       (i) => i.status === "Draft" || i.status === "Certified Translation Added",
     ).length;
-    const byCategory = CATEGORIES.map((category) => {
+    const byCategory = categories.map((category) => {
       const rows = items.filter((i) => i.category === category);
       const readyRows = rows.filter((i) => READY_STATUSES.includes(i.status)).length;
       return {
@@ -267,7 +367,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       totalPages: items.reduce((sum, i) => sum + i.pageCount, 0),
       byCategory,
     };
-  }, [items]);
+  }, [items, categories]);
 
   const value: EvidenceContextValue = {
     loading,
@@ -289,6 +389,13 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     bulkUpdate,
     bulkAssignPrefix,
     bulkAddTag,
+    deleteItem,
+    bulkDelete,
+    categories,
+    addCategory,
+    renameCategory,
+    deleteCategory,
+
     connection,
     connectDrive,
     exhibitGroups,
