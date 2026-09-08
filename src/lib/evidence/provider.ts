@@ -19,7 +19,11 @@ export interface DocumentProvider {
   readonly id: string;
   readonly displayName: string;
   getConnection(): Promise<ProviderConnection>;
-  connect(config: { apiKey?: string; folderPath?: string; accountLabel?: string }): Promise<ProviderConnection>;
+  connect(config: {
+    apiKey?: string;
+    folderPath?: string;
+    accountLabel?: string;
+  }): Promise<ProviderConnection>;
   disconnect(): Promise<ProviderConnection>;
   /** Full listing of evidence items in the connected folder. */
   list(): Promise<EvidenceItem[]>;
@@ -79,7 +83,9 @@ export class MockDriveProvider implements DocumentProvider {
       id: `ev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       cloudDriveUrl:
         draft.cloudDriveUrl ||
-        (file && typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : ""),
+        (file && typeof URL !== "undefined" && URL.createObjectURL
+          ? URL.createObjectURL(file)
+          : ""),
       auditTrail: [
         {
           id: `audit-${Math.random().toString(36).slice(2, 10)}`,

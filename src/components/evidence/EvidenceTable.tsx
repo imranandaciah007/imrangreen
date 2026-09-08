@@ -22,8 +22,17 @@ const columns: { key: SortKey; label: string; className?: string }[] = [
 ];
 
 export function EvidenceTable() {
-  const { filtered, items, sort, toggleSort, selectedIds, toggleSelected, setSelected, openInspector, updateItem } =
-    useEvidence();
+  const {
+    filtered,
+    items,
+    sort,
+    toggleSort,
+    selectedIds,
+    toggleSelected,
+    setSelected,
+    openInspector,
+    updateItem,
+  } = useEvidence();
   const [page, setPage] = useState(0);
   const [cursor, setCursor] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -36,7 +45,10 @@ export function EvidenceTable() {
     setCursor(0);
   }, [filtered.length]);
 
-  const rows = useMemo(() => filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE), [filtered, page]);
+  const rows = useMemo(
+    () => filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE),
+    [filtered, page],
+  );
   const allOnPageSelected = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
 
   useEffect(() => {
@@ -63,7 +75,8 @@ export function EvidenceTable() {
   }, [rows, cursor, openInspector, toggleSelected, editingId]);
 
   function commitExhibit(id: string) {
-    if (editValue.trim()) updateItem(id, { exhibitId: editValue.trim() }, `Exhibit ID set to ${editValue.trim()}`);
+    if (editValue.trim())
+      updateItem(id, { exhibitId: editValue.trim() }, `Exhibit ID set to ${editValue.trim()}`);
     setEditingId(null);
   }
 
@@ -96,7 +109,11 @@ export function EvidenceTable() {
                   <span className="inline-flex items-center gap-1">
                     {col.label}
                     {sort.key === col.key &&
-                      (sort.dir === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}
+                      (sort.dir === "asc" ? (
+                        <ArrowUp className="size-3" />
+                      ) : (
+                        <ArrowDown className="size-3" />
+                      ))}
                   </span>
                 </th>
               ))}
@@ -163,12 +180,16 @@ export function EvidenceTable() {
                 </td>
                 <td className="px-2 py-1.5 align-middle">
                   <span className="block truncate text-foreground">{item.category}</span>
-                  <span className="block truncate text-[10px] text-muted-foreground">{item.subCategory}</span>
+                  <span className="block truncate text-[10px] text-muted-foreground">
+                    {item.subCategory}
+                  </span>
                 </td>
                 <td className="px-2 py-1.5 align-middle">
                   <StatusSelect
                     value={item.status}
-                    onChange={(status) => updateItem(item.id, { status }, `${item.exhibitId} → ${status}`)}
+                    onChange={(status) =>
+                      updateItem(item.id, { status }, `${item.exhibitId} → ${status}`)
+                    }
                   />
                 </td>
                 <td className="px-2 py-1.5 text-right align-middle font-mono">{item.pageCount}</td>
@@ -179,7 +200,12 @@ export function EvidenceTable() {
                   {formatDate(item.dateOfDocument)}
                 </td>
                 <td className="px-2 py-1.5 align-middle">
-                  <Button variant="ghost" size="icon" className="size-7" onClick={() => openInspector(item.id)}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    onClick={() => openInspector(item.id)}
+                  >
                     <PanelRightOpen className="size-3.5" />
                   </Button>
                 </td>
@@ -187,11 +213,15 @@ export function EvidenceTable() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={columns.length + 2} className="px-3 py-12 text-center text-muted-foreground">
+                <td
+                  colSpan={columns.length + 2}
+                  className="px-3 py-12 text-center text-muted-foreground"
+                >
                   {items.length === 0 ? (
                     <span className="text-xs">
                       No documents yet — connect your drive folder to sync, or use{" "}
-                      <span className="font-semibold text-foreground">Add document</span> to file one manually.
+                      <span className="font-semibold text-foreground">Add document</span> to file
+                      one manually.
                     </span>
                   ) : (
                     "No exhibits match the current filters."
@@ -205,11 +235,18 @@ export function EvidenceTable() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
         <span className="font-mono">
-          Rows {filtered.length === 0 ? 0 : page * PAGE_SIZE + 1}–{Math.min(filtered.length, (page + 1) * PAGE_SIZE)} of{" "}
-          {filtered.length} · keys: j/k move, Enter inspect, x select
+          Rows {filtered.length === 0 ? 0 : page * PAGE_SIZE + 1}–
+          {Math.min(filtered.length, (page + 1) * PAGE_SIZE)} of {filtered.length} · keys: j/k move,
+          Enter inspect, x select
         </span>
         <span className="flex items-center gap-1.5">
-          <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            disabled={page === 0}
+            onClick={() => setPage((p) => p - 1)}
+          >
             Prev
           </Button>
           <span className="font-mono">
