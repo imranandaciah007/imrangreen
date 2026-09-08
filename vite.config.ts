@@ -12,4 +12,12 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    optimizeDeps: {
+      // Pre-bundle the PDF reader up front. It is only imported dynamically inside the
+      // diary import screen; discovering it mid-session forces a dep re-optimization
+      // that reloads a second copy of React and crashes the page.
+      include: ["pdfjs-dist"],
+    },
+  },
 });
