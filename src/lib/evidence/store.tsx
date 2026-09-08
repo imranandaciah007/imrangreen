@@ -175,7 +175,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<CaseTask[]>([]);
   const [profile, setProfileState] = useState<Profile>("Imran");
   const [profileChosen, setProfileChosen] = useState(false);
+  const [extractingIds, setExtractingIds] = useState<string[]>([]);
   const hydrated = useRef(false);
+
 
   useEffect(() => {
     let cancelled = false;
