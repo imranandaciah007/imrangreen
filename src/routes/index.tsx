@@ -138,8 +138,8 @@ function CaseApp() {
                     className={`size-2.5 shrink-0 ${connection?.connected ? "text-success" : "text-destructive"}`}
                   />
                   {connection?.lastSyncedAt
-                    ? `Drive synced ${new Date(connection.lastSyncedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`
-                    : "Drive not synced"}
+                    ? `Drive synched ${new Date(connection.lastSyncedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`
+                    : "Drive not synched"}
                 </p>
               </div>
             </div>
@@ -160,8 +160,8 @@ function CaseApp() {
                 size="icon"
                 className="hidden size-10 sm:inline-flex"
                 onClick={() => setConnectOpen(true)}
-                aria-label="Sync Drive"
-                title="Sync Drive"
+                aria-label="Synch Drive"
+                title="Synch Drive"
               >
                 <CloudCog className="size-4" />
               </Button>
@@ -195,13 +195,13 @@ function CaseApp() {
                   {connection?.lastSyncedAt ? "Drive is up to date" : "Bring in your Drive evidence"}
                 </p>
                 <p className="truncate text-[10px] font-medium text-muted-foreground">
-                  Last synced: {connection?.lastSyncedAt
+                  Last synched: {connection?.lastSyncedAt
                     ? new Date(connection.lastSyncedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
                     : "Never"}
                 </p>
               </div>
               <Button size="sm" className="h-10 shrink-0" onClick={() => setConnectOpen(true)}>
-                <CloudCog className="size-4" /> Sync Drive
+                <CloudCog className="size-4" /> Synch Drive
               </Button>
             </div>
 

@@ -95,7 +95,7 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
               setOpen(false);
             }}
           >
-            Sync Drive…
+            Synch Drive…
           </CommandItem>
         </CommandGroup>
       </CommandList>
