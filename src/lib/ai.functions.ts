@@ -550,7 +550,8 @@ export interface ReceiptRead {
   uncertain: { field: string; options: string[] }[];
   ranAt: string;
   contentRead: boolean;
-  passes: Record<string, unknown>[];
+  /** Both raw scans, kept as JSON for auditability. */
+  passes: string[];
 }
 
 async function receiptPass(input: {
@@ -706,6 +707,6 @@ export const extractReceipt = createServerFn({ method: "POST" })
       uncertain,
       ranAt: new Date().toISOString(),
       contentRead: Boolean(base64),
-      passes: [a as unknown as Record<string, unknown>, b as unknown as Record<string, unknown>],
+      passes: [JSON.stringify(a), JSON.stringify(b)],
     };
   });
