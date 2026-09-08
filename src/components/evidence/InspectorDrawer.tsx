@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  CheckSquare,
   ExternalLink,
   FileText,
   History,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { formatBytes, formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { TAGS, type EvidenceItem } from "@/lib/evidence/types";
+import { toast } from "sonner";
 import { StatusSelect, TagChip } from "./status-ui";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -48,6 +50,8 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
     extractingIds,
     confirmExtractionField,
     dismissExtractionField,
+    addTask,
+    profile,
   } = useEvidence();
   const item = items.find((i) => i.id === inspectorId) ?? null;
   const [notes, setNotes] = useState("");
@@ -117,6 +121,23 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                 >
                   <Sparkles className="size-3.5" />
                   {extractingIds.includes(item.id) ? "Reading…" : "Read with AI"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-xs"
+                  onClick={() => {
+                    addTask({
+                      title: `Follow up: ${item.title}`,
+                      category: item.category,
+                      dueDate: "",
+                      done: false,
+                      assignedTo: profile,
+                    });
+                    toast.success("Task created", { description: `Follow up: ${item.title}` });
+                  }}
+                >
+                  <CheckSquare className="size-3.5" /> Create task
                 </Button>
               </div>
 
