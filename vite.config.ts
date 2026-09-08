@@ -18,10 +18,19 @@ export default defineConfig({
       // diary import screen; discovering it mid-session forces a dep re-optimization
       // that reloads a second copy of React and crashes the page.
       include: [
+        "react",
+        "react-dom",
+        "react-dom/client",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
         "pdfjs-dist",
         "pdfjs-dist/legacy/build/pdf.mjs",
         "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
       ],
     },
+    resolve: {
+      dedupe: ["react", "react-dom"],
+    },
   },
 });
+
