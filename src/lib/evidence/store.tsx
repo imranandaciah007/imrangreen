@@ -33,6 +33,7 @@ import {
   type EvidenceStatus,
   type FinancialEntry,
   type HardshipEvent,
+  type PacketVersion,
   type IncomeSettings,
   type Profile,
   type SourceType,
@@ -987,7 +988,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           return { ...item, packetExhibitNo: mapped.number };
         }),
       );
-      void documentProvider.saveRecords;
       return version;
     },
     [packets.length, profile],
