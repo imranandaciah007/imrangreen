@@ -34,7 +34,7 @@ export function BottomNav({
           <button
             onClick={onAdd}
             aria-label="Add"
-            className="-mt-5 flex size-14 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-panel transition-transform active:scale-95"
+            className="-mt-5 flex size-14 items-center justify-center rounded-full bg-primary text-navy shadow-[0_8px_20px_rgba(255,201,38,.35)] transition-transform active:scale-95"
           >
             <Plus className="size-7" />
           </button>
