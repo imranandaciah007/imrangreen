@@ -1,6 +1,6 @@
 {
-  "name": "secs",
-  "short_name": "secs",
+  "name": "GC",
+  "short_name": "GC",
   "description": "Private hardship evidence portal for Imran & Aciah.",
   "start_url": "/",
   "id": "/",
