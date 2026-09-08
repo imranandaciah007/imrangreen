@@ -361,7 +361,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       toast.info("There are no documents to update yet.");
       return;
     }
-    applyPatch(ids, { status: "Ready", uncertainFields: [] }, "Marked as Ready");
+    applyPatch(ids, { status: "Ready" }, "Marked as Ready");
     toast.success(`Marked ${ids.length} document${ids.length === 1 ? "" : "s"} as Ready`);
   }, [applyPatch, items]);
 
