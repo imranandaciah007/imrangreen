@@ -139,6 +139,13 @@ interface EvidenceContextValue {
   dismissExtractionField: (id: string, field: string) => void;
   resolveConflict: (id: string, field: string, accept: boolean) => void;
 
+  /** Case packet builder (Prompt 5). */
+  packets: PacketVersion[];
+  togglePacketExclusion: (id: string) => void;
+  savePacketVersion: (
+    record: Omit<PacketVersion, "id" | "version" | "generatedAt" | "generatedBy">,
+  ) => PacketVersion;
+
 
   connection: ProviderConnection | null;
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
@@ -195,6 +202,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<Profile>("Imran");
   const [profileChosen, setProfileChosen] = useState(false);
   const [extractingIds, setExtractingIds] = useState<string[]>([]);
+  const [packets, setPackets] = useState<PacketVersion[]>([]);
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -211,6 +219,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       setEvents(records.events ?? []);
       setFinances(records.finances ?? []);
       setTasks(records.tasks ?? []);
+      setPackets(records.packets ?? []);
       setIncome({ ...DEFAULT_INCOME, ...(records.income ?? {}) });
       setCustomCategories(
         (records.categories ?? []).filter((c) => !DEFAULT_CATEGORIES.includes(c)),
@@ -236,8 +245,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       tasks,
       categories: customCategories,
       income,
+      packets,
     });
-  }, [events, finances, tasks, customCategories, income]);
+  }, [events, finances, tasks, customCategories, income, packets]);
 
   const setProfile = useCallback((p: Profile) => {
     setProfileState(p);
@@ -950,6 +960,39 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     });
   }, [items, filters, sort]);
 
+  const togglePacketExclusion = useCallback(
+    (id: string) => {
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
+      applyPatch([id], { excludeFromPacket: !item.excludeFromPacket }, item.excludeFromPacket ? "Included in the packet" : "Excluded from the packet");
+    },
+    [applyPatch, items],
+  );
+
+  /** Store an immutable packet version and freeze the exhibit numbers it used. */
+  const savePacketVersion = useCallback(
+    (record: Omit<PacketVersion, "id" | "version" | "generatedAt" | "generatedBy">) => {
+      const version: PacketVersion = {
+        ...record,
+        id: rid("packet"),
+        version: packets.length + 1,
+        generatedAt: nowIso(),
+        generatedBy: profile,
+      };
+      setPackets((prev) => [...prev, version]);
+      setItems((prev) =>
+        prev.map((item) => {
+          const mapped = record.exhibitMap.find((m) => m.evidenceId === item.id);
+          if (!mapped || item.packetExhibitNo) return item;
+          return { ...item, packetExhibitNo: mapped.number };
+        }),
+      );
+      void documentProvider.saveRecords;
+      return version;
+    },
+    [packets.length, profile],
+  );
+
   const gaps = useMemo(
     () => detectGaps(items, events, finances, tasks, categories),
     [items, events, finances, tasks, categories],
@@ -1060,6 +1103,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     confirmExtractionField,
     dismissExtractionField,
     resolveConflict,
+    packets,
+    togglePacketExclusion,
+    savePacketVersion,
 
 
     connection,
