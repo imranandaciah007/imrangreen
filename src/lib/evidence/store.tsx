@@ -507,6 +507,16 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     },
     [stamp],
   );
+  const updateEvent = useCallback(
+    (id: string, patch: Partial<HardshipEvent>) => {
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === id ? { ...e, ...patch, lastEditedBy: profile, updatedAt: nowIso() } : e,
+        ),
+      );
+    },
+    [profile],
+  );
   const deleteEvent = useCallback((id: string) => {
     setEvents((prev) => prev.filter((e) => e.id !== id));
     toast.success("Event deleted");
@@ -519,10 +529,21 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     },
     [stamp],
   );
+  const updateFinance = useCallback(
+    (id: string, patch: Partial<FinancialEntry>) => {
+      setFinances((prev) =>
+        prev.map((f) =>
+          f.id === id ? { ...f, ...patch, lastEditedBy: profile, updatedAt: nowIso() } : f,
+        ),
+      );
+    },
+    [profile],
+  );
   const deleteFinance = useCallback((id: string) => {
     setFinances((prev) => prev.filter((f) => f.id !== id));
     toast.success("Expense deleted");
   }, []);
+
 
   const addTask = useCallback(
     (draft: NewRecord<CaseTask>) => {
