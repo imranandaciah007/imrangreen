@@ -18,6 +18,43 @@ export interface DiaryChunk {
   hash: string;
 }
 
+export class PdfReaderInitializationError extends Error {
+  constructor(message = "The PDF reader could not start after three attempts.") {
+    super(message);
+    this.name = "PdfReaderInitializationError";
+  }
+}
+
+const READER_ATTEMPTS = 3;
+
+async function initialisePdfReader(onRetry?: (attempt: number, total: number) => void) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= READER_ATTEMPTS; attempt += 1) {
+    try {
+      const [pdfjs, worker] = await Promise.all([
+        import("pdfjs-dist"),
+        import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+      ]);
+      const workerSrc = (worker as { default?: string }).default;
+      if (typeof pdfjs.getDocument !== "function" || !workerSrc) {
+        throw new Error("The PDF reader did not load correctly.");
+      }
+      pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+      return pdfjs;
+    } catch (error) {
+      lastError = error;
+      if (attempt < READER_ATTEMPTS) {
+        onRetry?.(attempt + 1, READER_ATTEMPTS);
+        await new Promise((resolve) => window.setTimeout(resolve, attempt * 600));
+      }
+    }
+  }
+
+  console.error("PDF reader initialization failed", lastError);
+  throw new PdfReaderInitializationError();
+}
+
 /** Small stable fingerprint used to spot text that has already been imported. */
 export function hashText(text: string) {
   let h1 = 0x811c9dc5;
@@ -33,11 +70,9 @@ export function hashText(text: string) {
 export async function readDiaryPages(
   file: File,
   onProgress?: (done: number, total: number) => void,
+  onReaderRetry?: (attempt: number, total: number) => void,
 ): Promise<DiaryPage[]> {
-  const pdfjs = await import("pdfjs-dist");
-  const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
-  pdfjs.GlobalWorkerOptions.workerSrc = (worker as { default: string }).default;
-
+  const pdfjs = await initialisePdfReader(onReaderRetry);
   const buffer = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
   const pages: DiaryPage[] = [];

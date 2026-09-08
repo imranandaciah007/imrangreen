@@ -25,7 +25,11 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { analyseDiaryChunk, type DiaryChunkResult } from "@/lib/diary.functions";
-import { chunkPages, readDiaryPages } from "@/lib/evidence/diary-pdf";
+import {
+  chunkPages,
+  PdfReaderInitializationError,
+  readDiaryPages,
+} from "@/lib/evidence/diary-pdf";
 import {
   planDiaryImport,
   type DiaryPlan,
@@ -35,7 +39,7 @@ import {
 import { useEvidence } from "@/lib/evidence/store";
 import { EXPENSE_CATEGORIES, PEOPLE } from "@/lib/evidence/types";
 
-type Phase = "pick" | "reading" | "analysing" | "review" | "done";
+type Phase = "pick" | "reading" | "reader-error" | "analysing" | "review" | "done";
 
 export function DiaryImportDialog({
   open,
@@ -60,6 +64,7 @@ export function DiaryImportDialog({
   const [makeTasks, setMakeTasks] = useState(true);
   const [failures, setFailures] = useState(0);
   const [summary, setSummary] = useState<ReturnType<typeof describe> | null>(null);
+  const [readerError, setReaderError] = useState("");
 
   const previousKeys = useMemo(() => diaryImports.flatMap((d) => d.recordKeys), [diaryImports]);
   const previousHashes = useMemo(
@@ -76,14 +81,24 @@ export function DiaryImportDialog({
     setFailures(0);
     setSkipped(0);
     setSummary(null);
+    setReaderError("");
   }
 
   async function run(selected: File) {
     setFile(selected);
+    setReaderError("");
     setPhase("reading");
     try {
-      const pages = await readDiaryPages(selected, (done, total) =>
-        setProgress({ done, total, label: `Reading page ${done} of ${total}` }),
+      const pages = await readDiaryPages(
+        selected,
+        (done, total) =>
+          setProgress({ done, total, label: `Reading page ${done} of ${total}` }),
+        (attempt, total) =>
+          setProgress({
+            done: attempt,
+            total,
+            label: `PDF reader did not start — retrying automatically (${attempt} of ${total})`,
+          }),
       );
       setPagesAnalysed(pages.length);
       const allChunks = chunkPages(pages);
@@ -143,6 +158,13 @@ export function DiaryImportDialog({
       setPhase("review");
     } catch (error) {
       console.error(error);
+      if (error instanceof PdfReaderInitializationError) {
+        setReaderError(
+          "The PDF reader could not start after three attempts. Your file has not been changed. Retry below, or reload the app and try again.",
+        );
+        setPhase("reader-error");
+        return;
+      }
       toast.error("Could not read the diary", {
         description: error instanceof Error ? error.message.slice(0, 160) : "Please try again.",
       });
@@ -291,6 +313,32 @@ export function DiaryImportDialog({
                 ? "Reading the diary on this device."
                 : "Each section is read twice and the two readings are compared."}
             </p>
+          </div>
+        )}
+
+        {phase === "reader-error" && (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-md border border-destructive/35 bg-destructive/10 p-3">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+              <div>
+                <p className="text-sm font-semibold">PDF reader unavailable</p>
+                <p className="mt-1 text-xs text-muted-foreground">{readerError}</p>
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button
+                className="h-11"
+                disabled={!file}
+                onClick={() => {
+                  if (file) void run(file);
+                }}
+              >
+                Retry PDF reader
+              </Button>
+              <Button variant="outline" className="h-11" onClick={() => reset()}>
+                Choose another PDF
+              </Button>
+            </div>
           </div>
         )}
 
