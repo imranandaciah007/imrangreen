@@ -94,6 +94,9 @@ export function CaseReviewView({
 
   return (
     <div className="space-y-4">
+      <Button className="h-11 w-full" onClick={onBuildPacket}>
+        Build case packet
+      </Button>
       <div>
         <h2 className="text-sm font-semibold text-foreground">Case review</h2>
         <p className="text-[11px] text-muted-foreground">
