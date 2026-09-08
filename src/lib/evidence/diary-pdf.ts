@@ -60,6 +60,66 @@ function installPdfCompatibility() {
       return out;
     };
   }
+
+  const globalWithClone = globalThis as typeof globalThis & {
+    structuredClone?: <T>(value: T, options?: { transfer?: Transferable[] }) => T;
+  };
+  if (typeof globalWithClone.structuredClone !== "function") {
+    globalWithClone.structuredClone = function structuredCloneFallback<T>(value: T): T {
+      const seen = new Map<object, unknown>();
+      const clone = (input: unknown): unknown => {
+        if (input === null || typeof input !== "object") return input;
+        if (seen.has(input)) return seen.get(input);
+        if (input instanceof ArrayBuffer) return input.slice(0);
+        if (ArrayBuffer.isView(input)) {
+          const view = input as ArrayBufferView;
+          const copied = view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
+          if (input instanceof DataView) return new DataView(copied);
+          const Constructor = input.constructor as new (buffer: ArrayBuffer) => unknown;
+          return new Constructor(copied);
+        }
+        if (input instanceof Date) return new Date(input.getTime());
+        if (input instanceof Map) {
+          const output = new Map();
+          seen.set(input, output);
+          input.forEach((v, k) => output.set(clone(k), clone(v)));
+          return output;
+        }
+        if (input instanceof Set) {
+          const output = new Set();
+          seen.set(input, output);
+          input.forEach((v) => output.add(clone(v)));
+          return output;
+        }
+        const output: unknown[] | Record<string, unknown> = Array.isArray(input) ? [] : {};
+        seen.set(input, output);
+        for (const key of Object.keys(input)) {
+          (output as Record<string, unknown>)[key] = clone((input as Record<string, unknown>)[key]);
+        }
+        return output;
+      };
+      return clone(value) as T;
+    };
+  }
+
+  const signal = AbortSignal as typeof AbortSignal & {
+    any?: (signals: AbortSignal[]) => AbortSignal;
+  };
+  if (typeof signal.any !== "function") {
+    signal.any = (signals) => {
+      const controller = new AbortController();
+      const abort = (event: Event) =>
+        controller.abort((event.target as AbortSignal | null)?.reason);
+      for (const source of signals) {
+        if (source.aborted) {
+          controller.abort(source.reason);
+          break;
+        }
+        source.addEventListener("abort", abort, { once: true });
+      }
+      return controller.signal;
+    };
+  }
 }
 
 async function initialisePdfReader(onRetry?: (attempt: number, total: number) => void) {
@@ -109,23 +169,47 @@ export async function readDiaryPages(
   onProgress?: (done: number, total: number) => void,
   onReaderRetry?: (attempt: number, total: number) => void,
 ): Promise<DiaryPage[]> {
-  const pdfjs = await initialisePdfReader(onReaderRetry);
   const buffer = await file.arrayBuffer();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
-  const pages: DiaryPage[] = [];
-  for (let n = 1; n <= doc.numPages; n += 1) {
-    const page = await doc.getPage(n);
-    const content = await page.getTextContent();
-    const text = content.items
-      .map((item) => ("str" in item ? item.str : ""))
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim();
-    pages.push({ page: n, text });
-    onProgress?.(n, doc.numPages);
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= READER_ATTEMPTS; attempt += 1) {
+    let doc: Awaited<ReturnType<(typeof import("pdfjs-dist/legacy/build/pdf.mjs"))["getDocument"]>["promise"]> | null = null;
+    try {
+      const pdfjs = await initialisePdfReader(onReaderRetry);
+      // pdf.js may transfer/detach its input, so every retry needs a fresh copy.
+      doc = await pdfjs.getDocument({ data: new Uint8Array(buffer.slice(0)) }).promise;
+      const pages: DiaryPage[] = [];
+      for (let n = 1; n <= doc.numPages; n += 1) {
+        const page = await doc.getPage(n);
+        const content = await page.getTextContent();
+        const text = content.items
+          .map((item) => ("str" in item ? item.str : ""))
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        pages.push({ page: n, text });
+        onProgress?.(n, doc.numPages);
+        page.cleanup();
+      }
+
+      // Some Safari/pdf.js worker combinations never settle this cleanup promise.
+      // Cleanup remains best-effort and must not prevent the completed import advancing.
+      void Promise.resolve(doc.cleanup()).catch(() => undefined);
+      return pages;
+    } catch (error) {
+      lastError = error;
+      if (attempt < READER_ATTEMPTS) {
+        onReaderRetry?.(attempt + 1, READER_ATTEMPTS);
+        await new Promise((resolve) => window.setTimeout(resolve, attempt * 600));
+      }
+    }
   }
-  await doc.cleanup();
-  return pages;
+
+  console.error("PDF document reading failed", lastError);
+  const detail = lastError instanceof Error ? lastError.message : "Unknown PDF reader error";
+  throw new PdfReaderInitializationError(
+    `The PDF could not be read after three attempts. ${detail}`,
+  );
 }
 
 /** Group pages into chunks small enough for a careful two-pass read. */
