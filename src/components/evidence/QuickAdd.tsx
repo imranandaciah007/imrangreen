@@ -253,11 +253,11 @@ export function ExpenseDialog({
     });
     if (evidenceIds.length === 0) {
       addTask({
-        title: `Collect receipt/bank evidence for ${created.label}`,
-        due: "",
-        assignee: profile,
+        title: `Collect receipt/bank evidence for ${created.label} (${sym}${effectiveAmount} on ${date})`,
+        category: "",
+        dueDate: "",
         done: false,
-        notes: `${sym}${effectiveAmount} on ${date}`,
+        assignedTo: profile,
       });
     }
     onOpenChange(false);
