@@ -10,11 +10,15 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { extractDocument } from "@/lib/ai.functions";
 import { documentProvider, type ProviderConnection } from "./provider";
+
 import {
   CASE_SETTINGS,
   DEFAULT_CATEGORIES,
+  PEOPLE,
   READY_STATUSES,
+  SOURCE_TYPES,
   type CaseTask,
   type Category,
   type EvidenceItem,
@@ -22,8 +26,10 @@ import {
   type FinancialEntry,
   type HardshipEvent,
   type Profile,
+  type SourceType,
   type Tag,
 } from "./types";
+
 
 export type SortKey =
   "exhibitId" | "title" | "category" | "status" | "pageCount" | "dateOfDocument" | "fileSizeBytes";
