@@ -17,7 +17,7 @@ export default defineConfig({
       // Pre-bundle the PDF reader up front. It is only imported dynamically inside the
       // diary import screen; discovering it mid-session forces a dep re-optimization
       // that reloads a second copy of React and crashes the page.
-      include: ["pdfjs-dist"],
+      include: ["pdfjs-dist", "pdfjs-dist/legacy/build/pdf.mjs"],
     },
   },
 });
