@@ -193,7 +193,6 @@ function CaseApp() {
               />
             )}
 
-
             {tab === "vault" && (
               <div className="space-y-4 lg:grid lg:grid-cols-[320px_1fr] lg:items-start lg:gap-4 lg:space-y-0">
                 <CategoryPanel onUploadTo={(c) => openUpload(c)} />

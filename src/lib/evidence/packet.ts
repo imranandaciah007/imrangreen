@@ -250,8 +250,21 @@ interface PacketInput {
   events: HardshipEvent[];
   finances: FinancialEntry[];
   gaps: CaseGap[];
-  totals: { documented: number; sentToAciah: number; jibril: number; medical: number; housing: number; immigration: number };
-  income: { netMonthlyIncome: number; mortgage: number; councilTax: number; utilities: number; otherCommitments: number };
+  totals: {
+    documented: number;
+    sentToAciah: number;
+    jibril: number;
+    medical: number;
+    housing: number;
+    immigration: number;
+  };
+  income: {
+    netMonthlyIncome: number;
+    mortgage: number;
+    councilTax: number;
+    utilities: number;
+    otherCommitments: number;
+  };
 }
 
 const stamps = (p: PacketInput) =>

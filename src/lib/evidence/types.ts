@@ -135,10 +135,7 @@ export interface EvidenceItem {
   /** Fields a human has confirmed — AI must never silently overwrite these. */
   confirmedFields?: string[] | undefined;
   /** Later AI runs that disagree with a human-confirmed field, awaiting a decision. */
-  aiConflicts?:
-    | { field: string; existing: string; aiValue: string; ranAt: string }[]
-    | undefined;
-
+  aiConflicts?: { field: string; existing: string; aiValue: string; ranAt: string }[] | undefined;
 
   notes: string;
   /** Provenance when this record came from the hardship diary import. */
@@ -381,7 +378,6 @@ export const DEFAULT_INCOME: IncomeSettings = {
   updatedBy: "",
 };
 
-
 export const TASK_STATUSES = ["To do", "Waiting", "Complete"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
@@ -427,7 +423,6 @@ export function taskStatus(task: CaseTask): TaskStatus {
   if (task.status) return task.status;
   return task.done ? "Complete" : "To do";
 }
-
 
 export function stageForStatus(status: EvidenceStatus): Stage {
   switch (status) {

@@ -44,16 +44,8 @@ export function DiaryImportDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const {
-    items,
-    events,
-    finances,
-    categories,
-    addItem,
-    applyDiaryImport,
-    diaryImports,
-    profile,
-  } = useEvidence();
+  const { items, events, finances, categories, addItem, applyDiaryImport, diaryImports, profile } =
+    useEvidence();
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -69,10 +61,7 @@ export function DiaryImportDialog({
   const [failures, setFailures] = useState(0);
   const [summary, setSummary] = useState<ReturnType<typeof describe> | null>(null);
 
-  const previousKeys = useMemo(
-    () => diaryImports.flatMap((d) => d.recordKeys),
-    [diaryImports],
-  );
+  const previousKeys = useMemo(() => diaryImports.flatMap((d) => d.recordKeys), [diaryImports]);
   const previousHashes = useMemo(
     () => new Set(diaryImports.flatMap((d) => d.chunkHashes)),
     [diaryImports],
@@ -168,7 +157,8 @@ export function DiaryImportDialog({
     return {
       auto,
       enriched: [...plan.events, ...plan.finances].filter((p) => p.outcome === "enrich").length,
-      duplicates: [...plan.events, ...plan.finances].filter((p) => p.outcome === "duplicate").length,
+      duplicates: [...plan.events, ...plan.finances].filter((p) => p.outcome === "duplicate")
+        .length,
       uncertain: [...plan.events, ...plan.finances].filter((p) => p.uncertainFields.length).length,
       appendix: plan.appendix.length,
       appendixMissing: plan.appendixMissing.length,
@@ -328,7 +318,8 @@ export function DiaryImportDialog({
 
                 {(skipped > 0 || failures > 0) && (
                   <p className="text-[11px] text-muted-foreground">
-                    {skipped > 0 && `${skipped} section(s) unchanged since the last import were skipped. `}
+                    {skipped > 0 &&
+                      `${skipped} section(s) unchanged since the last import were skipped. `}
                     {failures > 0 && `${failures} section(s) could not be read and were left out.`}
                   </p>
                 )}

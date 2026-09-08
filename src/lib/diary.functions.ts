@@ -166,13 +166,25 @@ function s(v: unknown) {
 }
 
 function norm(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Cheap word-overlap similarity, 0..1. */
 export function similarity(a: string, b: string) {
-  const wa = new Set(norm(a).split(" ").filter((w) => w.length > 2));
-  const wb = new Set(norm(b).split(" ").filter((w) => w.length > 2));
+  const wa = new Set(
+    norm(a)
+      .split(" ")
+      .filter((w) => w.length > 2),
+  );
+  const wb = new Set(
+    norm(b)
+      .split(" ")
+      .filter((w) => w.length > 2),
+  );
   if (!wa.size || !wb.size) return 0;
   let hit = 0;
   wa.forEach((w) => {
@@ -300,7 +312,10 @@ function pairFinances(a: DiaryFinanceDraft[], b: DiaryFinanceDraft[]) {
     let best = 0;
     b.forEach((y, i) => {
       if (used.has(i)) return;
-      const score = similarity(`${x.label} ${x.merchant} ${x.purpose}`, `${y.label} ${y.merchant} ${y.purpose}`);
+      const score = similarity(
+        `${x.label} ${x.merchant} ${x.purpose}`,
+        `${y.label} ${y.merchant} ${y.purpose}`,
+      );
       if (score > best) {
         best = score;
         bestIdx = i;
@@ -391,7 +406,12 @@ export const analyseDiaryChunk = createServerFn({ method: "POST" })
       if (seen.has(key)) continue;
       seen.add(key);
       if (!y) {
-        uncertainEvents.push({ draft: x, fields: [{ field: "wholeRecord", options: ["only one of the two scans found this entry"] }] });
+        uncertainEvents.push({
+          draft: x,
+          fields: [
+            { field: "wholeRecord", options: ["only one of the two scans found this entry"] },
+          ],
+        });
         continue;
       }
       const fields: { field: string; options: string[] }[] = [];
@@ -412,7 +432,11 @@ export const analyseDiaryChunk = createServerFn({ method: "POST" })
         passage: x.passage || y.passage,
       };
       const agreedDate = Boolean(merged.date) && !fields.some((f) => f.field === "date");
-      if (fields.length || !agreedDate) uncertainEvents.push({ draft: merged, fields: fields.length ? fields : [{ field: "date", options: ["no date agreed"] }] });
+      if (fields.length || !agreedDate)
+        uncertainEvents.push({
+          draft: merged,
+          fields: fields.length ? fields : [{ field: "date", options: ["no date agreed"] }],
+        });
       else events.push(merged);
     }
 
@@ -422,7 +446,12 @@ export const analyseDiaryChunk = createServerFn({ method: "POST" })
     for (const { x, y } of pairFinances(a.finances, b.finances)) {
       if (!x.label) continue;
       if (!y) {
-        uncertainFinances.push({ draft: x, fields: [{ field: "wholeRecord", options: ["only one of the two scans found this cost"] }] });
+        uncertainFinances.push({
+          draft: x,
+          fields: [
+            { field: "wholeRecord", options: ["only one of the two scans found this cost"] },
+          ],
+        });
         continue;
       }
       const fields: { field: string; options: string[] }[] = [];

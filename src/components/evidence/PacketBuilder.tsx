@@ -138,7 +138,9 @@ export function PacketBuilder({
       councilTax: income.councilTax ?? 0,
       utilities: income.utilities ?? 0,
       otherCommitments:
-        (income.debtCommitments ?? 0) + (income.transportWork ?? 0) + (income.otherObligations ?? 0),
+        (income.debtCommitments ?? 0) +
+        (income.transportWork ?? 0) +
+        (income.otherObligations ?? 0),
     },
   };
 
@@ -147,7 +149,11 @@ export function PacketBuilder({
     const v = nextVersion;
     const files = [
       { name: `I601_Case_Packet_v${v}.html`, mime: "text/html", content: packetHtml(input) },
-      { name: `I601_Exhibit_Index_v${v}.html`, mime: "text/html", content: exhibitIndexHtml(input) },
+      {
+        name: `I601_Exhibit_Index_v${v}.html`,
+        mime: "text/html",
+        content: exhibitIndexHtml(input),
+      },
       { name: `I601_Timeline_v${v}.html`, mime: "text/html", content: timelineHtml(input) },
       {
         name: `I601_Financial_Summary_v${v}.html`,
@@ -253,7 +259,11 @@ export function PacketBuilder({
                     n: exhibits.length,
                     tone: "text-success",
                   },
-                  { label: "Needs attention", n: attention.length + blocking.length, tone: "text-warning" },
+                  {
+                    label: "Needs attention",
+                    n: attention.length + blocking.length,
+                    tone: "text-warning",
+                  },
                   { label: "Optional", n: optional.length, tone: "text-muted-foreground" },
                 ].map((c) => (
                   <div key={c.label} className="rounded-lg border border-border bg-card p-2.5">
@@ -378,8 +388,8 @@ export function PacketBuilder({
           {step === 2 && (
             <>
               <p className="text-[11px] text-muted-foreground">
-                {exhibits.length} exhibits, {pageCount} packet pages. Turn an exhibit off to leave it
-                out of this packet — it stays in the vault.
+                {exhibits.length} exhibits, {pageCount} packet pages. Turn an exhibit off to leave
+                it out of this packet — it stays in the vault.
               </p>
               <ul className="space-y-1.5">
                 {items.map((item) => {
@@ -398,8 +408,8 @@ export function PacketBuilder({
                           {item.title || item.fileName}
                         </p>
                         <p className="font-mono text-[10px] text-muted-foreground">
-                          {ex ? `${ex.number} · pages ${ex.firstPage}–${ex.lastPage}` : "excluded"} ·{" "}
-                          {formatDate(item.dateOfDocument)} · {item.sourceType}
+                          {ex ? `${ex.number} · pages ${ex.firstPage}–${ex.lastPage}` : "excluded"}{" "}
+                          · {formatDate(item.dateOfDocument)} · {item.sourceType}
                         </p>
                       </div>
                       {item.packetExhibitNo && (
@@ -454,7 +464,8 @@ export function PacketBuilder({
           {step === 4 && (
             <div className="space-y-2.5">
               <div className="flex items-center gap-2 rounded-lg border border-success/45 bg-success/10 p-2.5 text-xs">
-                <CheckCircle2 className="size-4 text-success" /> Case Packet v{packets.length} saved.
+                <CheckCircle2 className="size-4 text-success" /> Case Packet v{packets.length}{" "}
+                saved.
               </div>
               <ul className="space-y-1.5">
                 {saved.map((f) => (
@@ -488,12 +499,15 @@ export function PacketBuilder({
                     Previous versions
                   </p>
                   <ul className="mt-1.5 space-y-1">
-                    {packets.slice(0, -1).reverse().map((v) => (
-                      <li key={v.id} className="font-mono text-[10px] text-muted-foreground">
-                        v{v.version} · {formatDateTime(v.generatedAt)} · {v.exhibitCount} exhibits ·
-                        £{v.totals.documented.toFixed(2)}
-                      </li>
-                    ))}
+                    {packets
+                      .slice(0, -1)
+                      .reverse()
+                      .map((v) => (
+                        <li key={v.id} className="font-mono text-[10px] text-muted-foreground">
+                          v{v.version} · {formatDateTime(v.generatedAt)} · {v.exhibitCount} exhibits
+                          · £{v.totals.documented.toFixed(2)}
+                        </li>
+                      ))}
                   </ul>
                 </div>
               )}

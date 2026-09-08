@@ -21,7 +21,6 @@ import {
   type CategoryCoverage,
 } from "./review";
 
-
 import {
   CASE_SETTINGS,
   DEFAULT_CATEGORIES,
@@ -168,7 +167,6 @@ interface EvidenceContextValue {
   savePacketVersion: (
     record: Omit<PacketVersion, "id" | "version" | "generatedAt" | "generatedBy">,
   ) => PacketVersion;
-
 
   connection: ProviderConnection | null;
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
@@ -626,7 +624,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         ? finances.find((f) => f.transferKey === enriched.transferKey)
         : undefined;
       if (twin) {
-        const merged = Array.from(new Set([...(twin.evidenceIds ?? []), ...(enriched.evidenceIds ?? [])]));
+        const merged = Array.from(
+          new Set([...(twin.evidenceIds ?? []), ...(enriched.evidenceIds ?? [])]),
+        );
         setFinances((prev) =>
           prev.map((f) =>
             f.id === twin.id
@@ -719,7 +719,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-
   const runOne = useCallback(
     async (item: EvidenceItem, categoryList: Category[]) => {
       const result = await extractDocument({
@@ -784,7 +783,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       guard("sourceType", "sourceType", a.sourceType);
       guard("pageCount", "pageCount", a.pageCount);
       if (conflicts.length) patch.aiConflicts = conflicts;
-
 
       patch.aiExtraction = {
         ranAt: result.ranAt,
@@ -934,16 +932,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         : {};
       patch.aiConflicts = (item.aiConflicts ?? []).filter((c) => c.field !== field);
       patch.confirmedFields = Array.from(new Set([...(item.confirmedFields ?? []), field]));
-      applyPatch(
-        [id],
-        patch,
-        accept ? `Accepted AI value for ${field}` : `Kept existing ${field}`,
-      );
+      applyPatch([id], patch, accept ? `Accepted AI value for ${field}` : `Kept existing ${field}`);
     },
     [applyConfirmed, applyPatch, items],
   );
-
-
 
   /**
    * Write an approved hardship-diary import into the case. Existing records are only
@@ -1109,7 +1101,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       if (args.createTasksForMissing && args.plan.appendixMissing.length) {
         const chase: CaseTask[] = args.plan.appendixMissing.slice(0, 60).map((link) => ({
           id: rid("task"),
-          title: `Obtain ${link.ref} — ${link.description || "referenced in hardship diary"}`.slice(0, 120),
+          title: `Obtain ${link.ref} — ${link.description || "referenced in hardship diary"}`.slice(
+            0,
+            120,
+          ),
           category: "",
           dueDate: "",
           done: false,
@@ -1217,7 +1212,11 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       const item = items.find((i) => i.id === id);
       if (!item) return;
-      applyPatch([id], { excludeFromPacket: !item.excludeFromPacket }, item.excludeFromPacket ? "Included in the packet" : "Excluded from the packet");
+      applyPatch(
+        [id],
+        { excludeFromPacket: !item.excludeFromPacket },
+        item.excludeFromPacket ? "Included in the packet" : "Excluded from the packet",
+      );
     },
     [applyPatch, items],
   );
@@ -1259,7 +1258,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const stats = useMemo(() => {
-
     const ready = items.filter((i) => READY_STATUSES.includes(i.status)).length;
     const missingTranslation = items.filter((i) => i.status === "Translation needed").length;
     const gaps = items.filter((i) => i.status === "Missing supporting evidence").length;
@@ -1364,7 +1362,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     packets,
     togglePacketExclusion,
     savePacketVersion,
-
 
     connection,
     connectDrive,

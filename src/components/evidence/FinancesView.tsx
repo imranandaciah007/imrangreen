@@ -10,8 +10,7 @@ import { useEvidence } from "@/lib/evidence/store";
 import { EXPENSE_GROUPS, type ExpenseCategory, type FinancialEntry } from "@/lib/evidence/types";
 import { cn } from "@/lib/utils";
 
-const money = (n: number, sym = "£") =>
-  `${sym}${Math.round(n).toLocaleString()}`;
+const money = (n: number, sym = "£") => `${sym}${Math.round(n).toLocaleString()}`;
 
 /** Which reporting group an entry belongs to. */
 function groupOf(entry: FinancialEntry): string {
@@ -49,7 +48,16 @@ export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
     const byCategory = new Map<string, number>();
     const byMonth = new Map<
       string,
-      { total: number; transfers: number; jibril: number; medical: number; housing: number; immigration: number; count: number; missing: number }
+      {
+        total: number;
+        transfers: number;
+        jibril: number;
+        medical: number;
+        housing: number;
+        immigration: number;
+        count: number;
+        missing: number;
+      }
     >();
     let total = 0;
     let usdTotal = 0;
@@ -70,9 +78,16 @@ export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
       if ((f.evidenceIds ?? []).length === 0) missing += 1;
 
       const key = f.date.slice(0, 7);
-      const m =
-        byMonth.get(key) ??
-        { total: 0, transfers: 0, jibril: 0, medical: 0, housing: 0, immigration: 0, count: 0, missing: 0 };
+      const m = byMonth.get(key) ?? {
+        total: 0,
+        transfers: 0,
+        jibril: 0,
+        medical: 0,
+        housing: 0,
+        immigration: 0,
+        count: 0,
+        missing: 0,
+      };
       m.count += 1;
       if ((f.evidenceIds ?? []).length === 0) m.missing += 1;
       if (g !== "UK fixed obligations") m.total += v;
@@ -109,7 +124,10 @@ export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
       label: "Aciah medical / pregnancy",
       value: money(totals.byGroup.get("Aciah medical & pregnancy") ?? 0),
     },
-    { label: "Housing / relocation", value: money(totals.byGroup.get("Housing & relocation") ?? 0) },
+    {
+      label: "Housing / relocation",
+      value: money(totals.byGroup.get("Housing & relocation") ?? 0),
+    },
     {
       label: "Immigration / travel",
       value: money(totals.byGroup.get("Immigration & travel") ?? 0),
@@ -171,7 +189,12 @@ export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
           <h2 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
             Income &amp; fixed commitments (factual summary)
           </h2>
-          <Button variant="outline" size="sm" className="h-9" onClick={() => setShowIncome((v) => !v)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => setShowIncome((v) => !v)}
+          >
             <Pencil className="size-4" /> {showIncome ? "Done" : "Edit"}
           </Button>
         </header>

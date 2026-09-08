@@ -41,7 +41,13 @@ export interface CaseGap {
 }
 
 const MEDICAL_WORDS = /(medic|doctor|gp |hospital|diagnos|therap|mental|pregnan|midwife|clinic)/i;
-const INDEPENDENT_SOURCES = ["Medical", "Government / Official", "Police / Court", "Employer", "Independent Third Party"];
+const INDEPENDENT_SOURCES = [
+  "Medical",
+  "Government / Official",
+  "Police / Court",
+  "Employer",
+  "Independent Third Party",
+];
 
 function catsOf(item: EvidenceItem) {
   return item.categories?.length ? item.categories : [item.category];
@@ -60,8 +66,7 @@ export function aciahImpactState(record: {
   notes?: string | undefined;
 }): "Explicit in evidence" | "Linked / explained" | "Needs explanation" {
   const text = `${record.description ?? ""} ${record.notes ?? ""}`;
-  const mentionsAciah =
-    (record.people ?? []).includes("Aciah") || /aciah/i.test(text);
+  const mentionsAciah = (record.people ?? []).includes("Aciah") || /aciah/i.test(text);
   const explained = Boolean((record.effectOnAciah ?? record.affectsAciah ?? "").trim());
   if (mentionsAciah && (explained || /aciah/i.test(text))) {
     return explained ? "Explicit in evidence" : "Linked / explained";
@@ -343,7 +348,12 @@ export function categoryCoverage(
       sourceMix: [...mixMap.entries()]
         .map(([source, count]) => ({ source, count }))
         .sort((a, b) => b.count - a.count),
-      recentDate: rows.map((r) => r.dateOfDocument).filter(Boolean).sort().at(-1) ?? "",
+      recentDate:
+        rows
+          .map((r) => r.dateOfDocument)
+          .filter(Boolean)
+          .sort()
+          .at(-1) ?? "",
       gapCount,
       label,
     };
@@ -356,10 +366,7 @@ export const SEPARATION_DATE = CASE_SETTINGS.separationStartDate;
  * Documents the hardship diary refers to (appendix A1, A24 …) that are not in the vault.
  * Purely organisational: it says what is missing, never what it would prove.
  */
-export function detectDiaryGaps(
-  diaryImports: DiaryImport[],
-  items: EvidenceItem[],
-): CaseGap[] {
+export function detectDiaryGaps(diaryImports: DiaryImport[], items: EvidenceItem[]): CaseGap[] {
   if (!diaryImports.length) return [];
   const haveRefs = new Set(
     items.flatMap((i) => (i.appendixRefs ?? []).map((r) => r.toUpperCase())),

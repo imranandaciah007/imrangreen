@@ -1,15 +1,6 @@
-import type {
-  DiaryAppendixLink,
-  EvidenceItem,
-  FinancialEntry,
-  HardshipEvent,
-} from "./types";
+import type { DiaryAppendixLink, EvidenceItem, FinancialEntry, HardshipEvent } from "./types";
 import { CASE_SETTINGS } from "./types";
-import type {
-  DiaryChunkResult,
-  DiaryEventDraft,
-  DiaryFinanceDraft,
-} from "@/lib/diary.functions";
+import type { DiaryChunkResult, DiaryEventDraft, DiaryFinanceDraft } from "@/lib/diary.functions";
 
 /**
  * Cross-source merge planner for the hardship diary import.
@@ -58,11 +49,19 @@ export interface DiaryPlan {
 }
 
 function norm(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function words(text: string) {
-  return new Set(norm(text).split(" ").filter((w) => w.length > 2));
+  return new Set(
+    norm(text)
+      .split(" ")
+      .filter((w) => w.length > 2),
+  );
 }
 
 export function similarity(a: string, b: string) {
@@ -94,7 +93,8 @@ function findEvidenceForRefs(items: EvidenceItem[], refs: string[]) {
   if (!refs.length) return [];
   return items
     .filter((item) => {
-      const haystack = `${item.exhibitId} ${item.fileName} ${item.title} ${(item.appendixRefs ?? []).join(" ")}`.toUpperCase();
+      const haystack =
+        `${item.exhibitId} ${item.fileName} ${item.title} ${(item.appendixRefs ?? []).join(" ")}`.toUpperCase();
       return refs.some((ref) => new RegExp(`(^|[^A-Z0-9])${ref}([^A-Z0-9]|$)`).test(haystack));
     })
     .map((i) => i.id);
@@ -102,9 +102,7 @@ function findEvidenceForRefs(items: EvidenceItem[], refs: string[]) {
 
 function daysApart(a: string, b: string) {
   if (!a || !b) return 999;
-  return Math.abs(
-    (new Date(a).getTime() - new Date(b).getTime()) / (1000 * 60 * 60 * 24),
-  );
+  return Math.abs((new Date(a).getTime() - new Date(b).getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export function planDiaryImport(
@@ -211,9 +209,7 @@ export function planDiaryImport(
     }
 
     const jibrilOnly =
-      draft.people.includes("Jibril") &&
-      !draft.people.includes("Aciah") &&
-      !draft.effectOnAciah;
+      draft.people.includes("Jibril") && !draft.people.includes("Aciah") && !draft.effectOnAciah;
 
     eventPlans.push({
       key,
@@ -249,8 +245,7 @@ export function planDiaryImport(
     let best = 0;
 
     for (const entry of existing.finances) {
-      const sameAmount =
-        draft.amount > 0 && Math.abs(entry.amount - draft.amount) < 0.02;
+      const sameAmount = draft.amount > 0 && Math.abs(entry.amount - draft.amount) < 0.02;
       const gap = daysApart(draft.date, entry.date);
       const score = similarity(
         `${draft.label} ${draft.merchant} ${draft.purpose}`,
@@ -268,7 +263,8 @@ export function planDiaryImport(
       reason = "Same transaction already recorded — counted once, diary detail added.";
     } else if (matchId && best >= 0.3) {
       outcome = "duplicate";
-      reason = "Similar transaction already recorded — please confirm whether it is the same payment.";
+      reason =
+        "Similar transaction already recorded — please confirm whether it is the same payment.";
     }
 
     const match = existing.finances.find((f) => f.id === matchId);

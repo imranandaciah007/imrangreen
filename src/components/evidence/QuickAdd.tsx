@@ -55,7 +55,6 @@ import {
   type TaskStatus,
 } from "@/lib/evidence/types";
 
-
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function AddSheet({
@@ -194,7 +193,8 @@ export function ExpenseDialog({
       if (result.isTransfer) {
         setCategory("Money sent by Imran to Aciah");
         setBeneficiary("Aciah");
-        if (result.sender) setPayer(result.sender.toLowerCase().includes("aciah") ? "Aciah" : "Imran");
+        if (result.sender)
+          setPayer(result.sender.toLowerCase().includes("aciah") ? "Aciah" : "Imran");
       }
       const relevant = result.lineItems.filter((l) => l.amount > 0);
       setLines(
@@ -359,9 +359,7 @@ export function ExpenseDialog({
                     className="size-4"
                     onChange={(e) =>
                       setLines((prev) =>
-                        prev.map((x, xi) =>
-                          xi === i ? { ...x, included: e.target.checked } : x,
-                        ),
+                        prev.map((x, xi) => (xi === i ? { ...x, included: e.target.checked } : x)),
                       )
                     }
                   />
@@ -440,10 +438,7 @@ export function ExpenseDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Category</Label>
-              <Select
-                value={category}
-                onValueChange={(v) => setCategory(v as ExpenseCategory)}
-              >
+              <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
                 <SelectTrigger className="h-11 text-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -1230,4 +1225,3 @@ export function TaskDialog({
     </Dialog>
   );
 }
-
