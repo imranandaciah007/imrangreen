@@ -76,6 +76,13 @@ interface EvidenceContextValue {
     >,
     file?: File,
   ) => Promise<EvidenceItem>;
+  /** Bulk-import drafts (e.g. from a Drive sync); skips items whose driveFileId already exists. */
+  importItems: (
+    drafts: Omit<
+      EvidenceItem,
+      "id" | "auditTrail" | "createdBy" | "lastEditedBy" | "createdAt" | "updatedAt"
+    >[],
+  ) => Promise<{ added: number; skipped: number }>;
   bulkUpdate: (patch: Partial<EvidenceItem>, message: string) => void;
   bulkAssignPrefix: (prefix: string) => void;
   bulkAddTag: (tag: Tag) => void;
@@ -258,6 +265,38 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       return created;
     },
     [profile],
+  );
+
+  const importItems = useCallback(
+    async (
+      drafts: Omit<
+        EvidenceItem,
+        "id" | "auditTrail" | "createdBy" | "lastEditedBy" | "createdAt" | "updatedAt"
+      >[],
+    ) => {
+      const existing = new Set(
+        items.map((i) => i.driveFileId).filter((v): v is string => Boolean(v)),
+      );
+      const fresh = drafts.filter((d) => !d.driveFileId || !existing.has(d.driveFileId));
+      const skipped = drafts.length - fresh.length;
+      const now = nowIso();
+      const createdBatch: EvidenceItem[] = [];
+      for (const draft of fresh) {
+        const created = await documentProvider.create({
+          ...draft,
+          createdBy: profile,
+          lastEditedBy: profile,
+          createdAt: now,
+          updatedAt: now,
+        });
+        createdBatch.push(created);
+      }
+      if (createdBatch.length) setItems((prev) => [...prev, ...createdBatch]);
+      const conn = await documentProvider.getConnection();
+      setConnection({ ...conn, connected: true, lastSyncedAt: now });
+      return { added: createdBatch.length, skipped };
+    },
+    [items, profile],
   );
 
   const bulkUpdate = useCallback(
@@ -607,6 +646,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     openInspector: setInspectorId,
     updateItem,
     addItem,
+    importItems,
     bulkUpdate,
     bulkAssignPrefix,
     bulkAddTag,
