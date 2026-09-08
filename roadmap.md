@@ -20,5 +20,17 @@
 - [ ] One-tap "Create task" from any evidence item or event
 - [ ] "Ask my evidence" search over stored records only, answers cite stored items
 
+## Prompt 3 — financial strain since 18 Aug 2026
+- [ ] Full separation-focused expense categories (money sent, Jibril items, Aciah medical/pregnancy, housing, immigration, travel, comms, UK fixed obligations)
+- [ ] Entry fields: payer, beneficiary, merchant, original amount+currency kept as-is, GBP/USD equivalents, rate + rate date, purpose, status, effect-on-Aciah note
+- [ ] Receipt double-scan: merchant/date/total/line items, pick only relevant child/medical lines, one receipt -> several entries
+- [ ] Bank transfer detection -> suggested "Money sent by Imran to Aciah", no double counting across multiple proofs
+- [ ] Multiple evidence documents per single transaction, counted once
+- [ ] Recurring costs confirmed month by month, not projected forever
+- [ ] Income & fixed commitments section with remaining-amount summary
+- [ ] Month cards with evidence coverage % and missing receipts
+- [ ] Since-separation summary + reports (monthly, category, money sent, child, medical, missing evidence)
+
+
 ## Deferred / blocked
 - Real Drive upload of originals depends on the Drive connector write scope; currently originals stay in Drive untouched and local files are device-only.
