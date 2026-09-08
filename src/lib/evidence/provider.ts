@@ -21,6 +21,7 @@ export interface CaseRecords {
   tasks: CaseTask[];
   categories: string[];
   income?: IncomeSettings | undefined;
+  packets?: PacketVersion[] | undefined;
 }
 
 export interface DocumentProvider {
