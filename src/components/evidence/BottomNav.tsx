@@ -1,0 +1,74 @@
+import { Coins, Home, ListChecks, Plus, Vault } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+export type MainTab = "home" | "timeline" | "finances" | "vault";
+
+const tabs: { id: MainTab; label: string; icon: typeof Home }[] = [
+  { id: "home", label: "Home", icon: Home },
+  { id: "timeline", label: "Timeline", icon: ListChecks },
+  { id: "finances", label: "Finances", icon: Coins },
+  { id: "vault", label: "Vault", icon: Vault },
+];
+
+export function BottomNav({
+  tab,
+  onTab,
+  onAdd,
+}: {
+  tab: MainTab;
+  onTab: (t: MainTab) => void;
+  onAdd: () => void;
+}) {
+  const [home, timeline, finances, vault] = tabs;
+  const left = [home!, timeline!];
+  const right = [finances!, vault!];
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      <div className="mx-auto grid max-w-md grid-cols-5 items-end px-1 pt-1">
+        {left.map((t) => (
+          <TabButton key={t.id} t={t} active={tab === t.id} onClick={() => onTab(t.id)} />
+        ))}
+        <div className="flex justify-center">
+          <button
+            onClick={onAdd}
+            aria-label="Add"
+            className="-mt-5 flex size-14 items-center justify-center rounded-full bg-navy text-navy-foreground shadow-lg active:scale-95"
+          >
+            <Plus className="size-7" />
+          </button>
+        </div>
+        {right.map((t) => (
+          <TabButton key={t.id} t={t} active={tab === t.id} onClick={() => onTab(t.id)} />
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function TabButton({
+  t,
+  active,
+  onClick,
+}: {
+  t: { id: MainTab; label: string; icon: typeof Home };
+  active: boolean;
+  onClick: () => void;
+}) {
+  const Icon = t.icon;
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-medium",
+        active ? "text-navy" : "text-muted-foreground",
+      )}
+    >
+      <Icon className={cn("size-5", active && "stroke-[2.4]")} />
+      {t.label}
+    </button>
+  );
+}
+
+export { tabs as mainTabs };
