@@ -248,7 +248,11 @@ export function PacketBuilder({
             <>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: "Ready", n: findings.filter((f) => f.level === "ready").length + (blocking.length + attention.length === 0 ? 1 : 0), tone: "text-success" },
+                  {
+                    label: "Ready to include",
+                    n: exhibits.length,
+                    tone: "text-success",
+                  },
                   { label: "Needs attention", n: attention.length + blocking.length, tone: "text-warning" },
                   { label: "Optional", n: optional.length, tone: "text-muted-foreground" },
                 ].map((c) => (
