@@ -1,4 +1,3 @@
-import { mockEvidence } from "./mock-data";
 import type { EvidenceItem } from "./types";
 
 /**
@@ -36,18 +35,18 @@ function clone(items: EvidenceItem[]): EvidenceItem[] {
   return items.map((item) => ({ ...item, tags: [...item.tags], auditTrail: [...item.auditTrail] }));
 }
 
-/** In-memory provider that simulates a connected cloud drive folder. */
+/** In-memory provider standing in for a cloud drive folder. Starts empty. */
 export class MockDriveProvider implements DocumentProvider {
   readonly id = "mock-google-drive";
   readonly displayName = "Google Drive (Mock)";
 
-  private items = clone(mockEvidence);
+  private items: EvidenceItem[] = [];
   private connection: ProviderConnection = {
     providerName: "Google Drive",
-    connected: true,
-    accountLabel: "counsel@whitfield-immigration.com",
-    folderPath: "/Petitions/2026/EB-2 NIW — Rahman/Evidence",
-    lastSyncedAt: new Date().toISOString(),
+    connected: false,
+    accountLabel: undefined,
+    folderPath: undefined,
+    lastSyncedAt: undefined,
   };
 
   async getConnection() {
