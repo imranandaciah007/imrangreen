@@ -16,6 +16,7 @@ import { documentProvider, type ProviderConnection } from "./provider";
 import {
   categoryCoverage,
   detectGaps,
+  detectDiaryGaps,
   type CaseGap,
   type CategoryCoverage,
 } from "./review";
@@ -1245,7 +1246,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const gaps = useMemo(
-    () => detectGaps(items, events, finances, tasks, categories),
+    () => [
+      ...detectGaps(items, events, finances, tasks, categories),
+      ...detectDiaryGaps(diaryImports, items),
+    ],
     [items, events, finances, tasks, categories],
   );
 

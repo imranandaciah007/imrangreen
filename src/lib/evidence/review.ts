@@ -6,6 +6,7 @@ import {
   type CaseTask,
   type EvidenceItem,
   type FinancialEntry,
+  type DiaryImport,
   type HardshipEvent,
 } from "./types";
 
@@ -24,7 +25,8 @@ export type GapKind =
   | "evidence-unreviewed"
   | "evidence-ai-conflict"
   | "task-overdue"
-  | "aciah-impact";
+  | "aciah-impact"
+  | "diary-appendix-missing";
 
 export interface CaseGap {
   id: string;
@@ -349,3 +351,37 @@ export function categoryCoverage(
 }
 
 export const SEPARATION_DATE = CASE_SETTINGS.separationStartDate;
+
+/**
+ * Documents the hardship diary refers to (appendix A1, A24 …) that are not in the vault.
+ * Purely organisational: it says what is missing, never what it would prove.
+ */
+export function detectDiaryGaps(
+  diaryImports: DiaryImport[],
+  items: EvidenceItem[],
+): CaseGap[] {
+  if (!diaryImports.length) return [];
+  const haveRefs = new Set(
+    items.flatMap((i) => (i.appendixRefs ?? []).map((r) => r.toUpperCase())),
+  );
+  const seen = new Set<string>();
+  const gaps: CaseGap[] = [];
+  for (const imported of diaryImports) {
+    for (const link of imported.appendix) {
+      const ref = link.ref.toUpperCase();
+      if (link.evidenceId || haveRefs.has(ref) || seen.has(ref)) continue;
+      seen.add(ref);
+      gaps.push({
+        id: `diary-${imported.id}-${ref}`,
+        kind: "diary-appendix-missing",
+        label: `${link.ref} referenced in the hardship diary — document not found`,
+        detail: `${link.description || "Referred to in the diary"} (diary page ${link.pages.join(", ") || "?"}).`,
+        severity: "medium",
+        recordType: "evidence",
+        recordId: imported.masterEvidenceId ?? "",
+        taskTitle: `Obtain ${link.ref} — ${link.description || "referenced in hardship diary"}`,
+      });
+    }
+  }
+  return gaps;
+}
