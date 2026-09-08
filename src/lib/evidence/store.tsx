@@ -97,6 +97,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "exhibitId", dir: "asc" });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [inspectorId, setInspectorId] = useState<string | null>(null);
+  const [customCategories, setCustomCategories] = useState<Category[]>([]);
+
 
   useEffect(() => {
     let cancelled = false;
