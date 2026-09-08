@@ -99,6 +99,8 @@ interface EvidenceContextValue {
     >[],
   ) => Promise<{ added: number; skipped: number }>;
   bulkUpdate: (patch: Partial<EvidenceItem>, message: string) => void;
+  /** Set every document to Ready in one action. */
+  markAllReady: () => void;
   bulkAssignPrefix: (prefix: string) => void;
   bulkAddTag: (tag: Tag) => void;
   bulkMoveCategory: (category: Category) => void;
@@ -352,6 +354,16 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     },
     [items, profile],
   );
+
+  const markAllReady = useCallback(() => {
+    const ids = items.map((i) => i.id);
+    if (!ids.length) {
+      toast.info("There are no documents to update yet.");
+      return;
+    }
+    applyPatch(ids, { status: "Ready", needsConfirmation: false }, "Marked as Ready");
+    toast.success(`Marked ${ids.length} document${ids.length === 1 ? "" : "s"} as Ready`);
+  }, [applyPatch, items]);
 
   const bulkUpdate = useCallback(
     (patch: Partial<EvidenceItem>, message: string) => {
@@ -1069,6 +1081,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     addItem,
     importItems,
     bulkUpdate,
+    markAllReady,
     bulkAssignPrefix,
     bulkAddTag,
     bulkMoveCategory,
