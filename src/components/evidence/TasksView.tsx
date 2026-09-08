@@ -42,7 +42,8 @@ export function TasksView({ onAddTask }: { onAddTask: () => void }) {
         <div>
           <h2 className="text-sm font-semibold text-foreground">Tasks</h2>
           <p className="text-[11px] text-muted-foreground">
-            Everything still to collect, chase or explain. {tasks.filter((t) => !t.done).length} open.
+            Everything still to collect, chase or explain. {tasks.filter((t) => !t.done).length}{" "}
+            open.
           </p>
         </div>
         <Button size="sm" className="h-10" onClick={onAddTask}>
@@ -70,8 +71,7 @@ export function TasksView({ onAddTask }: { onAddTask: () => void }) {
                 <ul className="mt-2.5 space-y-2">
                   {rows.map((task) => {
                     const link = linked(task);
-                    const overdue =
-                      status !== "Complete" && task.dueDate && task.dueDate < today;
+                    const overdue = status !== "Complete" && task.dueDate && task.dueDate < today;
                     return (
                       <li
                         key={task.id}

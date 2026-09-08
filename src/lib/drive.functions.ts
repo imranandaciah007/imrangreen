@@ -118,14 +118,17 @@ async function ensureFolder(headers: HeadersInit, path: string): Promise<string>
 
 /** Save a generated packet file into /I601 Evidence/Generated Case Packets/. Originals untouched. */
 export const uploadPacketFile = createServerFn({ method: "POST" })
-  .inputValidator((data: { name: string; mimeType: string; content: string; folderPath?: string }) => {
-    if (!data?.name || !data?.content) throw new Error("A file name and content are required.");
-    return data;
-  })
+  .inputValidator(
+    (data: { name: string; mimeType: string; content: string; folderPath?: string }) => {
+      if (!data?.name || !data?.content) throw new Error("A file name and content are required.");
+      return data;
+    },
+  )
   .handler(async ({ data }) => {
     const lovableKey = process.env["LOVABLE_API_KEY"];
     const connectionKey = process.env["GOOGLE_DRIVE_API_KEY"];
-    if (!lovableKey || !connectionKey) throw new Error("Google Drive is not linked to this project yet.");
+    if (!lovableKey || !connectionKey)
+      throw new Error("Google Drive is not linked to this project yet.");
     const headers = {
       Authorization: `Bearer ${lovableKey}`,
       "X-Connection-Api-Key": connectionKey,

@@ -1,3 +1,4 @@
+import { BookOpenText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   CalendarPlus,
@@ -54,7 +55,6 @@ import {
   type TaskStatus,
 } from "@/lib/evidence/types";
 
-
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function AddSheet({
@@ -64,6 +64,7 @@ export function AddSheet({
   onExpense,
   onEvent,
   onTask,
+  onDiary,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -71,12 +72,14 @@ export function AddSheet({
   onExpense: () => void;
   onEvent: () => void;
   onTask: () => void;
+  onDiary: () => void;
 }) {
   const actions = [
     { label: "Upload evidence", icon: UploadCloud, run: onUpload },
     { label: "Add expense", icon: Coins, run: onExpense },
     { label: "Add hardship event", icon: CalendarPlus, run: onEvent },
     { label: "Add task", icon: CheckSquare, run: onTask },
+    { label: "Import hardship diary", icon: BookOpenText, run: onDiary },
   ];
 
   return (
@@ -190,7 +193,8 @@ export function ExpenseDialog({
       if (result.isTransfer) {
         setCategory("Money sent by Imran to Aciah");
         setBeneficiary("Aciah");
-        if (result.sender) setPayer(result.sender.toLowerCase().includes("aciah") ? "Aciah" : "Imran");
+        if (result.sender)
+          setPayer(result.sender.toLowerCase().includes("aciah") ? "Aciah" : "Imran");
       }
       const relevant = result.lineItems.filter((l) => l.amount > 0);
       setLines(
@@ -355,9 +359,7 @@ export function ExpenseDialog({
                     className="size-4"
                     onChange={(e) =>
                       setLines((prev) =>
-                        prev.map((x, xi) =>
-                          xi === i ? { ...x, included: e.target.checked } : x,
-                        ),
+                        prev.map((x, xi) => (xi === i ? { ...x, included: e.target.checked } : x)),
                       )
                     }
                   />
@@ -436,10 +438,7 @@ export function ExpenseDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Category</Label>
-              <Select
-                value={category}
-                onValueChange={(v) => setCategory(v as ExpenseCategory)}
-              >
+              <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
                 <SelectTrigger className="h-11 text-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -1226,4 +1225,3 @@ export function TaskDialog({
     </Dialog>
   );
 }
-

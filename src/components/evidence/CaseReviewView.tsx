@@ -51,10 +51,14 @@ export function CaseReviewView({
     markAllReady,
   } = useEvidence();
 
-  const uncategorised = items.filter((i) => !(i.categories?.length ? i.categories : [i.category]).filter(Boolean).length).length;
+  const uncategorised = items.filter(
+    (i) => !(i.categories?.length ? i.categories : [i.category]).filter(Boolean).length,
+  ).length;
   const duplicates = items.filter((i) => i.duplicateSuspected || i.duplicateOfId).length;
   const eventsNoEvidence = events.filter((e) => !(e.evidenceIds ?? []).length).length;
-  const financeNoProof = finances.filter((f) => !f.excluded && !(f.evidenceIds ?? []).length).length;
+  const financeNoProof = finances.filter(
+    (f) => !f.excluded && !(f.evidenceIds ?? []).length,
+  ).length;
   const conflicts = items.filter((i) => (i.aiConflicts?.length ?? 0) > 0);
 
   const aciahChecks = [
@@ -204,8 +208,8 @@ export function CaseReviewView({
                     </Badge>
                   </div>
                   <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                    {row.items} evidence · {row.events} events · {row.ready} ready ·{" "}
-                    {row.gapCount} gaps
+                    {row.items} evidence · {row.events} events · {row.ready} ready · {row.gapCount}{" "}
+                    gaps
                   </p>
                   <p className="mt-1 text-[10px] text-muted-foreground">
                     {row.sourceMix.length
@@ -324,9 +328,7 @@ export function CaseReviewView({
                           assignedTo: profile,
                           status: "To do",
                           priority: "Normal",
-                          ...(c.kind === "Evidence"
-                            ? { evidenceIds: [c.id] }
-                            : { eventId: c.id }),
+                          ...(c.kind === "Evidence" ? { evidenceIds: [c.id] } : { eventId: c.id }),
                         })
                       }
                     >

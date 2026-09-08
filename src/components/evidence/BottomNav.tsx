@@ -24,8 +24,6 @@ export function BottomNav({
   const left = tabs.slice(0, 2);
   const right = tabs.slice(2);
 
-
-
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
       <div className="mx-auto grid max-w-md grid-cols-6 items-end px-1 pt-1">

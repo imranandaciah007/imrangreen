@@ -135,12 +135,15 @@ export interface EvidenceItem {
   /** Fields a human has confirmed — AI must never silently overwrite these. */
   confirmedFields?: string[] | undefined;
   /** Later AI runs that disagree with a human-confirmed field, awaiting a decision. */
-  aiConflicts?:
-    | { field: string; existing: string; aiValue: string; ranAt: string }[]
-    | undefined;
-
+  aiConflicts?: { field: string; existing: string; aiValue: string; ranAt: string }[] | undefined;
 
   notes: string;
+  /** Provenance when this record came from the hardship diary import. */
+  diarySource?: DiarySource | undefined;
+  /** Appendix/exhibit references from the diary that this document satisfies. */
+  appendixRefs?: string[] | undefined;
+  /** True for the retained master hardship diary PDF itself. */
+  isMasterDiary?: boolean | undefined;
   /** For evidence about Jibril or others: how this affects Aciah (user-approved). */
   affectsAciah?: string | undefined;
   /** Id of the exhibit this may duplicate (never deleted automatically). */
@@ -199,6 +202,12 @@ export interface HardshipEvent {
   effectOnFamily?: string | undefined;
   followUp?: string | undefined;
   status?: EventStatus | undefined;
+  /** Advice, medication or referral recorded by a professional. */
+  professionalOutcome?: string | undefined;
+  diarySource?: DiarySource | undefined;
+  appendixRefs?: string[] | undefined;
+  /** Fields a human has confirmed — AI/diary imports must never overwrite these. */
+  confirmedFields?: string[] | undefined;
   financialImpact?: number | undefined;
   financialCurrency?: "GBP" | "USD" | undefined;
   evidenceIds: string[];
@@ -322,6 +331,11 @@ export interface FinancialEntry {
   transferKey?: string | undefined;
   /** True when the user has decided this is ordinary spending, not hardship-tracked. */
   excluded?: boolean | undefined;
+  diarySource?: DiarySource | undefined;
+  appendixRefs?: string[] | undefined;
+  /** True when the diary describes a cost but gives no amount. */
+  amountMissing?: boolean | undefined;
+  confirmedFields?: string[] | undefined;
   /** Monthly repeats are only generated up to a date the user confirms. */
   recurringUntil?: string | undefined;
   createdBy: string;
@@ -363,7 +377,6 @@ export const DEFAULT_INCOME: IncomeSettings = {
   updatedAt: "",
   updatedBy: "",
 };
-
 
 export const TASK_STATUSES = ["To do", "Waiting", "Complete"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
@@ -411,7 +424,6 @@ export function taskStatus(task: CaseTask): TaskStatus {
   return task.done ? "Complete" : "To do";
 }
 
-
 export function stageForStatus(status: EvidenceStatus): Stage {
   switch (status) {
     case "Ready":
@@ -452,3 +464,61 @@ export const DRIVE_FOLDERS = [
   "/I601 Evidence/Relationship/",
   "/I601 Evidence/Other/",
 ] as const;
+
+/* ------------------------------------------------------------------ *
+ * Hardship Diary master import (Prompt 6)
+ * ------------------------------------------------------------------ */
+
+/** Where a fact came from inside the hardship diary. Kept for traceability. */
+export interface DiarySource {
+  master: "Hardship Diary";
+  importId: string;
+  fileName: string;
+  /** Diary page number(s) the fact was read from. */
+  pages: number[];
+  /** Short quoted passage from the diary. */
+  passage: string;
+  appendixRefs: string[];
+  importedAt: string;
+  /** Raw output of both verification scans for this record. */
+  passes?: Record<string, unknown>[] | undefined;
+  /** True when the diary is the narrative source rather than independent evidence. */
+  narrativeOnly: boolean;
+}
+
+export interface DiaryAppendixLink {
+  ref: string;
+  description: string;
+  pages: number[];
+  /** Vault document that satisfies this appendix reference, when found. */
+  evidenceId?: string | undefined;
+  /** Timeline / finance records that cite it. */
+  eventIds?: string[] | undefined;
+  financeIds?: string[] | undefined;
+}
+
+export interface DiaryImport {
+  id: string;
+  fileName: string;
+  fileSizeBytes: number;
+  importedAt: string;
+  importedBy: string;
+  pagesAnalysed: number;
+  /** Fingerprints of processed text chunks, so a later version imports only what changed. */
+  chunkHashes: string[];
+  /** Fingerprints of records already created, so re-import never duplicates them. */
+  recordKeys: string[];
+  masterEvidenceId?: string | undefined;
+  appendix: DiaryAppendixLink[];
+  summary: {
+    eventsCreated: number;
+    eventsEnriched: number;
+    financesCreated: number;
+    financesEnriched: number;
+    matchedExisting: number;
+    possibleDuplicates: number;
+    needsConfirmation: number;
+    appendixRefs: number;
+    appendixMissing: number;
+  };
+}

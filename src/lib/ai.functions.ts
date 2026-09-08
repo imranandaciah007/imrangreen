@@ -509,7 +509,10 @@ const RECEIPT_SCHEMA = {
           label: { type: "string" },
           amount: { type: "number" },
           category: { type: "string", description: "One of the provided expense categories" },
-          beneficiary: { type: "string", description: "Aciah, Jibril, Family, Immigration or Other" },
+          beneficiary: {
+            type: "string",
+            description: "Aciah, Jibril, Family, Immigration or Other",
+          },
           relevant: {
             type: "boolean",
             description: "True only for separation/family/child related spending",
@@ -584,7 +587,9 @@ async function receiptPass(input: {
       model: MODEL,
       reasoning: { effort: "low" },
       input: [{ role: "user", content }],
-      text: { format: { type: "json_schema", name: "receipt_read", strict: true, schema: RECEIPT_SCHEMA } },
+      text: {
+        format: { type: "json_schema", name: "receipt_read", strict: true, schema: RECEIPT_SCHEMA },
+      },
     }),
   });
   if (!res.ok) {
@@ -606,7 +611,9 @@ async function receiptPass(input: {
   return {
     merchant: String(parsed["merchant"] ?? "").trim(),
     date: String(parsed["date"] ?? "").slice(0, 10),
-    currency: String(parsed["currency"] ?? "").trim().toUpperCase(),
+    currency: String(parsed["currency"] ?? "")
+      .trim()
+      .toUpperCase(),
     total: Number(parsed["total"]) || 0,
     tax: Number(parsed["tax"]) || 0,
     lineItems: (lines as Record<string, unknown>[]).map((l) => ({
@@ -641,7 +648,8 @@ export const extractReceipt = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }): Promise<ReceiptRead> => {
-    const base64 = data.base64 || (data.driveFileId ? await fetchDriveBytes(data.driveFileId) : null);
+    const base64 =
+      data.base64 || (data.driveFileId ? await fetchDriveBytes(data.driveFileId) : null);
     const prompt = [
       "Read this receipt, invoice, bank statement or transfer screenshot for a US I-601 hardship case.",
       "Imran (UK) supports Aciah (US citizen spouse) and their son Jibril while the family is separated since 2026-08-18.",
@@ -654,7 +662,12 @@ export const extractReceipt = createServerFn({ method: "POST" })
     ].join("\n");
 
     const [a, b] = await Promise.all([
-      receiptPass({ prompt: `${prompt}\nPass 1: read carefully.`, fileName: data.fileName, mimeType: data.mimeType, base64 }),
+      receiptPass({
+        prompt: `${prompt}\nPass 1: read carefully.`,
+        fileName: data.fileName,
+        mimeType: data.mimeType,
+        base64,
+      }),
       receiptPass({
         prompt: `${prompt}\nPass 2: independently verify. Prefer empty over guessing.`,
         fileName: data.fileName,
@@ -680,12 +693,18 @@ export const extractReceipt = createServerFn({ method: "POST" })
     const lineItems: ReceiptLine[] = [];
     for (const line of a.lineItems) {
       const twin = b.lineItems.find(
-        (l) => Math.abs(l.amount - line.amount) < 0.01 || l.label.toLowerCase() === line.label.toLowerCase(),
+        (l) =>
+          Math.abs(l.amount - line.amount) < 0.01 ||
+          l.label.toLowerCase() === line.label.toLowerCase(),
       );
       lineItems.push({
         ...line,
         relevant: twin ? line.relevant && twin.relevant : line.relevant,
-        certain: Boolean(twin) && line.certain && (twin?.certain ?? false) && line.category === twin?.category,
+        certain:
+          Boolean(twin) &&
+          line.certain &&
+          (twin?.certain ?? false) &&
+          line.category === twin?.category,
       });
     }
 
@@ -697,7 +716,8 @@ export const extractReceipt = createServerFn({ method: "POST" })
       tax: Math.abs(a.tax - b.tax) < 0.01 ? a.tax : 0,
       lineItems,
       isTransfer: a.isTransfer && b.isTransfer,
-      sender: a.sender && b.sender && a.sender.toLowerCase() === b.sender.toLowerCase() ? a.sender : "",
+      sender:
+        a.sender && b.sender && a.sender.toLowerCase() === b.sender.toLowerCase() ? a.sender : "",
       recipient:
         a.recipient && b.recipient && a.recipient.toLowerCase() === b.recipient.toLowerCase()
           ? a.recipient

@@ -11,24 +11,29 @@ import {
 import { toast } from "sonner";
 
 import { extractDocument } from "@/lib/ai.functions";
+import type { DiaryPlan } from "./diary-merge";
 import { documentProvider, type ProviderConnection } from "./provider";
 import {
   categoryCoverage,
   detectGaps,
+  detectDiaryGaps,
   type CaseGap,
   type CategoryCoverage,
 } from "./review";
-
 
 import {
   CASE_SETTINGS,
   DEFAULT_CATEGORIES,
   DEFAULT_INCOME,
+  EXPENSE_CATEGORIES,
   PEOPLE,
   READY_STATUSES,
   SOURCE_TYPES,
   type CaseTask,
   type Category,
+  type DiaryImport,
+  type DiarySource,
+  type ExpenseCategory,
   type EvidenceItem,
   type EvidenceStatus,
   type FinancialEntry,
@@ -142,13 +147,26 @@ interface EvidenceContextValue {
   dismissExtractionField: (id: string, field: string) => void;
   resolveConflict: (id: string, field: string, accept: boolean) => void;
 
+  /** Hardship Diary master import (Prompt 6). */
+  diaryImports: DiaryImport[];
+  applyDiaryImport: (args: {
+    fileName: string;
+    fileSizeBytes: number;
+    pagesAnalysed: number;
+    chunkHashes: string[];
+    plan: DiaryPlan;
+    acceptEventKeys: string[];
+    acceptFinanceKeys: string[];
+    masterEvidenceId?: string | undefined;
+    createTasksForMissing: boolean;
+  }) => DiaryImport;
+
   /** Case packet builder (Prompt 5). */
   packets: PacketVersion[];
   togglePacketExclusion: (id: string) => void;
   savePacketVersion: (
     record: Omit<PacketVersion, "id" | "version" | "generatedAt" | "generatedBy">,
   ) => PacketVersion;
-
 
   connection: ProviderConnection | null;
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
@@ -185,6 +203,8 @@ function groupOf(exhibitId: string) {
 
 const PROFILE_KEY = "i601.profile";
 
+const EXPENSE_CATEGORY_SET = new Set<string>(EXPENSE_CATEGORIES);
+
 export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<EvidenceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,6 +226,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [profileChosen, setProfileChosen] = useState(false);
   const [extractingIds, setExtractingIds] = useState<string[]>([]);
   const [packets, setPackets] = useState<PacketVersion[]>([]);
+  const [diaryImports, setDiaryImports] = useState<DiaryImport[]>([]);
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -223,6 +244,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       setFinances(records.finances ?? []);
       setTasks(records.tasks ?? []);
       setPackets(records.packets ?? []);
+      setDiaryImports(records.diaryImports ?? []);
       setIncome({ ...DEFAULT_INCOME, ...(records.income ?? {}) });
       setCustomCategories(
         (records.categories ?? []).filter((c) => !DEFAULT_CATEGORIES.includes(c)),
@@ -249,8 +271,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       categories: customCategories,
       income,
       packets,
+      diaryImports,
     });
-  }, [events, finances, tasks, customCategories, income, packets]);
+  }, [events, finances, tasks, customCategories, income, packets, diaryImports]);
 
   const setProfile = useCallback((p: Profile) => {
     setProfileState(p);
@@ -601,7 +624,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         ? finances.find((f) => f.transferKey === enriched.transferKey)
         : undefined;
       if (twin) {
-        const merged = Array.from(new Set([...(twin.evidenceIds ?? []), ...(enriched.evidenceIds ?? [])]));
+        const merged = Array.from(
+          new Set([...(twin.evidenceIds ?? []), ...(enriched.evidenceIds ?? [])]),
+        );
         setFinances((prev) =>
           prev.map((f) =>
             f.id === twin.id
@@ -694,7 +719,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-
   const runOne = useCallback(
     async (item: EvidenceItem, categoryList: Category[]) => {
       const result = await extractDocument({
@@ -759,7 +783,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       guard("sourceType", "sourceType", a.sourceType);
       guard("pageCount", "pageCount", a.pageCount);
       if (conflicts.length) patch.aiConflicts = conflicts;
-
 
       patch.aiExtraction = {
         ranAt: result.ranAt,
@@ -909,15 +932,227 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         : {};
       patch.aiConflicts = (item.aiConflicts ?? []).filter((c) => c.field !== field);
       patch.confirmedFields = Array.from(new Set([...(item.confirmedFields ?? []), field]));
-      applyPatch(
-        [id],
-        patch,
-        accept ? `Accepted AI value for ${field}` : `Kept existing ${field}`,
-      );
+      applyPatch([id], patch, accept ? `Accepted AI value for ${field}` : `Kept existing ${field}`);
     },
     [applyConfirmed, applyPatch, items],
   );
 
+  /**
+   * Write an approved hardship-diary import into the case. Existing records are only
+   * enriched with information they are missing; nothing is replaced or deleted, and
+   * every created record keeps its diary page provenance.
+   */
+  const applyDiaryImport = useCallback(
+    (args: {
+      fileName: string;
+      fileSizeBytes: number;
+      pagesAnalysed: number;
+      chunkHashes: string[];
+      plan: DiaryPlan;
+      acceptEventKeys: string[];
+      acceptFinanceKeys: string[];
+      masterEvidenceId?: string | undefined;
+      createTasksForMissing: boolean;
+    }) => {
+      const importId = rid("diary");
+      const importedAt = nowIso();
+      const source = (
+        pages: number[],
+        passage: string,
+        appendixRefs: string[],
+        passes?: Record<string, unknown>[],
+      ): DiarySource => ({
+        master: "Hardship Diary",
+        importId,
+        fileName: args.fileName,
+        pages,
+        passage,
+        appendixRefs,
+        importedAt,
+        passes,
+        narrativeOnly: true,
+      });
+
+      const acceptEvents = new Set(args.acceptEventKeys);
+      const acceptFinances = new Set(args.acceptFinanceKeys);
+
+      const newEvents: HardshipEvent[] = [];
+      const eventPatches: { id: string; patch: Partial<HardshipEvent> }[] = [];
+      const usedKeys: string[] = [];
+      let eventsCreated = 0;
+      let eventsEnriched = 0;
+
+      for (const plan of args.plan.events) {
+        if (!acceptEvents.has(plan.key)) continue;
+        usedKeys.push(plan.key);
+        const src = source(plan.draft.pages, plan.draft.passage, plan.draft.appendixRefs);
+        if (plan.outcome === "enrich" && plan.matchId) {
+          eventPatches.push({
+            id: plan.matchId,
+            patch: { ...plan.enrich, diarySource: src },
+          });
+          eventsEnriched += 1;
+          continue;
+        }
+        const cats = plan.draft.categories.filter((c) => categories.includes(c));
+        const primary = cats[0] ?? "Other";
+        newEvents.push({
+          id: rid("evt"),
+          date: plan.draft.date,
+          title: plan.draft.title || "Hardship diary entry",
+          category: primary,
+          categories: cats.length ? cats : [primary],
+          people: plan.draft.people.length ? plan.draft.people : ["Aciah"],
+          description: plan.draft.description,
+          effectOnAciah: plan.draft.effectOnAciah,
+          effectOnFamily: plan.draft.effectOnFamily,
+          professionalOutcome: plan.draft.professionalOutcome,
+          followUp: plan.draft.followUp,
+          status: plan.linkedEvidenceIds.length ? "Recorded" : "Needs evidence",
+          evidenceIds: Array.from(
+            new Set([
+              ...plan.linkedEvidenceIds,
+              ...(args.masterEvidenceId ? [args.masterEvidenceId] : []),
+            ]),
+          ),
+          appendixRefs: plan.draft.appendixRefs,
+          diarySource: src,
+          createdBy: profile,
+          lastEditedBy: profile,
+          createdAt: importedAt,
+          updatedAt: importedAt,
+        });
+        eventsCreated += 1;
+      }
+
+      const newFinances: FinancialEntry[] = [];
+      const financePatches: { id: string; patch: Partial<FinancialEntry> }[] = [];
+      let financesCreated = 0;
+      let financesEnriched = 0;
+
+      for (const plan of args.plan.finances) {
+        if (!acceptFinances.has(plan.key)) continue;
+        usedKeys.push(plan.key);
+        const src = source(plan.draft.pages, plan.draft.passage, plan.draft.appendixRefs);
+        if (plan.outcome === "enrich" && plan.matchId) {
+          financePatches.push({ id: plan.matchId, patch: { ...plan.enrich, diarySource: src } });
+          financesEnriched += 1;
+          continue;
+        }
+        const currency = plan.draft.currency === "USD" ? "USD" : "GBP";
+        const conv = convert(plan.draft.amount, currency);
+        newFinances.push({
+          id: rid("fin"),
+          date: plan.draft.date,
+          label: plan.draft.label || "Cost recorded in hardship diary",
+          kind: "Other",
+          amount: plan.draft.amount,
+          currency,
+          recurring: false,
+          notes: plan.draft.purpose,
+          evidenceIds: Array.from(
+            new Set([
+              ...plan.linkedEvidenceIds,
+              ...(args.masterEvidenceId ? [args.masterEvidenceId] : []),
+            ]),
+          ),
+          expenseCategory: (EXPENSE_CATEGORY_SET.has(plan.draft.expenseCategory)
+            ? plan.draft.expenseCategory
+            : "Other") as ExpenseCategory,
+          payer: plan.draft.payer === "Aciah" ? "Aciah" : "Imran",
+          merchant: plan.draft.merchant,
+          purpose: plan.draft.purpose,
+          gbpEquivalent: Math.round(conv.gbp * 100) / 100,
+          usdEquivalent: Math.round(conv.usd * 100) / 100,
+          exchangeRate: conv.rate,
+          exchangeRateDate: income.rateDate || importedAt.slice(0, 10),
+          exchangeRateSource: income.rateSource,
+          status: plan.draft.amountMissing ? "Needs confirmation" : "Missing receipt",
+          amountMissing: plan.draft.amountMissing,
+          appendixRefs: plan.draft.appendixRefs,
+          diarySource: src,
+          createdBy: profile,
+          lastEditedBy: profile,
+          createdAt: importedAt,
+          updatedAt: importedAt,
+        });
+        financesCreated += 1;
+      }
+
+      if (newEvents.length || eventPatches.length) {
+        setEvents((prev) => {
+          const patched = prev.map((e) => {
+            const hit = eventPatches.find((p) => p.id === e.id);
+            return hit ? { ...e, ...hit.patch, lastEditedBy: profile, updatedAt: importedAt } : e;
+          });
+          return [...patched, ...newEvents];
+        });
+      }
+      if (newFinances.length || financePatches.length) {
+        setFinances((prev) => {
+          const patched = prev.map((f) => {
+            const hit = financePatches.find((p) => p.id === f.id);
+            return hit ? { ...f, ...hit.patch, lastEditedBy: profile, updatedAt: importedAt } : f;
+          });
+          return [...patched, ...newFinances];
+        });
+      }
+
+      if (args.createTasksForMissing && args.plan.appendixMissing.length) {
+        const chase: CaseTask[] = args.plan.appendixMissing.slice(0, 60).map((link) => ({
+          id: rid("task"),
+          title: `Obtain ${link.ref} — ${link.description || "referenced in hardship diary"}`.slice(
+            0,
+            120,
+          ),
+          category: "",
+          dueDate: "",
+          done: false,
+          assignedTo: profile,
+          status: "To do",
+          priority: "Normal",
+          notes: `Hardship diary page ${link.pages.join(", ") || "?"} refers to ${link.ref} but no matching document is in the vault.`,
+          createdBy: profile,
+          lastEditedBy: profile,
+          createdAt: importedAt,
+          updatedAt: importedAt,
+        }));
+        setTasks((prev) => [...prev, ...chase]);
+      }
+
+      const previous = diaryImports.flatMap((d) => d.recordKeys);
+      const record: DiaryImport = {
+        id: importId,
+        fileName: args.fileName,
+        fileSizeBytes: args.fileSizeBytes,
+        importedAt,
+        importedBy: profile,
+        pagesAnalysed: args.pagesAnalysed,
+        chunkHashes: args.chunkHashes,
+        recordKeys: Array.from(new Set([...previous, ...usedKeys])),
+        masterEvidenceId: args.masterEvidenceId,
+        appendix: args.plan.appendix,
+        summary: {
+          eventsCreated,
+          eventsEnriched,
+          financesCreated,
+          financesEnriched,
+          matchedExisting: args.plan.alreadyImported,
+          possibleDuplicates: [...args.plan.events, ...args.plan.finances].filter(
+            (p) => p.outcome === "duplicate",
+          ).length,
+          needsConfirmation: [...args.plan.events, ...args.plan.finances].filter(
+            (p) => p.uncertainFields.length,
+          ).length,
+          appendixRefs: args.plan.appendix.length,
+          appendixMissing: args.plan.appendixMissing.length,
+        },
+      };
+      setDiaryImports((prev) => [...prev, record]);
+      return record;
+    },
+    [categories, convert, diaryImports, income.rateDate, income.rateSource, profile],
+  );
 
   const connectDrive = useCallback(
     (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => {
@@ -977,7 +1212,11 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       const item = items.find((i) => i.id === id);
       if (!item) return;
-      applyPatch([id], { excludeFromPacket: !item.excludeFromPacket }, item.excludeFromPacket ? "Included in the packet" : "Excluded from the packet");
+      applyPatch(
+        [id],
+        { excludeFromPacket: !item.excludeFromPacket },
+        item.excludeFromPacket ? "Included in the packet" : "Excluded from the packet",
+      );
     },
     [applyPatch, items],
   );
@@ -1006,8 +1245,11 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const gaps = useMemo(
-    () => detectGaps(items, events, finances, tasks, categories),
-    [items, events, finances, tasks, categories],
+    () => [
+      ...detectGaps(items, events, finances, tasks, categories),
+      ...detectDiaryGaps(diaryImports, items),
+    ],
+    [items, events, finances, tasks, categories, diaryImports],
   );
 
   const coverage = useMemo(
@@ -1016,7 +1258,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const stats = useMemo(() => {
-
     const ready = items.filter((i) => READY_STATUSES.includes(i.status)).length;
     const missingTranslation = items.filter((i) => i.status === "Translation needed").length;
     const gaps = items.filter((i) => i.status === "Missing supporting evidence").length;
@@ -1116,10 +1357,11 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     confirmExtractionField,
     dismissExtractionField,
     resolveConflict,
+    diaryImports,
+    applyDiaryImport,
     packets,
     togglePacketExclusion,
     savePacketVersion,
-
 
     connection,
     connectDrive,

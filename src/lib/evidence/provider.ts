@@ -1,5 +1,6 @@
 import type {
   CaseTask,
+  DiaryImport,
   EvidenceItem,
   FinancialEntry,
   HardshipEvent,
@@ -29,6 +30,7 @@ export interface CaseRecords {
   categories: string[];
   income?: IncomeSettings | undefined;
   packets?: PacketVersion[] | undefined;
+  diaryImports?: DiaryImport[] | undefined;
 }
 
 export interface DocumentProvider {
