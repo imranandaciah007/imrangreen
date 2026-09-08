@@ -16,6 +16,7 @@ import { documentProvider, type ProviderConnection } from "./provider";
 import {
   CASE_SETTINGS,
   DEFAULT_CATEGORIES,
+  DEFAULT_INCOME,
   PEOPLE,
   READY_STATUSES,
   SOURCE_TYPES,
@@ -25,6 +26,7 @@ import {
   type EvidenceStatus,
   type FinancialEntry,
   type HardshipEvent,
+  type IncomeSettings,
   type Profile,
   type SourceType,
   type Tag,
@@ -105,7 +107,11 @@ interface EvidenceContextValue {
   updateEvent: (id: string, patch: Partial<HardshipEvent>) => void;
   deleteEvent: (id: string) => void;
   finances: FinancialEntry[];
-  addFinance: (draft: NewRecord<FinancialEntry>) => void;
+  addFinance: (draft: NewRecord<FinancialEntry>) => FinancialEntry;
+  income: IncomeSettings;
+  updateIncome: (patch: Partial<IncomeSettings>) => void;
+  /** Converts an amount into GBP and USD using the stored rate. */
+  convert: (amount: number, currency: "GBP" | "USD") => { gbp: number; usd: number; rate: number };
   updateFinance: (id: string, patch: Partial<FinancialEntry>) => void;
   deleteFinance: (id: string) => void;
   tasks: CaseTask[];
@@ -171,6 +177,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<HardshipEvent[]>([]);
   const [finances, setFinances] = useState<FinancialEntry[]>([]);
   const [tasks, setTasks] = useState<CaseTask[]>([]);
+  const [income, setIncome] = useState<IncomeSettings>(DEFAULT_INCOME);
   const [profile, setProfileState] = useState<Profile>("Imran");
   const [profileChosen, setProfileChosen] = useState(false);
   const [extractingIds, setExtractingIds] = useState<string[]>([]);
@@ -190,6 +197,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       setEvents(records.events ?? []);
       setFinances(records.finances ?? []);
       setTasks(records.tasks ?? []);
+      setIncome({ ...DEFAULT_INCOME, ...(records.income ?? {}) });
       setCustomCategories(
         (records.categories ?? []).filter((c) => !DEFAULT_CATEGORIES.includes(c)),
       );
@@ -208,8 +216,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated.current) return;
-    void documentProvider.saveRecords({ events, finances, tasks, categories: customCategories });
-  }, [events, finances, tasks, customCategories]);
+    void documentProvider.saveRecords({
+      events,
+      finances,
+      tasks,
+      categories: customCategories,
+      income,
+    });
+  }, [events, finances, tasks, customCategories, income]);
 
   const setProfile = useCallback((p: Profile) => {
     setProfileState(p);
@@ -521,12 +535,67 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     toast.success("Event deleted");
   }, []);
 
+  const convert = useCallback(
+    (amount: number, currency: "GBP" | "USD") => {
+      const rate = income.usdToGbp || DEFAULT_INCOME.usdToGbp;
+      return currency === "USD"
+        ? { gbp: amount * rate, usd: amount, rate }
+        : { gbp: amount, usd: rate ? amount / rate : amount, rate };
+    },
+    [income.usdToGbp],
+  );
+
   const addFinance = useCallback(
     (draft: NewRecord<FinancialEntry>) => {
-      setFinances((prev) => [...prev, { ...stamp(draft), id: rid("fin") }]);
-      toast.success("Expense added", { description: draft.label });
+      const conv = convert(draft.amount, draft.currency);
+      const enriched: NewRecord<FinancialEntry> = {
+        ...draft,
+        gbpEquivalent: draft.gbpEquivalent ?? Math.round(conv.gbp * 100) / 100,
+        usdEquivalent: draft.usdEquivalent ?? Math.round(conv.usd * 100) / 100,
+        exchangeRate: draft.exchangeRate ?? conv.rate,
+        exchangeRateDate: draft.exchangeRateDate ?? (income.rateDate || nowIso().slice(0, 10)),
+        exchangeRateSource: draft.exchangeRateSource ?? income.rateSource,
+        status:
+          draft.status ??
+          ((draft.evidenceIds ?? []).length === 0 ? "Missing receipt" : "Needs confirmation"),
+      };
+      // The same real-world transfer may be proved by several documents — link, never duplicate.
+      const twin = enriched.transferKey
+        ? finances.find((f) => f.transferKey === enriched.transferKey)
+        : undefined;
+      if (twin) {
+        const merged = Array.from(new Set([...(twin.evidenceIds ?? []), ...(enriched.evidenceIds ?? [])]));
+        setFinances((prev) =>
+          prev.map((f) =>
+            f.id === twin.id
+              ? {
+                  ...f,
+                  evidenceIds: merged,
+                  status: merged.length ? "Verified" : f.status,
+                  lastEditedBy: profile,
+                  updatedAt: nowIso(),
+                }
+              : f,
+          ),
+        );
+        toast.info("Already recorded — evidence linked to the existing transaction", {
+          description: `${twin.label} · counted once`,
+        });
+        return { ...twin, evidenceIds: merged };
+      }
+      const created = { ...stamp(enriched), id: rid("fin") } as FinancialEntry;
+      setFinances((prev) => [...prev, created]);
+      toast.success("Expense recorded", { description: draft.label });
+      return created;
     },
-    [stamp],
+    [convert, finances, income.rateDate, income.rateSource, profile, stamp],
+  );
+
+  const updateIncome = useCallback(
+    (patch: Partial<IncomeSettings>) => {
+      setIncome((prev) => ({ ...prev, ...patch, updatedAt: nowIso(), updatedBy: profile }));
+    },
+    [profile],
   );
   const updateFinance = useCallback(
     (id: string, patch: Partial<FinancialEntry>) => {
@@ -874,6 +943,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     deleteEvent,
     finances,
     addFinance,
+    income,
+    updateIncome,
+    convert,
     updateFinance,
     deleteFinance,
     tasks,

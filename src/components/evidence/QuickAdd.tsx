@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarPlus, CheckSquare, Coins, Mic, MicOff, Sparkles, UploadCloud } from "lucide-react";
+import {
+  CalendarPlus,
+  Camera,
+  CheckSquare,
+  Coins,
+  Mic,
+  MicOff,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -23,15 +32,21 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { EvidencePicker } from "@/components/evidence/EvidencePicker";
 import { Textarea } from "@/components/ui/textarea";
-import { structureEvent } from "@/lib/ai.functions";
+import { extractReceipt, structureEvent, type ReceiptRead } from "@/lib/ai.functions";
+import { cn } from "@/lib/utils";
 import { useEvidence } from "@/lib/evidence/store";
 import {
+  BENEFICIARIES,
   EVENT_STATUSES,
+  EXPENSE_CATEGORIES,
   FINANCE_KINDS,
+  PAYERS,
   PEOPLE,
   PROFILES,
   type EventStatus,
+  type ExpenseCategory,
   type FinanceKind,
+  type FinanceLineItem,
 } from "@/lib/evidence/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -94,59 +109,313 @@ export function ExpenseDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { addFinance, caseSettings } = useEvidence();
+  const { addFinance, addTask, caseSettings, categories, events, profile } = useEvidence();
   const [label, setLabel] = useState("");
-  const [kind, setKind] = useState<FinanceKind>("Travel / Flights");
+  const [category, setCategory] = useState<ExpenseCategory>("Money sent by Imran to Aciah");
+  const [payer, setPayer] = useState<"Imran" | "Aciah">("Imran");
+  const [beneficiary, setBeneficiary] = useState<string>("Aciah");
+  const [merchant, setMerchant] = useState("");
+  const [purpose, setPurpose] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<"GBP" | "USD">("GBP");
   const [date, setDate] = useState(today());
   const [recurring, setRecurring] = useState(false);
+  const [recurringUntil, setRecurringUntil] = useState("");
   const [notes, setNotes] = useState("");
+  const [affectsAciah, setAffectsAciah] = useState("");
+  const [eventId, setEventId] = useState("none");
+  const [hardshipCats, setHardshipCats] = useState<string[]>([]);
   const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scan, setScan] = useState<ReceiptRead | null>(null);
+  const [lines, setLines] = useState<FinanceLineItem[]>([]);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const cameraRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setEvidenceIds([]);
     setLabel("");
-    setKind("Travel / Flights");
+    setCategory("Money sent by Imran to Aciah");
+    setPayer("Imran");
+    setBeneficiary("Aciah");
+    setMerchant("");
+    setPurpose("");
     setAmount("");
     setCurrency(caseSettings.baseCurrency as "GBP");
     setDate(today());
     setRecurring(false);
+    setRecurringUntil("");
     setNotes("");
+    setAffectsAciah("");
+    setEventId("none");
+    setHardshipCats([]);
+    setScan(null);
+    setLines([]);
   }, [open, caseSettings.baseCurrency]);
+
+  /** Double-scan a receipt photo/PDF, then prefill only what both scans agreed on. */
+  const readReceipt = async (file: File) => {
+    setScanning(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(new Error("Could not read that file"));
+        reader.readAsDataURL(file);
+      });
+      const result = await extractReceipt({
+        data: {
+          base64,
+          fileName: file.name,
+          mimeType: file.type || "application/pdf",
+          allowedCategories: [...EXPENSE_CATEGORIES],
+        },
+      });
+      setScan(result);
+      if (result.merchant) {
+        setMerchant(result.merchant);
+        if (!label.trim()) setLabel(result.merchant);
+      }
+      if (result.date) setDate(result.date);
+      if (result.currency === "GBP" || result.currency === "USD") setCurrency(result.currency);
+      if (result.summary) setPurpose(result.summary);
+      if (result.isTransfer) {
+        setCategory("Money sent by Imran to Aciah");
+        setBeneficiary("Aciah");
+        if (result.sender) setPayer(result.sender.toLowerCase().includes("aciah") ? "Aciah" : "Imran");
+      }
+      const relevant = result.lineItems.filter((l) => l.amount > 0);
+      setLines(
+        relevant.map((l) => ({
+          label: l.label,
+          amount: l.amount,
+          category: (EXPENSE_CATEGORIES as readonly string[]).includes(l.category)
+            ? (l.category as ExpenseCategory)
+            : "Other",
+          included: l.relevant && l.certain,
+        })),
+      );
+      if (relevant.length === 0 && result.total) setAmount(String(result.total));
+      toast.success(
+        result.uncertain.length === 0
+          ? "Verified by double scan"
+          : "Read — please confirm the highlighted fields",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not read that receipt");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const includedTotal = lines.filter((l) => l.included).reduce((s, l) => s + l.amount, 0);
+  const effectiveAmount = lines.length > 0 ? includedTotal : Number(amount) || 0;
+  const uncertainFields = new Set((scan?.uncertain ?? []).map((u) => u.field));
+  const sym = currency === "GBP" ? "£" : "$";
+
+  const toggleCat = (c: string) =>
+    setHardshipCats((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+
+  const save = () => {
+    if (!label.trim() || !effectiveAmount) {
+      toast.error("Add a description and an amount");
+      return;
+    }
+    const included = lines.filter((l) => l.included);
+    const created = addFinance({
+      date,
+      label: label.trim(),
+      kind: "Other",
+      expenseCategory: included.length === 1 ? included[0]?.category : category,
+      payer,
+      beneficiary: beneficiary as "Aciah",
+      merchant: merchant.trim(),
+      purpose: purpose.trim(),
+      amount: effectiveAmount,
+      currency,
+      recurring,
+      recurringUntil: recurring ? recurringUntil : undefined,
+      notes: notes.trim(),
+      affectsAciah: affectsAciah.trim(),
+      hardshipCategories: hardshipCats,
+      eventId: eventId === "none" ? undefined : eventId,
+      evidenceIds,
+      lineItems: lines.length ? lines : undefined,
+      status: uncertainFields.size
+        ? "Needs confirmation"
+        : evidenceIds.length
+          ? "Verified"
+          : "Missing receipt",
+      // One real-world payment proved by several documents must only ever be counted once.
+      transferKey: `${date}|${effectiveAmount.toFixed(2)}|${currency}|${(merchant || label).trim().toLowerCase()}`,
+    });
+    if (evidenceIds.length === 0) {
+      addTask({
+        title: `Collect receipt/bank evidence for ${created.label} (${sym}${effectiveAmount} on ${date})`,
+        category: "",
+        dueDate: "",
+        done: false,
+        assignedTo: profile,
+      });
+    }
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base">Add expense</DialogTitle>
+          <DialogTitle className="text-base">Add expense or transfer</DialogTitle>
           <DialogDescription className="text-xs">
-            Costs caused by the separation, counted from {caseSettings.separationStartDate}.
+            Separation-related costs, counted from {caseSettings.separationStartDate}. Ordinary
+            personal spending stays out unless you include it.
           </DialogDescription>
         </DialogHeader>
+
         <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 text-xs"
+              disabled={scanning}
+              onClick={() => cameraRef.current?.click()}
+            >
+              <Camera className="size-4" /> Photograph receipt
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 text-xs"
+              disabled={scanning}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Sparkles className="size-4" /> {scanning ? "Reading…" : "Read a file"}
+            </Button>
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void readReceipt(f);
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void readReceipt(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
+
+          {scan && (
+            <div className="rounded-lg border border-border bg-muted/40 p-2.5 text-[11px]">
+              <p className="font-semibold text-foreground">
+                {scan.uncertain.length === 0
+                  ? "Verified by double scan"
+                  : "Read twice — confirm the fields below"}
+              </p>
+              {scan.uncertain.length > 0 && (
+                <ul className="mt-1 space-y-0.5 text-warning-foreground/90">
+                  {scan.uncertain.map((u) => (
+                    <li key={u.field}>
+                      {u.field}: the two readings differed ({u.options.join(" / ")})
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {lines.length > 0 && (
+            <div className="space-y-1.5 rounded-lg border border-border p-2.5">
+              <Label className="text-xs">Which lines belong to the case?</Label>
+              {lines.map((l, i) => (
+                <div key={`${l.label}-${i}`} className="flex items-center gap-2 text-[11px]">
+                  <input
+                    type="checkbox"
+                    checked={l.included}
+                    className="size-4"
+                    onChange={(e) =>
+                      setLines((prev) =>
+                        prev.map((x, xi) =>
+                          xi === i ? { ...x, included: e.target.checked } : x,
+                        ),
+                      )
+                    }
+                  />
+                  <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                  <Select
+                    value={l.category}
+                    onValueChange={(v) =>
+                      setLines((prev) =>
+                        prev.map((x, xi) =>
+                          xi === i ? { ...x, category: v as ExpenseCategory } : x,
+                        ),
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-[130px] text-[10px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXPENSE_CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c} className="text-xs">
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="font-mono">
+                    {sym}
+                    {l.amount.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+              <p className="font-mono text-[11px] text-muted-foreground">
+                Counted: {sym}
+                {includedTotal.toFixed(2)}
+              </p>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-xs">What was it?</Label>
             <Input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="Return flight London–Boston"
+              placeholder="Formula and nappies, Target"
               className="h-11 text-sm"
             />
           </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Amount</Label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="h-11 font-mono text-sm"
-              />
-            </div>
+            {lines.length === 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Amount</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className={cn(
+                    "h-11 font-mono text-sm",
+                    uncertainFields.has("total") && "border-warning",
+                  )}
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label className="text-xs">Currency</Label>
               <Select value={currency} onValueChange={(v) => setCurrency(v as "GBP" | "USD")}>
@@ -160,15 +429,18 @@ export function ExpenseDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Type</Label>
-              <Select value={kind} onValueChange={(v) => setKind(v as FinanceKind)}>
+              <Label className="text-xs">Category</Label>
+              <Select
+                value={category}
+                onValueChange={(v) => setCategory(v as ExpenseCategory)}
+              >
                 <SelectTrigger className="h-11 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {FINANCE_KINDS.map((k) => (
-                    <SelectItem key={k} value={k} className="text-xs">
-                      {k}
+                  {EXPENSE_CATEGORIES.map((c) => (
+                    <SelectItem key={c} value={c} className="text-xs">
+                      {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -180,10 +452,102 @@ export function ExpenseDialog({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="h-11 text-xs"
+                className={cn("h-11 text-xs", uncertainFields.has("date") && "border-warning")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Paid by</Label>
+              <Select value={payer} onValueChange={(v) => setPayer(v as "Imran")}>
+                <SelectTrigger className="h-11 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYERS.map((p) => (
+                    <SelectItem key={p} value={p} className="text-xs">
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">For</Label>
+              <Select value={beneficiary} onValueChange={setBeneficiary}>
+                <SelectTrigger className="h-11 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BENEFICIARIES.map((b) => (
+                    <SelectItem key={b} value={b} className="text-xs">
+                      {b}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Merchant / payee</Label>
+              <Input
+                value={merchant}
+                onChange={(e) => setMerchant(e.target.value)}
+                className={cn("h-11 text-xs", uncertainFields.has("merchant") && "border-warning")}
               />
             </div>
           </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Link to a hardship event</Label>
+            <Select value={eventId} onValueChange={setEventId}>
+              <SelectTrigger className="h-11 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" className="text-xs">
+                  Not linked
+                </SelectItem>
+                {events.map((e) => (
+                  <SelectItem key={e.id} value={e.id} className="text-xs">
+                    {e.date} · {e.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Hardship categories</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => toggleCat(c)}
+                  className={cn(
+                    "rounded-md border px-2 py-1 text-[10px]",
+                    hardshipCats.includes(c)
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border text-muted-foreground",
+                  )}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(beneficiary === "Jibril" || category.startsWith("Jibril")) && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">How does this affect Aciah?</Label>
+              <Textarea
+                value={affectsAciah}
+                onChange={(e) => setAffectsAciah(e.target.value)}
+                rows={2}
+                className="text-xs"
+                placeholder="Aciah covers this alone while separated…"
+              />
+            </div>
+          )}
+
           <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
@@ -193,6 +557,18 @@ export function ExpenseDialog({
             />
             This repeats every month
           </label>
+          {recurring && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Repeat until (confirmed)</Label>
+              <Input
+                type="date"
+                value={recurringUntil}
+                onChange={(e) => setRecurringUntil(e.target.value)}
+                className="h-11 text-xs"
+              />
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-xs">Receipt or bank evidence</Label>
             <Button
@@ -202,46 +578,32 @@ export function ExpenseDialog({
               onClick={() => setPickerOpen(true)}
             >
               {evidenceIds.length === 0
-                ? "Link a receipt or statement (optional)"
+                ? "Link a receipt or statement"
                 : `${evidenceIds.length} document(s) linked`}
             </Button>
             {evidenceIds.length === 0 && (
               <p className="text-[11px] text-warning-foreground/90">
-                No evidence linked yet — link one now or add a task to collect it.
+                Add receipt or bank evidence now, or a task to collect it will be created for you.
               </p>
             )}
           </div>
+
           <div className="space-y-1.5">
-            <Label className="text-xs">Notes</Label>
+            <Label className="text-xs">Purpose / notes</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={3}
+              rows={2}
               className="text-xs"
             />
           </div>
         </div>
+
         <DialogFooter className="gap-2">
           <Button variant="outline" className="h-11" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button
-            className="h-11"
-            onClick={() => {
-              if (!label.trim() || !Number(amount)) return;
-              addFinance({
-                date,
-                label: label.trim(),
-                kind,
-                amount: Number(amount),
-                currency,
-                recurring,
-                notes: notes.trim(),
-                evidenceIds,
-              });
-              onOpenChange(false);
-            }}
-          >
+          <Button className="h-11" disabled={scanning} onClick={save}>
             Save expense
           </Button>
         </DialogFooter>

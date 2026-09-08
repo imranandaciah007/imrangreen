@@ -471,3 +471,242 @@ export const askEvidence = createServerFn({ method: "POST" })
       gaps: normList(parsed["gaps"]),
     };
   });
+
+/* ------------------------------------------------------------------ *
+ * Receipts, statements and transfers (Prompt 3)
+ * ------------------------------------------------------------------ */
+
+const RECEIPT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "merchant",
+    "date",
+    "currency",
+    "total",
+    "tax",
+    "lineItems",
+    "isTransfer",
+    "sender",
+    "recipient",
+    "reference",
+    "summary",
+  ],
+  properties: {
+    merchant: { type: "string", description: "Shop, provider or bank shown on the document" },
+    date: { type: "string", description: "YYYY-MM-DD, empty if not stated" },
+    currency: { type: "string", description: "GBP or USD, empty if unclear" },
+    total: { type: "number", description: "Document total, 0 if not stated" },
+    tax: { type: "number", description: "Tax/VAT amount, 0 if not stated" },
+    lineItems: {
+      type: "array",
+      description: "Each purchased line. Mark relevant=false for ordinary personal items.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["label", "amount", "category", "beneficiary", "relevant", "certain"],
+        properties: {
+          label: { type: "string" },
+          amount: { type: "number" },
+          category: { type: "string", description: "One of the provided expense categories" },
+          beneficiary: { type: "string", description: "Aciah, Jibril, Family, Immigration or Other" },
+          relevant: {
+            type: "boolean",
+            description: "True only for separation/family/child related spending",
+          },
+          certain: { type: "boolean", description: "False when the classification is a guess" },
+        },
+      },
+    },
+    isTransfer: { type: "boolean", description: "True for a bank transfer/remittance record" },
+    sender: { type: "string" },
+    recipient: { type: "string" },
+    reference: { type: "string" },
+    summary: { type: "string", description: "One factual sentence" },
+  },
+} as const;
+
+export interface ReceiptLine {
+  label: string;
+  amount: number;
+  category: string;
+  beneficiary: string;
+  relevant: boolean;
+  certain: boolean;
+}
+
+export interface ReceiptRead {
+  merchant: string;
+  date: string;
+  currency: string;
+  total: number;
+  tax: number;
+  lineItems: ReceiptLine[];
+  isTransfer: boolean;
+  sender: string;
+  recipient: string;
+  reference: string;
+  summary: string;
+  uncertain: { field: string; options: string[] }[];
+  ranAt: string;
+  contentRead: boolean;
+  /** Both raw scans, kept as JSON for auditability. */
+  passes: string[];
+}
+
+async function receiptPass(input: {
+  prompt: string;
+  fileName: string;
+  mimeType: string;
+  base64: string | null;
+}) {
+  const lovableKey = process.env["LOVABLE_API_KEY"];
+  if (!lovableKey) throw new Error("AI is not configured for this project.");
+  const content: Record<string, unknown>[] = [{ type: "input_text", text: input.prompt }];
+  if (input.base64) {
+    if (input.mimeType.startsWith("image/")) {
+      content.push({
+        type: "input_image",
+        image_url: `data:${input.mimeType};base64,${input.base64}`,
+      });
+    } else {
+      content.push({
+        type: "input_file",
+        filename: input.fileName,
+        file_data: `data:${input.mimeType};base64,${input.base64}`,
+      });
+    }
+  }
+  const res = await fetch(GATEWAY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
+    body: JSON.stringify({
+      model: MODEL,
+      reasoning: { effort: "low" },
+      input: [{ role: "user", content }],
+      text: { format: { type: "json_schema", name: "receipt_read", strict: true, schema: RECEIPT_SCHEMA } },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`AI request failed [${res.status}]: ${body.slice(0, 400)}`);
+  }
+  const data = (await res.json()) as {
+    output?: { content?: { type?: string; text?: string }[] }[];
+    output_text?: string;
+  };
+  let text = data.output_text ?? "";
+  if (!text) {
+    for (const part of data.output ?? []) {
+      for (const c of part.content ?? []) if (c.type === "output_text" && c.text) text += c.text;
+    }
+  }
+  const parsed = JSON.parse(text) as Record<string, unknown>;
+  const lines = Array.isArray(parsed["lineItems"]) ? parsed["lineItems"] : [];
+  return {
+    merchant: String(parsed["merchant"] ?? "").trim(),
+    date: String(parsed["date"] ?? "").slice(0, 10),
+    currency: String(parsed["currency"] ?? "").trim().toUpperCase(),
+    total: Number(parsed["total"]) || 0,
+    tax: Number(parsed["tax"]) || 0,
+    lineItems: (lines as Record<string, unknown>[]).map((l) => ({
+      label: String(l["label"] ?? "").trim(),
+      amount: Number(l["amount"]) || 0,
+      category: String(l["category"] ?? "").trim(),
+      beneficiary: String(l["beneficiary"] ?? "").trim(),
+      relevant: Boolean(l["relevant"]),
+      certain: Boolean(l["certain"]),
+    })),
+    isTransfer: Boolean(parsed["isTransfer"]),
+    sender: String(parsed["sender"] ?? "").trim(),
+    recipient: String(parsed["recipient"] ?? "").trim(),
+    reference: String(parsed["reference"] ?? "").trim(),
+    summary: String(parsed["summary"] ?? "").trim(),
+  } satisfies Omit<ReceiptRead, "uncertain" | "ranAt" | "contentRead" | "passes">;
+}
+
+/**
+ * Double-scan read of a receipt, bank statement or transfer screenshot. Amounts and merchant
+ * are only returned when both scans agree; anything else is handed back for confirmation.
+ */
+export const extractReceipt = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => {
+    const d = (data ?? {}) as Record<string, unknown>;
+    return {
+      base64: String(d["base64"] ?? ""),
+      driveFileId: d["driveFileId"] ? String(d["driveFileId"]) : "",
+      fileName: String(d["fileName"] ?? "receipt"),
+      mimeType: String(d["mimeType"] ?? "application/pdf"),
+      allowedCategories: normList(d["allowedCategories"]),
+    };
+  })
+  .handler(async ({ data }): Promise<ReceiptRead> => {
+    const base64 = data.base64 || (data.driveFileId ? await fetchDriveBytes(data.driveFileId) : null);
+    const prompt = [
+      "Read this receipt, invoice, bank statement or transfer screenshot for a US I-601 hardship case.",
+      "Imran (UK) supports Aciah (US citizen spouse) and their son Jibril while the family is separated since 2026-08-18.",
+      `File name: ${data.fileName}`,
+      base64 ? "Read the attached document." : "No file content is available; report empty values.",
+      `Expense categories to choose from: ${data.allowedCategories.join(" | ")}`,
+      "Mark ordinary personal spending (coffee, alcohol, adult snacks, unrelated shopping) as relevant=false.",
+      "Mark child items (formula, nappies/diapers, wipes, baby food, baby clothing, baby medicine, childcare) as relevant=true with the matching Jibril category.",
+      "Never invent amounts, merchants or dates. Leave values empty or 0 when not stated.",
+    ].join("\n");
+
+    const [a, b] = await Promise.all([
+      receiptPass({ prompt: `${prompt}\nPass 1: read carefully.`, fileName: data.fileName, mimeType: data.mimeType, base64 }),
+      receiptPass({
+        prompt: `${prompt}\nPass 2: independently verify. Prefer empty over guessing.`,
+        fileName: data.fileName,
+        mimeType: data.mimeType,
+        base64,
+      }),
+    ]);
+
+    const uncertain: { field: string; options: string[] }[] = [];
+    const agree = (field: string, x: string, y: string) => {
+      if (x && y && x.toLowerCase() === y.toLowerCase()) return x;
+      if (x || y) uncertain.push({ field, options: [x, y].filter(Boolean) });
+      return "";
+    };
+    const merchant = agree("merchant", a.merchant, b.merchant);
+    const date = agree("date", a.date, b.date);
+    const currency = agree("currency", a.currency, b.currency);
+    const totalAgrees = Math.abs(a.total - b.total) < 0.01;
+    if (!totalAgrees && (a.total || b.total))
+      uncertain.push({ field: "total", options: [String(a.total), String(b.total)] });
+
+    // Keep only lines both scans found at the same amount; everything else needs confirmation.
+    const lineItems: ReceiptLine[] = [];
+    for (const line of a.lineItems) {
+      const twin = b.lineItems.find(
+        (l) => Math.abs(l.amount - line.amount) < 0.01 || l.label.toLowerCase() === line.label.toLowerCase(),
+      );
+      lineItems.push({
+        ...line,
+        relevant: twin ? line.relevant && twin.relevant : line.relevant,
+        certain: Boolean(twin) && line.certain && (twin?.certain ?? false) && line.category === twin?.category,
+      });
+    }
+
+    return {
+      merchant,
+      date,
+      currency: currency === "USD" || currency === "GBP" ? currency : "",
+      total: totalAgrees ? a.total : 0,
+      tax: Math.abs(a.tax - b.tax) < 0.01 ? a.tax : 0,
+      lineItems,
+      isTransfer: a.isTransfer && b.isTransfer,
+      sender: a.sender && b.sender && a.sender.toLowerCase() === b.sender.toLowerCase() ? a.sender : "",
+      recipient:
+        a.recipient && b.recipient && a.recipient.toLowerCase() === b.recipient.toLowerCase()
+          ? a.recipient
+          : "",
+      reference: a.reference === b.reference ? a.reference : "",
+      summary: a.summary || b.summary,
+      uncertain,
+      ranAt: new Date().toISOString(),
+      contentRead: Boolean(base64),
+      passes: [JSON.stringify(a), JSON.stringify(b)],
+    };
+  });

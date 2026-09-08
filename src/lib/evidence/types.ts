@@ -184,21 +184,150 @@ export const FINANCE_KINDS = [
 ] as const;
 export type FinanceKind = (typeof FINANCE_KINDS)[number];
 
+/** Separation-related expense categories (Prompt 3). Ordinary spending is not tracked. */
+export const EXPENSE_CATEGORIES = [
+  "Money sent by Imran to Aciah",
+  "Jibril — formula/milk",
+  "Jibril — nappies/wipes",
+  "Jibril — baby food",
+  "Jibril — clothing",
+  "Jibril — medicines/medical",
+  "Jibril — equipment/baby supplies",
+  "Jibril — childcare",
+  "Jibril — transport",
+  "Aciah — medical",
+  "Aciah — medication",
+  "Aciah — pregnancy related",
+  "Aciah — appointment transport",
+  "Housing / household contribution",
+  "Relocation / re-establishment in U.S.",
+  "Immigration fees",
+  "Separation-related travel",
+  "Communication / postage / document costs",
+  "Other genuine separation-related expense",
+  "UK fixed obligations",
+  "Other",
+] as const;
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
+export const EXPENSE_GROUPS: Record<string, ExpenseCategory[]> = {
+  "Money sent to Aciah": ["Money sent by Imran to Aciah"],
+  "Jibril costs": [
+    "Jibril — formula/milk",
+    "Jibril — nappies/wipes",
+    "Jibril — baby food",
+    "Jibril — clothing",
+    "Jibril — medicines/medical",
+    "Jibril — equipment/baby supplies",
+    "Jibril — childcare",
+    "Jibril — transport",
+  ],
+  "Aciah medical & pregnancy": [
+    "Aciah — medical",
+    "Aciah — medication",
+    "Aciah — pregnancy related",
+    "Aciah — appointment transport",
+  ],
+  "Housing & relocation": [
+    "Housing / household contribution",
+    "Relocation / re-establishment in U.S.",
+  ],
+  "Immigration & travel": ["Immigration fees", "Separation-related travel"],
+  "UK fixed obligations": ["UK fixed obligations"],
+  Other: [
+    "Communication / postage / document costs",
+    "Other genuine separation-related expense",
+    "Other",
+  ],
+};
+
+export const PAYERS = ["Imran", "Aciah"] as const;
+export const BENEFICIARIES = ["Aciah", "Jibril", "Family", "Immigration", "Other"] as const;
+export const FINANCE_STATUSES = ["Verified", "Needs confirmation", "Missing receipt"] as const;
+export type FinanceStatus = (typeof FINANCE_STATUSES)[number];
+
+/** One relevant line item taken from a mixed receipt. */
+export interface FinanceLineItem {
+  label: string;
+  amount: number;
+  category: ExpenseCategory;
+  /** False = personal/ordinary spending, excluded from hardship totals. */
+  included: boolean;
+}
+
 export interface FinancialEntry {
   id: string;
   date: string;
   label: string;
   kind: FinanceKind;
+  /** Original amount as paid — never overwritten by a converted value. */
   amount: number;
   currency: "GBP" | "USD";
   recurring: boolean;
   notes: string;
   evidenceIds: string[];
+  /** Prompt 3 fields (all optional so older entries keep working). */
+  expenseCategory?: ExpenseCategory | undefined;
+  payer?: (typeof PAYERS)[number] | undefined;
+  beneficiary?: (typeof BENEFICIARIES)[number] | undefined;
+  merchant?: string | undefined;
+  purpose?: string | undefined;
+  gbpEquivalent?: number | undefined;
+  usdEquivalent?: number | undefined;
+  exchangeRate?: number | undefined;
+  exchangeRateDate?: string | undefined;
+  exchangeRateSource?: string | undefined;
+  hardshipCategories?: Category[] | undefined;
+  affectsAciah?: string | undefined;
+  status?: FinanceStatus | undefined;
+  eventId?: string | undefined;
+  lineItems?: FinanceLineItem[] | undefined;
+  /** Fingerprint of a real-world transfer, so two evidence documents never double-count it. */
+  transferKey?: string | undefined;
+  /** True when the user has decided this is ordinary spending, not hardship-tracked. */
+  excluded?: boolean | undefined;
+  /** Monthly repeats are only generated up to a date the user confirms. */
+  recurringUntil?: string | undefined;
   createdBy: string;
   lastEditedBy: string;
   createdAt: string;
   updatedAt: string;
 }
+
+/** UK income and fixed commitments — a factual summary, not a legal conclusion. */
+export interface IncomeSettings {
+  netMonthlyIncome: number;
+  mortgage: number;
+  councilTax: number;
+  utilities: number;
+  debtCommitments: number;
+  transportWork: number;
+  otherObligations: number;
+  currency: "GBP";
+  /** Manual USD→GBP rate used for dashboard equivalents. */
+  usdToGbp: number;
+  rateDate: string;
+  rateSource: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export const DEFAULT_INCOME: IncomeSettings = {
+  netMonthlyIncome: 0,
+  mortgage: 0,
+  councilTax: 0,
+  utilities: 0,
+  debtCommitments: 0,
+  transportWork: 0,
+  otherObligations: 0,
+  currency: "GBP",
+  usdToGbp: 0.79,
+  rateDate: "",
+  rateSource: "Manually entered",
+  updatedAt: "",
+  updatedBy: "",
+};
+
 
 export interface CaseTask {
   id: string;
