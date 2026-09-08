@@ -29,7 +29,13 @@ const COVERAGE_STYLE: Record<string, string> = {
   "Needs supporting evidence": "border-destructive/40 bg-destructive/10 text-foreground",
 };
 
-export function CaseReviewView({ onAddTask }: { onAddTask: () => void }) {
+export function CaseReviewView({
+  onAddTask,
+  onBuildPacket,
+}: {
+  onAddTask: () => void;
+  onBuildPacket: () => void;
+}) {
   const {
     stats,
     gaps,

@@ -48,8 +48,10 @@ function Metric({
 
 export function HomeView({
   onNavigate,
+  onBuildPacket,
 }: {
   onNavigate: (tab: "timeline" | "finances" | "vault" | "review") => void;
+  onBuildPacket: () => void;
 }) {
   const { stats, caseSettings, tasks, events, gaps } = useEvidence();
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -58,6 +60,20 @@ export function HomeView({
 
   return (
     <div className="space-y-4">
+      <button
+        type="button"
+        onClick={onBuildPacket}
+        className="flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3.5 text-left transition-colors hover:bg-primary/15"
+      >
+        <FileText className="size-5 shrink-0 text-primary" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-foreground">Build case packet</span>
+          <span className="block text-[11px] text-muted-foreground">
+            Check the case, number the exhibits and export the bundle
+          </span>
+        </span>
+      </button>
+
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Metric
           label="Exhibits"
