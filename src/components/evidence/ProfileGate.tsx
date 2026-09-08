@@ -10,7 +10,6 @@ export function ProfileGate() {
   return (
     <Dialog open={!loading && !profileChosen}>
       <DialogContent
-        showCloseButton={false}
         className="max-w-sm rounded-2xl [&>button]:hidden"
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
