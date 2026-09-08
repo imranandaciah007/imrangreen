@@ -125,6 +125,13 @@ export class MockDriveProvider implements DocumentProvider {
     });
     return updated;
   }
+
+  async remove(ids: string[]) {
+    const set = new Set(ids);
+    this.items = this.items.filter((item) => !set.has(item.id));
+    return ids;
+  }
 }
+
 
 export const documentProvider: DocumentProvider = new MockDriveProvider();
