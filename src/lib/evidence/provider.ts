@@ -1,4 +1,3 @@
-import { mockEvidence } from "./mock-data";
 import type { EvidenceItem } from "./types";
 
 /**
@@ -20,7 +19,11 @@ export interface DocumentProvider {
   readonly id: string;
   readonly displayName: string;
   getConnection(): Promise<ProviderConnection>;
-  connect(config: { apiKey?: string; folderPath?: string; accountLabel?: string }): Promise<ProviderConnection>;
+  connect(config: {
+    apiKey?: string;
+    folderPath?: string;
+    accountLabel?: string;
+  }): Promise<ProviderConnection>;
   disconnect(): Promise<ProviderConnection>;
   /** Full listing of evidence items in the connected folder. */
   list(): Promise<EvidenceItem[]>;
@@ -36,18 +39,18 @@ function clone(items: EvidenceItem[]): EvidenceItem[] {
   return items.map((item) => ({ ...item, tags: [...item.tags], auditTrail: [...item.auditTrail] }));
 }
 
-/** In-memory provider that simulates a connected cloud drive folder. */
+/** In-memory provider standing in for a cloud drive folder. Starts empty. */
 export class MockDriveProvider implements DocumentProvider {
   readonly id = "mock-google-drive";
   readonly displayName = "Google Drive (Mock)";
 
-  private items = clone(mockEvidence);
+  private items: EvidenceItem[] = [];
   private connection: ProviderConnection = {
     providerName: "Google Drive",
-    connected: true,
-    accountLabel: "counsel@whitfield-immigration.com",
-    folderPath: "/Petitions/2026/EB-2 NIW — Rahman/Evidence",
-    lastSyncedAt: new Date().toISOString(),
+    connected: false,
+    accountLabel: undefined,
+    folderPath: undefined,
+    lastSyncedAt: undefined,
   };
 
   async getConnection() {
@@ -80,7 +83,9 @@ export class MockDriveProvider implements DocumentProvider {
       id: `ev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       cloudDriveUrl:
         draft.cloudDriveUrl ||
-        (file && typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : ""),
+        (file && typeof URL !== "undefined" && URL.createObjectURL
+          ? URL.createObjectURL(file)
+          : ""),
       auditTrail: [
         {
           id: `audit-${Math.random().toString(36).slice(2, 10)}`,

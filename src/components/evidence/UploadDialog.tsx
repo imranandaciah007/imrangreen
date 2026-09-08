@@ -12,7 +12,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatBytes } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
@@ -35,7 +41,13 @@ function fileTypeOf(name: string): FileType {
   return "PDF";
 }
 
-export function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+export function UploadDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
   const { addItem, items } = useEvidence();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -92,7 +104,7 @@ export function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     try {
       await addItem(
         {
-          exhibitId: (exhibitId.trim() || suggestedExhibit),
+          exhibitId: exhibitId.trim() || suggestedExhibit,
           fileName: file.name,
           title: title.trim(),
           category,
@@ -130,7 +142,8 @@ export function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChan
             <UploadCloud className="size-4" /> Add evidence document
           </DialogTitle>
           <DialogDescription className="text-xs">
-            The file, exhibit number, category and tags are filed together and the summary bar updates immediately.
+            The file, exhibit number, category and tags are filed together and the summary bar
+            updates immediately.
           </DialogDescription>
         </DialogHeader>
 
@@ -162,7 +175,9 @@ export function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               </>
             ) : (
               <>
-                <p className="text-xs font-semibold text-foreground">Drop a file here or click to browse</p>
+                <p className="text-xs font-semibold text-foreground">
+                  Drop a file here or click to browse
+                </p>
                 <p className="text-[11px] text-muted-foreground">PDF, DOCX, JPG or PNG</p>
               </>
             )}
@@ -193,7 +208,9 @@ export function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 placeholder={suggestedExhibit}
                 className="font-mono text-xs"
               />
-              <p className="text-[10px] text-muted-foreground">Leave blank to use {suggestedExhibit}</p>
+              <p className="text-[10px] text-muted-foreground">
+                Leave blank to use {suggestedExhibit}
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Category</Label>
@@ -297,11 +314,20 @@ export function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" className="text-xs" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
           <Button size="sm" className="text-xs" onClick={submit} disabled={saving}>
-            {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
+            {saving ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Paperclip className="size-3.5" />
+            )}
             File document
           </Button>
         </DialogFooter>
