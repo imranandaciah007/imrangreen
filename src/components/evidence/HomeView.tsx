@@ -46,7 +46,11 @@ function Metric({
   );
 }
 
-export function HomeView({ onNavigate }: { onNavigate: (tab: "timeline" | "finances" | "vault") => void }) {
+export function HomeView({
+  onNavigate,
+}: {
+  onNavigate: (tab: "timeline" | "finances" | "vault") => void;
+}) {
   const { stats, caseSettings, tasks, events } = useEvidence();
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const openTasks = tasks.filter((t) => !t.done).slice(0, 4);

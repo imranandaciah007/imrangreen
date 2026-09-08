@@ -22,12 +22,24 @@ const JOINT_HINTS = /joint|marriage|married|wedding|tenanc|mortgage|both|family/
 
 const CATEGORY_RULES: [RegExp, string][] = [
   [/pregnan|matern|scan\b|antenat|midwif|ultrasound|nhs.*(preg|matern)/i, "Pregnancy"],
-  [/gp\b|doctor|hospital|medical|prescri|therap|psych|mental|counsel|diagnos|nhs/i, "Medical & Psychological"],
-  [/bank|statement|payslip|salary|tax\b|hmrc|invoice|receipt|debt|loan|saving|utility|bill/i, "Financial Hardship"],
+  [
+    /gp\b|doctor|hospital|medical|prescri|therap|psych|mental|counsel|diagnos|nhs/i,
+    "Medical & Psychological",
+  ],
+  [
+    /bank|statement|payslip|salary|tax\b|hmrc|invoice|receipt|debt|loan|saving|utility|bill/i,
+    "Financial Hardship",
+  ],
   [/school|nurser|child|jibril|immunis|vaccin|paediatr/i, "Jibril / Child & Family"],
   [/flight|travel|ticket|boarding|separat|visa.*visit|hotel/i, "Family Separation"],
-  [/police|crime|caution|court|solicitor|legal|statement.*police|cps/i, "Police / Government / Independent Evidence"],
-  [/passport|visa|home\s*office|immigra|uscis|biometr|brp|entry\s*clearance|decision\s*letter/i, "Immigration / Legal Records"],
+  [
+    /police|crime|caution|court|solicitor|legal|statement.*police|cps/i,
+    "Police / Government / Independent Evidence",
+  ],
+  [
+    /passport|visa|home\s*office|immigra|uscis|biometr|brp|entry\s*clearance|decision\s*letter/i,
+    "Immigration / Legal Records",
+  ],
   [/tenanc|rent\b|mortgage|landlord|housing|council\s*tax/i, "Housing"],
   [/employ|job\b|contract.*employ|reference.*employer|p45|p60|work\b/i, "Employment / Career"],
   [/photo|picture|img_|screenshot|chat|whatsapp|message|call\s*log/i, "Relationship Evidence"],

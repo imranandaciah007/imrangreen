@@ -106,8 +106,6 @@ export interface AiExtraction {
   passes?: Record<string, unknown>[] | undefined;
 }
 
-
-
 export interface EvidenceItem {
   id: string;
   exhibitId: string;
@@ -173,7 +171,6 @@ export interface HardshipEvent {
   createdAt: string;
   updatedAt: string;
 }
-
 
 export const FINANCE_KINDS = [
   "Travel / Flights",

@@ -1,13 +1,4 @@
-import {
-  Check,
-  ChevronDown,
-  FolderInput,
-  Search,
-  Sparkles,
-  Tags,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Check, ChevronDown, FolderInput, Search, Sparkles, Tags, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {

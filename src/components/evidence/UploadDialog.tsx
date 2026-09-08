@@ -57,7 +57,6 @@ function toBase64(file: File) {
   });
 }
 
-
 function Chip({
   active,
   children,
@@ -245,7 +244,12 @@ export function UploadDialog({
       if (field === "sourceType" && (SOURCE_TYPES as readonly string[]).includes(value))
         setSourceType(value as SourceType);
       if (field === "people")
-        setPeople(value.split(",").map((v) => v.trim()).filter(Boolean));
+        setPeople(
+          value
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean),
+        );
       if (field === "categories")
         setCats(
           value
@@ -374,7 +378,6 @@ export function UploadDialog({
       setSaving(false);
     }
   }
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -699,7 +702,6 @@ export function UploadDialog({
           )}
 
           {error && <p className="text-xs font-medium text-destructive">{error}</p>}
-
         </div>
 
         <DialogFooter className="gap-2">

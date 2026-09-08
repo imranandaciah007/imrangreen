@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  CalendarPlus,
-  CheckSquare,
-  Coins,
-  Mic,
-  MicOff,
-  Sparkles,
-  UploadCloud,
-} from "lucide-react";
+import { CalendarPlus, CheckSquare, Coins, Mic, MicOff, Sparkles, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -43,7 +35,6 @@ import {
 } from "@/lib/evidence/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
-
 
 export function AddSheet({
   open,
@@ -445,12 +436,7 @@ export function EventDialog({
               className="text-xs"
             />
             <div className="flex flex-wrap gap-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 text-xs"
-                onClick={dictate}
-              >
+              <Button type="button" variant="outline" className="h-10 text-xs" onClick={dictate}>
                 {listening ? <MicOff className="size-4" /> : <Mic className="size-4" />}
                 {listening ? "Stop" : "Dictate"}
               </Button>
@@ -670,7 +656,6 @@ export function EventDialog({
     </Dialog>
   );
 }
-
 
 export function TaskDialog({
   open,

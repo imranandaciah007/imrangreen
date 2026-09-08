@@ -87,7 +87,9 @@ export function AskEvidenceDialog({
     } catch (error) {
       setAnswer({
         answer:
-          error instanceof Error ? error.message.slice(0, 200) : "Could not search the case records.",
+          error instanceof Error
+            ? error.message.slice(0, 200)
+            : "Could not search the case records.",
         recordIds: [],
         gaps: [],
       });
