@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { extractDocument } from "@/lib/ai.functions";
 import type { DiaryPlan } from "./diary-merge";
 import { documentProvider, type ProviderConnection } from "./provider";
+import { defaultReminderAt } from "../task-reminders";
 import {
   categoryCoverage,
   detectGaps,
@@ -678,7 +679,11 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     (draft: NewRecord<CaseTask>) => {
       setTasks((prev) => [
         ...prev,
-        { ...stamp({ status: "To do", priority: "Normal", ...draft }), id: rid("task") },
+        {
+          ...stamp({ status: "To do", priority: "Normal", ...draft }),
+          reminderAt: draft.reminderAt ?? defaultReminderAt(draft.dueDate),
+          id: rid("task"),
+        },
       ]);
       toast.success("Task added", { description: draft.title });
     },

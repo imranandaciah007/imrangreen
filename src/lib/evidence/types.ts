@@ -409,6 +409,10 @@ export interface CaseTask {
   /** To do / Waiting / Complete. Older tasks fall back to done ? Complete : To do. */
   status?: TaskStatus | undefined;
   priority?: TaskPriority | undefined;
+  /** Local device reminder time. */
+  reminderAt?: string | undefined;
+  /** Set after the system notification has been shown; cleared when rescheduled. */
+  reminderNotifiedAt?: string | undefined;
   notes?: string | undefined;
   evidenceIds?: string[] | undefined;
   eventId?: string | undefined;
