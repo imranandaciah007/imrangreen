@@ -407,6 +407,8 @@ export function UploadDialog({
         }
       }
       onOpenChange(false);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "The evidence could not be saved to Drive.");
     } finally {
       setSaving(false);
     }

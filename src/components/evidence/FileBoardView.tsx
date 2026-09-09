@@ -314,19 +314,48 @@ export function FileBoardView() {
 
   async function addEvidence(files: FileList | null) {
     if (!files?.length) return;
+    if (currentPath.split("/").includes("I601 Evidence Clones")) {
+      toast.error("Add originals outside the clone folder.", {
+        description: "GC creates and manages the matching enriched PDF here automatically.",
+      });
+      return;
+    }
     setBusy("upload");
     try {
       for (const file of Array.from(files)) {
-        await uploadEvidenceToFolder({
+        const base64 = await fileToBase64(file);
+        const uploaded = await uploadEvidenceToFolder({
           data: {
             folderPath: currentPath,
             name: file.name,
             mimeType: file.type || "application/octet-stream",
-            base64: await fileToBase64(file),
+            base64,
+          },
+        });
+        const exhibitId = exhibitFor(uploaded.id);
+        await generateCloneDocument({
+          data: {
+            driveFileId: uploaded.id,
+            fileName: file.name,
+            folderPath: currentPath,
+            mimeType: file.type || "application/octet-stream",
+            meta: {
+              exhibitId,
+              title: file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "),
+              documentDate: new Date().toISOString().slice(0, 10),
+              person: "Aciah",
+              categories: [],
+              people: ["Aciah"],
+              sourceType: "Other",
+              status: "Needs confirmation",
+              summary: "New evidence uploaded through GC. Confirm the important document details in the app.",
+              tags: [],
+              addedBy: profile,
+            },
           },
         });
       }
-      toast.success(`${files.length} file${files.length > 1 ? "s" : ""} added to Drive`);
+      toast.success(`${files.length} original${files.length > 1 ? "s" : ""} and matching PDF clone${files.length > 1 ? "s" : ""} saved to Drive`);
       await sync();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "The upload failed.");

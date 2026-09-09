@@ -16,7 +16,6 @@ import { useEvidence } from "@/lib/evidence/store";
 interface SyncResult {
   added: number;
   skipped: number;
-  needsConfirmation: number;
   updated: number;
   removed: number;
 }
@@ -38,7 +37,7 @@ export function ConnectDriveDialog({
     setResult(null);
     try {
       const synced = await syncDrive();
-      setResult({ added: synced.added, skipped: synced.files - synced.added, needsConfirmation: 0, updated: synced.updated, removed: synced.removed });
+      setResult({ added: synced.added, skipped: synced.files - synced.added, updated: synced.updated, removed: synced.removed });
       toast.success(`Drive sync complete`, {
         description: `${synced.added} added · ${synced.updated} renamed or moved · ${synced.removed} removed`,
       });

@@ -64,7 +64,7 @@ export function TimelineView({
   const documentedGbp = finances
     .filter((f) => f.date >= separation)
     .reduce((s, f) => s + (f.currency === "USD" ? f.amount * 0.79 : f.amount), 0);
-  const openFollowUps = tasks.filter((t) => !t.done).length;
+  const openFollowUps = tasks.filter((t) => taskStatus(t) !== "Complete").length;
 
   const linkTarget = events.find((e) => e.id === linkFor) ?? null;
 
