@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bell, ChevronDown, HelpCircle, Plus, Search } from "lucide-react";
+import { Bell, ChevronDown, Plus, Search, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -87,10 +87,10 @@ function CaseApp() {
   }
 
   return (
-    <div className="case-shell min-h-screen bg-background pb-24 lg:grid lg:grid-cols-[228px_minmax(0,1fr)] lg:pb-0">
-      <aside className="case-sidebar fixed inset-y-0 left-0 z-40 hidden w-[228px] flex-col lg:flex">
-        <div className="case-brand"><span>GC</span><strong>CASE PORTAL</strong></div>
-        <nav className="mt-7 flex w-full flex-col gap-1.5 px-3" aria-label="Primary navigation">
+    <div className="case-shell min-h-screen bg-background pb-24 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:pb-0">
+      <aside className="case-sidebar fixed inset-y-0 left-0 z-40 hidden w-[240px] flex-col lg:flex">
+        <div className="case-brand"><img src="/favicon.png" alt="" /><div><strong>GC</strong><small>Evidence portal</small></div></div>
+        <nav className="mt-5 flex w-full flex-col gap-1 px-3" aria-label="Primary navigation">
           {mainTabs.map((item) => {
             const Icon = item.icon;
             const active = tab === item.id;
@@ -100,7 +100,7 @@ function CaseApp() {
                 variant="ghost"
                 onClick={() => setTab(item.id)}
                 aria-current={active ? "page" : undefined}
-                className={`case-side-link h-11 w-full justify-start gap-3 px-4 text-sm font-extrabold ${
+                className={`case-side-link h-11 w-full justify-start gap-3 px-4 text-sm font-bold ${
                   active
                     ? "case-side-link-active"
                     : "text-white/60 hover:bg-white/5 hover:text-white"
@@ -112,22 +112,20 @@ function CaseApp() {
             );
           })}
         </nav>
-        <div className="case-sidebar-help"><HelpCircle /><strong>Need help?</strong><span>View our guide or contact support.</span><button>Get Support</button></div>
+        <div className="case-sidebar-status"><ShieldCheck /><div><strong>Private case</strong><span>Imran &amp; Aciah</span></div></div>
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
         <header className="case-topbar sticky top-0 z-30 pt-[env(safe-area-inset-top)]">
-          <div className="flex min-h-[76px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-9">
+          <div className="flex min-h-[68px] items-center gap-3 px-4 py-2 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3 sm:flex-1">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary font-display text-sm font-black text-navy lg:hidden">
-                GC
-              </span>
+               <img src="/favicon.png" alt="GC" className="size-10 shrink-0 rounded-lg lg:hidden" />
               <div className="min-w-0">
                 <h1 className="truncate font-display text-base font-black text-white sm:text-lg">
                   {caseSettings.caseName}
                 </h1>
                 <p className="mt-0.5 truncate text-[10px] font-bold text-white/50">
-                  Private Evidence Management System
+                   Private evidence portal
                 </p>
               </div>
             </div>
@@ -136,16 +134,7 @@ function CaseApp() {
               <Search className="size-4" /><button onClick={() => setAskOpen(true)} className="h-10 flex-1 text-left text-xs">Search evidence, tasks, notes...</button><kbd>⌘K</kbd>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-10 text-white hover:bg-white/10 hover:text-white"
-                onClick={() => setAskOpen(true)}
-                aria-label="Ask my evidence"
-                title="Ask my evidence"
-              >
-                <Bell className="size-4" />
-              </Button>
+              <Button variant="ghost" size="icon" className="size-10 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={() => setAskOpen(true)} aria-label="Open reminders" title="Open reminders"><Bell className="size-4" /></Button>
               <Select value={profile} onValueChange={(v) => setProfile(v as Profile)}>
                 <SelectTrigger className="h-10 w-[108px] border-white/10 bg-white/5 text-xs font-bold text-white">
                   <SelectValue />
@@ -163,7 +152,7 @@ function CaseApp() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1480px] space-y-4 p-3 sm:p-6 lg:p-9">
+         <main className="mx-auto max-w-[1440px] space-y-4 p-3 sm:p-5 lg:p-7">
         {loading ? (
           <p className="py-20 text-center text-sm text-muted-foreground">Loading case…</p>
         ) : (

@@ -1,6 +1,10 @@
 # GC case portal — roadmap
 
 ## Interface reconstruction
+- [x] Replace installed app artwork with a crisp American flag icon
+- [x] Apply the selected Federal Clean palette with Sora and Manrope typography
+- [x] Refine the Files board into compact, information-rich explorer rows
+- [x] Simplify the navigation shell and dashboard hierarchy across phone and desktop
 - [x] Apply the selected precision layout and premium red, royal-blue and silver system
 - [x] Replace the crowded desktop header with a navigation rail
 - [x] Simplify the Home view without removing case information

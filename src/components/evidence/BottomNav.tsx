@@ -1,6 +1,7 @@
 import { ClipboardCheck, Coins, Home, LayoutGrid, ListChecks, Plus, Vault } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export type MainTab = "home" | "board" | "timeline" | "finances" | "vault" | "review";
 
@@ -34,13 +35,14 @@ export function BottomNav({
           <TabButton key={t.id} t={t} active={tab === t.id} onClick={() => onTab(t.id)} />
         ))}
         <div className="flex justify-center">
-          <button
+          <Button
             onClick={onAdd}
             aria-label="Add"
-            className="-mt-5 flex size-14 items-center justify-center rounded-full bg-primary text-navy shadow-[0_8px_20px_rgba(255,201,38,.35)] transition-transform active:scale-95"
+            size="icon"
+            className="-mt-4 size-13 rounded-full border-4 border-card shadow-lg active:scale-95"
           >
-            <Plus className="size-7" />
-          </button>
+            <Plus className="size-6" />
+          </Button>
         </div>
         {right.map((t) => (
           <TabButton key={t.id} t={t} active={tab === t.id} onClick={() => onTab(t.id)} />
@@ -61,16 +63,17 @@ function TabButton({
 }) {
   const Icon = t.icon;
   return (
-    <button
+    <Button
+      variant="ghost"
       onClick={onClick}
       className={cn(
-        "flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-bold",
-        active ? "bg-accent/70 text-primary" : "text-muted-foreground",
+        "h-[58px] min-w-0 flex-col gap-1 rounded-md px-0 text-[9px] font-bold",
+        active ? "bg-accent text-primary" : "text-muted-foreground",
       )}
     >
       <Icon className={cn("size-5", active && "stroke-[2.4]")} />
       {t.label}
-    </button>
+    </Button>
   );
 }
 

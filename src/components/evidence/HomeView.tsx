@@ -63,22 +63,21 @@ export function HomeView({
     .slice(0, 3);
 
   return (
-    <div className="case-home space-y-5">
+    <div className="case-home space-y-4">
       <section className="case-hero">
         <div className="case-hero-copy">
           <span className="case-kicker">CASE OVERVIEW</span>
           <h2>Good morning, Imran</h2>
           <p>
-            Your case is moving forward. Focus on the {gaps.length} unresolved gap
-            {gaps.length === 1 ? "" : "s"} and keep your evidence up to date.
+             {gaps.length} unresolved gap{gaps.length === 1 ? "" : "s"}. Keep evidence current and review anything that needs attention.
           </p>
         </div>
         <div className="case-hero-actions">
           <Button onClick={onUpload} className="case-primary-action">
-            <Upload /> Upload Evidence
+             <Upload /> Add evidence
           </Button>
           <Button onClick={onAddTask} variant="outline" className="case-secondary-action">
-            <ListChecks /> Add Task
+             <ListChecks /> Add task
           </Button>
         </div>
       </section>
