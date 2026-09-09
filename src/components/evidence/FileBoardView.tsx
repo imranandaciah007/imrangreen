@@ -84,6 +84,36 @@ function exhibitFor(fileId: string) {
   return `EX-${fileId.replace(/[^A-Za-z0-9]/g, "").slice(-4).toUpperCase()}`;
 }
 
+/** Plain-language summary of what moved, was renamed, added or removed in Drive. */
+function countChanges(before: DriveTree | null, after: DriveTree): string | null {
+  if (!before) return null;
+  const prev = new Map(
+    [...before.folders, ...before.files].map((n) => [n.id, { name: n.name, path: n.path }]),
+  );
+  const now = [...after.folders, ...after.files];
+  let added = 0;
+  let renamed = 0;
+  let moved = 0;
+  for (const node of now) {
+    const old = prev.get(node.id);
+    if (!old) {
+      added += 1;
+      continue;
+    }
+    if (old.name !== node.name) renamed += 1;
+    else if (old.path !== node.path) moved += 1;
+    prev.delete(node.id);
+  }
+  const removed = prev.size;
+  const parts = [
+    added ? `${added} new` : "",
+    renamed ? `${renamed} renamed` : "",
+    moved ? `${moved} moved` : "",
+    removed ? `${removed} no longer in Drive` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export function FileBoardView() {
   const { items, profile, connection } = useEvidence();
   const [tree, setTree] = useState<DriveTree | null>(() => readJson<DriveTree | null>(TREE_KEY, null));
