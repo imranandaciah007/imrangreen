@@ -102,23 +102,57 @@ export function FileBoardView() {
   const uploadRef = useRef<HTMLInputElement>(null);
   const sentinel = useRef<HTMLDivElement | null>(null);
 
-  const sync = useCallback(async () => {
-    setSyncing(true);
+  const treeRef = useRef<DriveTree | null>(tree);
+  treeRef.current = tree;
+  const inFlight = useRef(false);
+
+  const sync = useCallback(async (mode: "manual" | "auto" = "manual") => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (mode === "manual") setSyncing(true);
+    else setAutoSyncing(true);
     try {
       const next = (await listDriveTree()) as DriveTree;
+      const before = treeRef.current;
+      const changes = countChanges(before, next);
       setTree(next);
       writeJson(TREE_KEY, next);
-      toast.success(`Drive synched — ${next.folders.length} folders, ${next.files.length} files`);
+      if (mode === "manual") {
+        toast.success(`Drive synched — ${next.folders.length} folders, ${next.files.length} files`);
+      } else if (changes) {
+        toast.success("Your Drive changed — the board has been updated", {
+          description: changes,
+        });
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Drive sync failed.");
+      if (mode === "manual") {
+        toast.error(error instanceof Error ? error.message : "Drive sync failed.");
+      }
     } finally {
+      inFlight.current = false;
       setSyncing(false);
+      setAutoSyncing(false);
     }
   }, []);
 
+  // Always mirror Drive: refresh on open, when the app comes back to the
+  // foreground, and quietly every couple of minutes while it stays open.
   useEffect(() => {
-    if (!tree) void sync();
-  }, [tree, sync]);
+    void sync(tree ? "auto" : "manual");
+    const onFocus = () => {
+      if (document.visibilityState === "visible") void sync("auto");
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    const timer = window.setInterval(() => void sync("auto"), 120_000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      window.clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sync]);
+
 
   const folderById = useMemo(
     () => new Map((tree?.folders ?? []).map((f) => [f.id, f])),
