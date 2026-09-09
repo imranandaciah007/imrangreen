@@ -88,6 +88,7 @@ export function FileBoardView() {
   const { items, profile, connection } = useEvidence();
   const [tree, setTree] = useState<DriveTree | null>(() => readJson<DriveTree | null>(TREE_KEY, null));
   const [syncing, setSyncing] = useState(false);
+  const [autoSyncing, setAutoSyncing] = useState(false);
   const [folderId, setFolderId] = useState<string | null>(null);
   const [favourites, setFavourites] = useState<string[]>(() => readJson<string[]>(FAV_KEY, []));
   const [recent, setRecent] = useState<string[]>(() => readJson<string[]>(RECENT_KEY, []));
