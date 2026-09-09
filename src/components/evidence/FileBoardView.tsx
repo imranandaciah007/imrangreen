@@ -380,12 +380,12 @@ export function FileBoardView() {
 
   return (
     <section className="space-y-4">
-      <header className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-panel">
+      <header className="flex flex-wrap items-center gap-3 border-b border-border bg-card px-1 pb-4">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-black text-foreground">
+          <h2 className="truncate font-display text-xl font-bold text-foreground">
             {folderId ? trail.at(-1)?.name : "My Drive"}
           </h2>
-          <p className="truncate text-[11px] font-semibold text-muted-foreground">
+          <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
             {autoSyncing
               ? "Checking your Drive for changes…"
               : tree
@@ -400,7 +400,7 @@ export function FileBoardView() {
             <ArrowLeft className="size-4" /> Back
           </Button>
         )}
-        <Button size="sm" onClick={() => void sync("manual")} disabled={syncing}>
+        <Button size="sm" className="h-10" onClick={() => void sync("manual")} disabled={syncing}>
           {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           {syncing ? "Synching" : "Synch now"}
         </Button>
@@ -562,11 +562,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-card p-3 shadow-panel">
+    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-panel">
       <button
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 text-left"
+        className="flex min-h-12 w-full items-center gap-2 border-b border-border px-4 text-left"
       >
         <Icon className="size-4 text-primary" />
         <span className="text-xs font-black tracking-wide text-foreground uppercase">{label}</span>
@@ -575,14 +575,14 @@ function Section({
           className={cn("ml-auto size-4 text-muted-foreground transition-transform", !open && "-rotate-90")}
         />
       </button>
-      {open && <div className="pt-3">{children}</div>}
+      {open && <div className="p-3 sm:p-4">{children}</div>}
     </section>
   );
 }
 
 function CardGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">{children}</div>
+    <div className="grid gap-2">{children}</div>
   );
 }
 
@@ -616,27 +616,24 @@ function FolderCard({
       onDragOver={(e) => draggable && e.preventDefault()}
       onDrop={onDrop}
       className={cn(
-        "group relative flex min-h-[112px] flex-col justify-between rounded-xl border border-border bg-background p-3 shadow-panel transition-transform active:scale-[.98]",
+        "group relative grid min-h-[72px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-background px-3 py-2.5 transition-colors hover:border-ring hover:bg-accent/40 active:bg-accent",
         dragging && "opacity-50",
       )}
     >
-      <div className="flex items-start gap-2">
-        <Folder className="size-5 shrink-0 text-primary" />
-        <button onClick={onOpen} className="min-w-0 flex-1 text-left">
-          <span className="line-clamp-2 text-xs font-black text-foreground">{folder.name}</span>
-        </button>
-        <button onClick={onFavourite} aria-label="Favourite" className="shrink-0">
-          <Star
-            className={cn("size-4", favourite ? "fill-primary text-primary" : "text-muted-foreground")}
-          />
-        </button>
-      </div>
-      <div className="flex items-end justify-between gap-1">
-        <span className="font-mono text-[10px] text-muted-foreground">
+      <button onClick={onOpen} className="grid size-11 place-items-center rounded-md bg-secondary text-primary" aria-label={`Open ${folder.name}`}>
+        <Folder className="size-5" />
+      </button>
+      <button onClick={onOpen} className="min-w-0 text-left">
+        <span className="block truncate text-sm font-bold text-foreground">{folder.name}</span>
+        <span className="mt-1 block font-mono text-[10px] text-muted-foreground">
           {folder.folderCount} folders · {folder.fileCount} files
         </span>
-        {draggable && (
-          <div className="flex items-center gap-0.5">
+      </button>
+      <div className="flex items-center gap-0.5">
+        <Button variant="ghost" size="icon" className="size-9" onClick={onFavourite} aria-label="Favourite">
+          <Star className={cn("size-4", favourite ? "fill-primary text-primary" : "text-muted-foreground")} />
+        </Button>
+        {draggable && <>
             <GripVertical className="size-3.5 cursor-grab text-muted-foreground" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -653,8 +650,7 @@ function FolderCard({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        )}
+        </>}
       </div>
     </div>
   );
@@ -672,19 +668,18 @@ function FileCard({
   onClone: () => void;
 }) {
   return (
-    <div className="flex min-h-[112px] flex-col justify-between rounded-xl border border-border bg-card p-3 shadow-panel">
-      <div className="flex items-start gap-2">
-        <FileText className="size-5 shrink-0 text-muted-foreground" />
-        <span className="line-clamp-2 min-w-0 flex-1 text-xs font-bold text-foreground">
+    <div className="grid min-h-[72px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:border-ring hover:bg-accent/40">
+      <span className="grid size-11 place-items-center rounded-md bg-muted text-destructive"><FileText className="size-5" /></span>
+      <div className="min-w-0">
+        <span className="block truncate text-sm font-bold text-foreground">
           {file.name}
         </span>
-      </div>
-      <div className="space-y-1.5">
-        <span className="block font-mono text-[10px] text-muted-foreground">
+        <span className="mt-1 block font-mono text-[10px] text-muted-foreground">
           {exhibit} · {(file.size / 1024 / 1024).toFixed(1)} MB
         </span>
-        <div className="flex gap-1.5">
-          <Button size="sm" className="h-8 flex-1 text-[11px]" onClick={onClone} disabled={busy}>
+      </div>
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" className="h-9 text-[11px]" onClick={onClone} disabled={busy}>
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
             Clone
           </Button>
@@ -699,7 +694,6 @@ function FileCard({
               <ExternalLink className="size-3.5" />
             </Button>
           )}
-        </div>
       </div>
     </div>
   );
