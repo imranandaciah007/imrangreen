@@ -84,10 +84,41 @@ function exhibitFor(fileId: string) {
   return `EX-${fileId.replace(/[^A-Za-z0-9]/g, "").slice(-4).toUpperCase()}`;
 }
 
+/** Plain-language summary of what moved, was renamed, added or removed in Drive. */
+function countChanges(before: DriveTree | null, after: DriveTree): string | null {
+  if (!before) return null;
+  const prev = new Map(
+    [...before.folders, ...before.files].map((n) => [n.id, { name: n.name, path: n.path }]),
+  );
+  const now = [...after.folders, ...after.files];
+  let added = 0;
+  let renamed = 0;
+  let moved = 0;
+  for (const node of now) {
+    const old = prev.get(node.id);
+    if (!old) {
+      added += 1;
+      continue;
+    }
+    if (old.name !== node.name) renamed += 1;
+    else if (old.path !== node.path) moved += 1;
+    prev.delete(node.id);
+  }
+  const removed = prev.size;
+  const parts = [
+    added ? `${added} new` : "",
+    renamed ? `${renamed} renamed` : "",
+    moved ? `${moved} moved` : "",
+    removed ? `${removed} no longer in Drive` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export function FileBoardView() {
   const { items, profile, connection } = useEvidence();
   const [tree, setTree] = useState<DriveTree | null>(() => readJson<DriveTree | null>(TREE_KEY, null));
   const [syncing, setSyncing] = useState(false);
+  const [autoSyncing, setAutoSyncing] = useState(false);
   const [folderId, setFolderId] = useState<string | null>(null);
   const [favourites, setFavourites] = useState<string[]>(() => readJson<string[]>(FAV_KEY, []));
   const [recent, setRecent] = useState<string[]>(() => readJson<string[]>(RECENT_KEY, []));
@@ -102,28 +133,67 @@ export function FileBoardView() {
   const uploadRef = useRef<HTMLInputElement>(null);
   const sentinel = useRef<HTMLDivElement | null>(null);
 
-  const sync = useCallback(async () => {
-    setSyncing(true);
+  const treeRef = useRef<DriveTree | null>(tree);
+  treeRef.current = tree;
+  const inFlight = useRef(false);
+
+  const sync = useCallback(async (mode: "manual" | "auto" = "manual") => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (mode === "manual") setSyncing(true);
+    else setAutoSyncing(true);
     try {
       const next = (await listDriveTree()) as DriveTree;
+      const before = treeRef.current;
+      const changes = countChanges(before, next);
       setTree(next);
       writeJson(TREE_KEY, next);
-      toast.success(`Drive synched — ${next.folders.length} folders, ${next.files.length} files`);
+      if (mode === "manual") {
+        toast.success(`Drive synched — ${next.folders.length} folders, ${next.files.length} files`);
+      } else if (changes) {
+        toast.success("Your Drive changed — the board has been updated", {
+          description: changes,
+        });
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Drive sync failed.");
+      if (mode === "manual") {
+        toast.error(error instanceof Error ? error.message : "Drive sync failed.");
+      }
     } finally {
+      inFlight.current = false;
       setSyncing(false);
+      setAutoSyncing(false);
     }
   }, []);
 
+  // Always mirror Drive: refresh on open, when the app comes back to the
+  // foreground, and quietly every couple of minutes while it stays open.
   useEffect(() => {
-    if (!tree) void sync();
-  }, [tree, sync]);
+    void sync(tree ? "auto" : "manual");
+    const onFocus = () => {
+      if (document.visibilityState === "visible") void sync("auto");
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    const timer = window.setInterval(() => void sync("auto"), 120_000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      window.clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sync]);
 
   const folderById = useMemo(
     () => new Map((tree?.folders ?? []).map((f) => [f.id, f])),
     [tree],
   );
+
+  // If the folder you are standing in was deleted or moved out of Drive, go home.
+  useEffect(() => {
+    if (tree && folderId && !folderById.has(folderId)) setFolderId(null);
+  }, [tree, folderId, folderById]);
+
 
   const childFolders = useMemo(
     () => (tree?.folders ?? []).filter((f) => f.parentId === folderId),
@@ -316,11 +386,13 @@ export function FileBoardView() {
             {folderId ? trail.at(-1)?.name : "My Drive"}
           </h2>
           <p className="truncate text-[11px] font-semibold text-muted-foreground">
-            {tree
-              ? `${childFolders.length} folders · ${childFiles.length} files · last synched ${
-                  tree.syncedAt ? new Date(tree.syncedAt).toLocaleString() : "never"
-                }`
-              : "Loading your Drive…"}
+            {autoSyncing
+              ? "Checking your Drive for changes…"
+              : tree
+                ? `${childFolders.length} folders · ${childFiles.length} files · auto-matched with Drive ${
+                    tree.syncedAt ? new Date(tree.syncedAt).toLocaleTimeString() : "never"
+                  }`
+                : "Loading your Drive…"}
           </p>
         </div>
         {folderId && (
@@ -328,10 +400,11 @@ export function FileBoardView() {
             <ArrowLeft className="size-4" /> Back
           </Button>
         )}
-        <Button size="sm" onClick={() => void sync()} disabled={syncing}>
+        <Button size="sm" onClick={() => void sync("manual")} disabled={syncing}>
           {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          {syncing ? "Synching" : "Synch Drive"}
+          {syncing ? "Synching" : "Synch now"}
         </Button>
+
       </header>
 
       {trail.length > 0 && (
