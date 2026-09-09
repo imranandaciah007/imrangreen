@@ -1,16 +1,18 @@
-import { ClipboardCheck, Coins, Home, ListChecks, Plus, Vault } from "lucide-react";
+import { ClipboardCheck, Coins, Home, LayoutGrid, ListChecks, Plus, Vault } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export type MainTab = "home" | "timeline" | "finances" | "vault" | "review";
+export type MainTab = "home" | "board" | "timeline" | "finances" | "vault" | "review";
 
 const tabs: { id: MainTab; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
+  { id: "board", label: "Files", icon: LayoutGrid },
   { id: "timeline", label: "Timeline", icon: ListChecks },
   { id: "finances", label: "Finances", icon: Coins },
   { id: "vault", label: "Vault", icon: Vault },
   { id: "review", label: "Review", icon: ClipboardCheck },
 ];
+
 
 export function BottomNav({
   tab,
