@@ -170,6 +170,9 @@ function CaseApp() {
               <HomeView onNavigate={(t) => setTab(t)} onUpload={() => openUpload()} onAddTask={() => setTaskOpen(true)} onBuildPacket={() => setPacketOpen(true)} />
             )}
 
+            {tab === "board" && <FileBoardView />}
+
+
             {tab === "timeline" && (
               <TimelineView
                 onAddEvent={() => setEventOpen(true)}
