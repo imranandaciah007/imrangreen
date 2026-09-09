@@ -80,8 +80,8 @@ export function ConnectDriveDialog({
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
             <p>
               Originals are never changed — the app reads file names and details only. Anything it
-              can't sort with confidence is marked <em>Needs confirmation</em> so you can check it
-              yourself.
+              can't sort because an important person or hardship category is missing is marked
+              <em> Needs confirmation</em>. Everything else is treated as ready.
             </p>
           </div>
 

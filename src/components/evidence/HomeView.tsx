@@ -65,6 +65,9 @@ export function HomeView({
   const recentEvidence = [...items]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 3);
+  const attentionRecords = new Set(gaps.map((gap) => `${gap.recordType}:${gap.recordId}`)).size;
+  const indexedDriveIds = new Set(items.map((item) => item.driveFileId).filter(Boolean)).size;
+  const otherDriveFiles = Math.max(0, (driveTree?.files.length ?? 0) - indexedDriveIds);
 
   return (
     <div className="case-home space-y-4">
@@ -73,7 +76,7 @@ export function HomeView({
           <span className="case-kicker">CASE OVERVIEW</span>
           <h2>Good morning, Imran</h2>
           <p>
-             {gaps.length} unresolved gap{gaps.length === 1 ? "" : "s"}. Keep evidence current and review anything that needs attention.
+             {attentionRecords} record{attentionRecords === 1 ? "" : "s"} need supporting evidence or important details.
           </p>
         </div>
         <div className="case-hero-actions">
@@ -92,7 +95,7 @@ export function HomeView({
       <section className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-4 py-3 text-xs">
         <span className="font-bold text-foreground">Drive originals and enriched clones</span>
         <span className="text-muted-foreground">
-          {driveTree ? `${driveTree.folders.length} folders · ${driveTree.files.length} files` : "Not checked yet"}
+          {driveTree ? `${driveTree.folders.length} folders · ${indexedDriveIds} evidence files${otherDriveFiles ? ` · ${otherDriveFiles} other files` : ""}` : "Not checked yet"}
           {connection?.lastSyncedAt ? ` · Last synched ${new Date(connection.lastSyncedAt).toLocaleString()}` : ""}
         </span>
       </section>

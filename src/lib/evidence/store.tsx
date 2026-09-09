@@ -1295,6 +1295,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         created.push(record);
       }
 
+      const statusCorrectedIds = new Set<string>();
       const reconciled = [...updatedItems, ...created].map((item) => {
         if (item.status !== "Needs confirmation") return item;
         const hasUncertainty = (item.aiExtraction?.uncertain.length ?? 0) > 0;
@@ -1306,15 +1307,17 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           (item.people ?? []).every((person) => person === "Third party") ||
           !(item.categories ?? []).length ||
           (item.categories ?? []).every((category) => category === "Other");
-        return hasUncertainty || hasConflict || missingImportant ? item : { ...item, status: "Ready" as EvidenceStatus };
+        if (hasUncertainty || hasConflict || missingImportant) return item;
+        statusCorrectedIds.add(item.id);
+        return { ...item, status: "Ready" as EvidenceStatus };
       });
 
       setItems(reconciled);
       await documentProvider.remove(removedIds);
       const finalById = new Map(reconciled.map((item) => [item.id, item]));
       await Promise.all(
-        updatedItems
-          .filter((item) => finalById.has(item.id))
+        reconciled
+          .filter((item) => updatedItems.some((updatedItem) => updatedItem.id === item.id) || statusCorrectedIds.has(item.id))
           .map((item) => documentProvider.update(item.id, finalById.get(item.id) ?? item)),
       );
       const conn = await documentProvider.connect({ accountLabel: "Google Drive", folderPath: "/My Drive/" });
