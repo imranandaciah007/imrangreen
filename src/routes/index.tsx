@@ -24,6 +24,8 @@ import { ExhibitIndexView } from "@/components/evidence/ExhibitIndexView";
 import { FilterToolbar } from "@/components/evidence/FilterToolbar";
 import { FinancesView } from "@/components/evidence/FinancesView";
 import { HomeView } from "@/components/evidence/HomeView";
+import { FileBoardView } from "@/components/evidence/FileBoardView";
+
 import { InspectorDrawer } from "@/components/evidence/InspectorDrawer";
 import { KanbanBoard } from "@/components/evidence/KanbanBoard";
 import { ProfileGate } from "@/components/evidence/ProfileGate";
