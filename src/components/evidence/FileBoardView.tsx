@@ -386,11 +386,13 @@ export function FileBoardView() {
             {folderId ? trail.at(-1)?.name : "My Drive"}
           </h2>
           <p className="truncate text-[11px] font-semibold text-muted-foreground">
-            {tree
-              ? `${childFolders.length} folders · ${childFiles.length} files · last synched ${
-                  tree.syncedAt ? new Date(tree.syncedAt).toLocaleString() : "never"
-                }`
-              : "Loading your Drive…"}
+            {autoSyncing
+              ? "Checking your Drive for changes…"
+              : tree
+                ? `${childFolders.length} folders · ${childFiles.length} files · auto-matched with Drive ${
+                    tree.syncedAt ? new Date(tree.syncedAt).toLocaleTimeString() : "never"
+                  }`
+                : "Loading your Drive…"}
           </p>
         </div>
         {folderId && (
@@ -398,10 +400,11 @@ export function FileBoardView() {
             <ArrowLeft className="size-4" /> Back
           </Button>
         )}
-        <Button size="sm" onClick={() => void sync()} disabled={syncing}>
+        <Button size="sm" onClick={() => void sync("manual")} disabled={syncing}>
           {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          {syncing ? "Synching" : "Synch Drive"}
+          {syncing ? "Synching" : "Synch now"}
         </Button>
+
       </header>
 
       {trail.length > 0 && (
