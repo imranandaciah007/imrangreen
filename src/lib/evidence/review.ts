@@ -169,17 +169,6 @@ export function detectGaps(
         taskTitle: `Review AI conflict on ${item.exhibitId}`,
       });
     }
-    if (!READY_STATUSES.includes(item.status) && item.status !== "Needs confirmation") {
-      gaps.push({
-        ...base,
-        id: `${item.id}-review`,
-        kind: "evidence-unreviewed",
-        severity: "low",
-        label: "Not reviewed yet",
-        detail: name,
-        taskTitle: `Review ${item.exhibitId}`,
-      });
-    }
     if (
       (item.people ?? []).includes("Jibril") &&
       !(item.people ?? []).includes("Aciah") &&

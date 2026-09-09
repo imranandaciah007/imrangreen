@@ -17,6 +17,10 @@
 - [x] Mirror the full Drive folder tree and drill into subfolders as cards
 - [x] Add evidence and create folders straight into Drive from the board
 - [x] Generate annotated clone PDFs into "I601 Evidence Clones", mirroring the Drive folders
+- [x] Reconcile dashboard counters and evidence records from one live Drive scan
+- [x] Add main-page manual sync with folder, rename, move, upload, and removal matching
+- [x] Keep review attention limited to missing support or important missing details
+- [x] Save app uploads as Drive originals and generate matching enriched PDF clones
 
 ## External limitation
 - Real Drive upload of originals depends on Drive write access; originals remain unchanged.

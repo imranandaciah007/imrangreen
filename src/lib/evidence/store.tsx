@@ -11,7 +11,9 @@ import {
 import { toast } from "sonner";
 
 import { extractDocument } from "@/lib/ai.functions";
+import { listDriveTree, type DriveFileNode, type DriveFolderNode } from "@/lib/drive-tree.functions";
 import type { DiaryPlan } from "./diary-merge";
+import { classifyDriveFile, fileTypeFor, titleFromName } from "./drive-classify";
 import { documentProvider, type ProviderConnection } from "./provider";
 import { defaultReminderAt } from "../task-reminders";
 import {
@@ -30,6 +32,7 @@ import {
   PEOPLE,
   READY_STATUSES,
   SOURCE_TYPES,
+  taskStatus,
   type CaseTask,
   type Category,
   type DiaryImport,
@@ -171,6 +174,9 @@ interface EvidenceContextValue {
 
   connection: ProviderConnection | null;
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
+  driveTree: { folders: DriveFolderNode[]; files: DriveFileNode[]; syncedAt: string } | null;
+  driveSyncing: boolean;
+  syncDrive: () => Promise<{ added: number; updated: number; removed: number; folders: number; files: number }>;
   exhibitGroups: string[];
   stats: {
     total: number;
@@ -203,6 +209,7 @@ function groupOf(exhibitId: string) {
 }
 
 const PROFILE_KEY = "i601.profile";
+const DRIVE_TREE_KEY = "gc.driveTree";
 
 const EXPENSE_CATEGORY_SET = new Set<string>(EXPENSE_CATEGORIES);
 
@@ -228,7 +235,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [extractingIds, setExtractingIds] = useState<string[]>([]);
   const [packets, setPackets] = useState<PacketVersion[]>([]);
   const [diaryImports, setDiaryImports] = useState<DiaryImport[]>([]);
+  const [driveTree, setDriveTree] = useState<{
+    folders: DriveFolderNode[];
+    files: DriveFileNode[];
+    syncedAt: string;
+  } | null>(null);
+  const [driveSyncing, setDriveSyncing] = useState(false);
   const hydrated = useRef(false);
+  const driveSyncInFlight = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -254,6 +268,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       if (saved === "Imran" || saved === "Aciah") {
         setProfileState(saved);
         setProfileChosen(true);
+      }
+      if (typeof localStorage !== "undefined") {
+        try {
+          const cachedTree = localStorage.getItem(DRIVE_TREE_KEY);
+          if (cachedTree) setDriveTree(JSON.parse(cachedTree));
+        } catch {
+          localStorage.removeItem(DRIVE_TREE_KEY);
+        }
       }
       hydrated.current = true;
       setLoading(false);
@@ -1169,6 +1191,147 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const syncDrive = useCallback(async () => {
+    if (driveSyncInFlight.current) {
+      return { added: 0, updated: 0, removed: 0, folders: driveTree?.folders.length ?? 0, files: driveTree?.files.length ?? 0 };
+    }
+    driveSyncInFlight.current = true;
+    setDriveSyncing(true);
+    try {
+      const next = await listDriveTree();
+      setDriveTree(next);
+      if (typeof localStorage !== "undefined") localStorage.setItem(DRIVE_TREE_KEY, JSON.stringify(next));
+
+      const originalFiles = next.files.filter(
+        (file) =>
+          !file.path.split("/").includes("I601 Evidence Clones") &&
+          !file.path.includes("Generated Case Packets") &&
+          Boolean(fileTypeFor(file.name, file.mimeType)),
+      );
+      const liveIds = new Set(originalFiles.map((file) => file.id));
+      const existingByDriveId = new Map(
+        items.filter((item) => item.driveFileId).map((item) => [item.driveFileId as string, item]),
+      );
+      const removedIds = items
+        .filter((item) => item.driveFileId && !liveIds.has(item.driveFileId))
+        .map((item) => item.id);
+      const removedSet = new Set(removedIds);
+      let updated = 0;
+      const now = nowIso();
+      const updatedItems = items
+        .filter((item) => !removedSet.has(item.id))
+        .map((item) => {
+          if (!item.driveFileId) return item;
+          const file = originalFiles.find((candidate) => candidate.id === item.driveFileId);
+          if (!file) return item;
+          const nextTitle = (item.confirmedFields ?? []).includes("title")
+            ? item.title
+            : titleFromName(file.name);
+          const changed =
+            item.fileName !== file.name ||
+            item.driveFolder !== file.path ||
+            item.cloudDriveUrl !== file.webViewLink ||
+            item.fileSizeBytes !== file.size ||
+            item.title !== nextTitle;
+          if (!changed) return item;
+          updated += 1;
+          return {
+            ...item,
+            fileName: file.name,
+            title: nextTitle,
+            driveFolder: file.path,
+            cloudDriveUrl: file.webViewLink,
+            fileSizeBytes: file.size,
+            mimeType: file.mimeType,
+            updatedAt: now,
+            auditTrail: [...item.auditTrail, auditEntry("Matched renamed or moved Drive file")],
+          };
+        });
+
+      const fresh = originalFiles.filter((file) => !existingByDriveId.has(file.id));
+      const created: EvidenceItem[] = [];
+      for (const [index, file] of fresh.entries()) {
+        const classification = classifyDriveFile({
+          ...file,
+          parentFolders: file.path.split("/").filter(Boolean),
+        });
+        const fileType = fileTypeFor(file.name, file.mimeType);
+        if (!fileType) continue;
+        const categories = classification?.categories ?? ["Other"];
+        const people = classification?.people ?? ["Third party"];
+        const missingImportant =
+          categories.length === 0 ||
+          categories.every((category) => category === "Other") ||
+          people.length === 0 ||
+          people.every((person) => person === "Third party");
+        const record = await documentProvider.create({
+          exhibitId: `Exhibit D-${items.length + index + 1}`,
+          fileName: file.name,
+          title: titleFromName(file.name),
+          category: categories[0] ?? "Other",
+          categories,
+          subCategory: file.path.split("/").at(-1) ?? "Google Drive",
+          sourceType: classification?.sourceType ?? "Other",
+          people,
+          fileType,
+          fileSizeBytes: file.size,
+          mimeType: file.mimeType,
+          pageCount: 1,
+          status: missingImportant ? "Needs confirmation" : "Ready",
+          dateOfDocument: (file.modifiedTime || now).slice(0, 10),
+          tags: classification?.tags ?? [],
+          cloudDriveUrl: file.webViewLink,
+          driveFileId: file.id,
+          driveFolder: file.path,
+          aiConfidence: classification?.confidence,
+          notes: missingImportant
+            ? "Imported from Drive. Confirm the person or hardship category."
+            : "Imported from Drive and matched to its folder.",
+          createdBy: profile,
+          lastEditedBy: profile,
+          createdAt: now,
+          updatedAt: now,
+        });
+        created.push(record);
+      }
+
+      const reconciled = [...updatedItems, ...created].map((item) => {
+        if (item.status !== "Needs confirmation") return item;
+        const hasUncertainty = (item.aiExtraction?.uncertain.length ?? 0) > 0;
+        const hasConflict = (item.aiConflicts?.length ?? 0) > 0;
+        const missingImportant =
+          !item.title.trim() ||
+          !item.dateOfDocument ||
+          !(item.people ?? []).length ||
+          (item.people ?? []).every((person) => person === "Third party") ||
+          !(item.categories ?? []).length ||
+          (item.categories ?? []).every((category) => category === "Other");
+        return hasUncertainty || hasConflict || missingImportant ? item : { ...item, status: "Ready" as EvidenceStatus };
+      });
+
+      setItems(reconciled);
+      await documentProvider.remove(removedIds);
+      const finalById = new Map(reconciled.map((item) => [item.id, item]));
+      await Promise.all(
+        updatedItems
+          .filter((item) => finalById.has(item.id))
+          .map((item) => documentProvider.update(item.id, finalById.get(item.id) ?? item)),
+      );
+      const conn = await documentProvider.connect({ accountLabel: "Google Drive", folderPath: "/My Drive/" });
+      setConnection({ ...conn, lastSyncedAt: next.syncedAt });
+      return {
+        added: created.length,
+        updated,
+        removed: removedIds.length,
+        folders: next.folders.length,
+        files: originalFiles.length,
+      };
+    } finally {
+      driveSyncInFlight.current = false;
+      setDriveSyncing(false);
+    }
+  }, [auditEntry, driveTree, items, profile]);
+
   const exhibitGroups = useMemo(
     () => Array.from(new Set(items.map((i) => groupOf(i.exhibitId)))).sort(),
     [items],
@@ -1296,7 +1459,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       gaps,
       missingTranslation,
       totalPages: items.reduce((sum, i) => sum + (i.pageCount || 0), 0),
-      openTasks: tasks.filter((t) => !t.done).length,
+      openTasks: tasks.filter((t) => taskStatus(t) !== "Complete").length,
       timelineEvents: events.length,
       financialImpact,
       lastEditedAt: editStamps.length ? editStamps.sort().at(-1)! : null,
@@ -1370,6 +1533,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
     connection,
     connectDrive,
+    driveTree,
+    driveSyncing,
+    syncDrive,
     exhibitGroups,
     stats,
   };

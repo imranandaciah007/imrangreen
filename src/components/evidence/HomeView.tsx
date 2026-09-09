@@ -6,6 +6,8 @@ import {
   DollarSign,
   FileText,
   ListChecks,
+  Loader2,
+  RefreshCw,
   Upload,
 } from "lucide-react";
 
@@ -48,13 +50,15 @@ export function HomeView({
   onUpload,
   onAddTask,
   onBuildPacket,
+  onSyncDrive,
 }: {
   onNavigate: (tab: "timeline" | "finances" | "vault" | "review") => void;
   onUpload: () => void;
   onAddTask: () => void;
   onBuildPacket: () => void;
+  onSyncDrive: () => Promise<void>;
 }) {
-  const { stats, caseSettings, tasks, events, items, gaps } = useEvidence();
+  const { stats, caseSettings, tasks, events, items, gaps, connection, driveSyncing, driveTree } = useEvidence();
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const openTasks = tasks.filter(isOpenTask);
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
@@ -73,6 +77,9 @@ export function HomeView({
           </p>
         </div>
         <div className="case-hero-actions">
+          <Button onClick={() => void onSyncDrive()} variant="outline" className="case-secondary-action" disabled={driveSyncing}>
+             {driveSyncing ? <Loader2 className="animate-spin" /> : <RefreshCw />} {driveSyncing ? "Synching…" : "Synch now"}
+          </Button>
           <Button onClick={onUpload} className="case-primary-action">
              <Upload /> Add evidence
           </Button>
@@ -82,9 +89,17 @@ export function HomeView({
         </div>
       </section>
 
+      <section className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-4 py-3 text-xs">
+        <span className="font-bold text-foreground">Drive originals and enriched clones</span>
+        <span className="text-muted-foreground">
+          {driveTree ? `${driveTree.folders.length} folders · ${driveTree.files.length} files` : "Not checked yet"}
+          {connection?.lastSyncedAt ? ` · Last synched ${new Date(connection.lastSyncedAt).toLocaleString()}` : ""}
+        </span>
+      </section>
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Total Exhibits" value={String(stats.total)} icon={<FileText />} tone="yellow" onClick={() => onNavigate("vault")} />
-        <Metric label="Ready for Review" value={String(stats.ready)} icon={<CheckCircle2 />} tone="blue" onClick={() => onNavigate("vault")} />
+        <Metric label="Reviewed & Ready" value={String(stats.ready)} icon={<CheckCircle2 />} tone="blue" onClick={() => onNavigate("vault")} />
         <Metric label="Open Tasks" value={String(openTasks.length)} icon={<Clock3 />} tone="orange" onClick={() => onNavigate("review")} />
         <Metric label="Separation Costs" value={gbp(stats.financialImpact)} icon={<DollarSign />} tone="green" onClick={() => onNavigate("finances")} />
       </section>
