@@ -184,11 +184,16 @@ export function FileBoardView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sync]);
 
-
   const folderById = useMemo(
     () => new Map((tree?.folders ?? []).map((f) => [f.id, f])),
     [tree],
   );
+
+  // If the folder you are standing in was deleted or moved out of Drive, go home.
+  useEffect(() => {
+    if (tree && folderId && !folderById.has(folderId)) setFolderId(null);
+  }, [tree, folderId, folderById]);
+
 
   const childFolders = useMemo(
     () => (tree?.folders ?? []).filter((f) => f.parentId === folderId),
