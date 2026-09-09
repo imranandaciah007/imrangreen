@@ -62,7 +62,7 @@ export function TasksView({ onAddTask }: { onAddTask: () => void }) {
         <div>
           <h2 className="text-sm font-semibold text-foreground">Tasks</h2>
           <p className="text-[11px] text-muted-foreground">
-            Everything still to collect, chase or explain. {tasks.filter((t) => !t.done).length}{" "}
+            Everything still to collect, chase or explain. {tasks.filter((t) => taskStatus(t) !== "Complete").length}{" "}
             open.
           </p>
         </div>

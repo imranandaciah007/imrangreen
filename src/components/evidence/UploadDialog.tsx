@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { extractUploadedFile, type ExtractionResult } from "@/lib/ai.functions";
+import { generateCloneDocument, uploadEvidenceToFolder } from "@/lib/drive-tree.functions";
 import { formatBytes } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import {
@@ -337,6 +338,15 @@ export function UploadDialog({
           `${common.exhibitId} updated`,
         );
       } else if (file) {
+        const base64 = await toBase64(file);
+        const original = await uploadEvidenceToFolder({
+          data: {
+            folderPath: "I601 Evidence/Original Evidence",
+            name: file.name,
+            mimeType: file.type || "application/octet-stream",
+            base64,
+          },
+        });
         const created = await addItem(
           {
             ...common,
@@ -344,12 +354,35 @@ export function UploadDialog({
             fileType: fileTypeOf(file.name),
             fileSizeBytes: file.size,
             mimeType: file.type,
-            cloudDriveUrl: "",
-            driveFolder: "/I601 Evidence/Original Evidence/",
+            cloudDriveUrl: original.webViewLink ?? "",
+            driveFileId: original.id,
+            driveFolder: "I601 Evidence/Original Evidence",
             translationFileUrl: undefined,
           },
           file,
         );
+        await generateCloneDocument({
+          data: {
+            driveFileId: original.id,
+            fileName: file.name,
+            folderPath: "I601 Evidence/Original Evidence",
+            mimeType: file.type || "application/octet-stream",
+            meta: {
+              exhibitId: created.exhibitId,
+              title: created.title,
+              documentDate: created.dateOfDocument,
+              person: created.people[0] ?? "Aciah",
+              categories: created.categories,
+              people: created.people,
+              sourceType: created.sourceType,
+              status: created.status,
+              summary: created.notes,
+              tags: created.tags,
+              affectsAciah: created.affectsAciah,
+              addedBy: profile,
+            },
+          },
+        });
         if (alsoEvent) {
           addEvent({
             date: docDate,
@@ -374,6 +407,8 @@ export function UploadDialog({
         }
       }
       onOpenChange(false);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "The evidence could not be saved to Drive.");
     } finally {
       setSaving(false);
     }

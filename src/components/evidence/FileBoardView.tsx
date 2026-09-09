@@ -31,7 +31,6 @@ import { useEvidence } from "@/lib/evidence/store";
 import {
   createDriveFolder,
   generateCloneDocument,
-  listDriveTree,
   uploadEvidenceToFolder,
   type DriveFileNode,
   type DriveFolderNode,
@@ -115,8 +114,8 @@ function countChanges(before: DriveTree | null, after: DriveTree): string | null
 }
 
 export function FileBoardView() {
-  const { items, profile, connection } = useEvidence();
-  const [tree, setTree] = useState<DriveTree | null>(() => readJson<DriveTree | null>(TREE_KEY, null));
+  const { items, profile, connection, driveTree, driveSyncing, syncDrive } = useEvidence();
+  const [tree, setTree] = useState<DriveTree | null>(() => driveTree ?? readJson<DriveTree | null>(TREE_KEY, null));
   const [syncing, setSyncing] = useState(false);
   const [autoSyncing, setAutoSyncing] = useState(false);
   const [folderId, setFolderId] = useState<string | null>(null);
@@ -143,13 +142,15 @@ export function FileBoardView() {
     if (mode === "manual") setSyncing(true);
     else setAutoSyncing(true);
     try {
-      const next = (await listDriveTree()) as DriveTree;
+      const result = await syncDrive();
+      const next = readJson<DriveTree | null>(TREE_KEY, null);
+      if (!next) throw new Error("Drive returned no file list.");
       const before = treeRef.current;
       const changes = countChanges(before, next);
       setTree(next);
       writeJson(TREE_KEY, next);
       if (mode === "manual") {
-        toast.success(`Drive synched — ${next.folders.length} folders, ${next.files.length} files`);
+        toast.success(`Drive synched — ${result.folders} folders, ${result.files} original files`);
       } else if (changes) {
         toast.success("Your Drive changed — the board has been updated", {
           description: changes,
@@ -164,7 +165,11 @@ export function FileBoardView() {
       setSyncing(false);
       setAutoSyncing(false);
     }
-  }, []);
+  }, [syncDrive]);
+
+  useEffect(() => {
+    if (driveTree) setTree(driveTree);
+  }, [driveTree]);
 
   // Always mirror Drive: refresh on open, when the app comes back to the
   // foreground, and quietly every couple of minutes while it stays open.
@@ -309,19 +314,48 @@ export function FileBoardView() {
 
   async function addEvidence(files: FileList | null) {
     if (!files?.length) return;
+    if (currentPath.split("/").includes("I601 Evidence Clones")) {
+      toast.error("Add originals outside the clone folder.", {
+        description: "GC creates and manages the matching enriched PDF here automatically.",
+      });
+      return;
+    }
     setBusy("upload");
     try {
       for (const file of Array.from(files)) {
-        await uploadEvidenceToFolder({
+        const base64 = await fileToBase64(file);
+        const uploaded = await uploadEvidenceToFolder({
           data: {
             folderPath: currentPath,
             name: file.name,
             mimeType: file.type || "application/octet-stream",
-            base64: await fileToBase64(file),
+            base64,
+          },
+        });
+        const exhibitId = exhibitFor(uploaded.id);
+        await generateCloneDocument({
+          data: {
+            driveFileId: uploaded.id,
+            fileName: file.name,
+            folderPath: currentPath,
+            mimeType: file.type || "application/octet-stream",
+            meta: {
+              exhibitId,
+              title: file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "),
+              documentDate: new Date().toISOString().slice(0, 10),
+              person: "Aciah",
+              categories: [],
+              people: ["Aciah"],
+              sourceType: "Other",
+              status: "Needs confirmation",
+              summary: "New evidence uploaded through GC. Confirm the important document details in the app.",
+              tags: [],
+              addedBy: profile,
+            },
           },
         });
       }
-      toast.success(`${files.length} file${files.length > 1 ? "s" : ""} added to Drive`);
+      toast.success(`${files.length} original${files.length > 1 ? "s" : ""} and matching PDF clone${files.length > 1 ? "s" : ""} saved to Drive`);
       await sync();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "The upload failed.");
@@ -400,9 +434,9 @@ export function FileBoardView() {
             <ArrowLeft className="size-4" /> Back
           </Button>
         )}
-        <Button size="sm" className="h-10" onClick={() => void sync("manual")} disabled={syncing}>
-          {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          {syncing ? "Synching" : "Synch now"}
+        <Button size="sm" className="h-10" onClick={() => void sync("manual")} disabled={syncing || driveSyncing}>
+          {syncing || driveSyncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+          {syncing || driveSyncing ? "Synching" : "Synch now"}
         </Button>
 
       </header>

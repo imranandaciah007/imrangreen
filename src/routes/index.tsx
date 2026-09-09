@@ -60,7 +60,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CaseApp() {
-  const { connection, loading, profile, setProfile, caseSettings, stats } = useEvidence();
+  const { loading, profile, setProfile, caseSettings, stats, syncDrive } = useEvidence();
   const [tab, setTab] = useState<MainTab>("home");
   const [connectOpen, setConnectOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -84,6 +84,21 @@ function CaseApp() {
     setUploadCategory(undefined);
     setEditItem(item);
     setUploadOpen(true);
+  }
+
+  async function handleDriveSync() {
+    try {
+      const result = await syncDrive();
+      const changed = result.added + result.updated + result.removed;
+      const description = changed
+        ? `${result.added} added · ${result.updated} renamed or moved · ${result.removed} removed`
+        : `${result.folders} folders and ${result.files} original files already match`;
+      const { toast } = await import("sonner");
+      toast.success("Drive synched successfully", { description });
+    } catch (error) {
+      const { toast } = await import("sonner");
+      toast.error("Drive sync failed", { description: error instanceof Error ? error.message : "Please try again." });
+    }
   }
 
   return (
@@ -158,7 +173,7 @@ function CaseApp() {
         ) : (
           <>
             {tab === "home" && (
-              <HomeView onNavigate={(t) => setTab(t)} onUpload={() => openUpload()} onAddTask={() => setTaskOpen(true)} onBuildPacket={() => setPacketOpen(true)} />
+              <HomeView onNavigate={(t) => setTab(t)} onUpload={() => openUpload()} onAddTask={() => setTaskOpen(true)} onBuildPacket={() => setPacketOpen(true)} onSyncDrive={handleDriveSync} />
             )}
 
             {tab === "board" && <FileBoardView />}

@@ -11,21 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { listDriveFiles } from "@/lib/drive.functions";
-import { classifyDriveFile, fileTypeFor, titleFromName } from "@/lib/evidence/drive-classify";
 import { useEvidence } from "@/lib/evidence/store";
-import type { EvidenceItem } from "@/lib/evidence/types";
-
-type Draft = Omit<
-  EvidenceItem,
-  "id" | "auditTrail" | "createdBy" | "lastEditedBy" | "createdAt" | "updatedAt"
->;
 
 interface SyncResult {
   added: number;
   skipped: number;
-  needsConfirmation: number;
-  unsupported: number;
+  updated: number;
+  removed: number;
 }
 
 export function ConnectDriveDialog({
@@ -35,7 +27,7 @@ export function ConnectDriveDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { connection, connectDrive, importItems, profile } = useEvidence();
+  const { connection, syncDrive, profile } = useEvidence();
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
   const startedForOpen = useRef(false);
@@ -44,49 +36,10 @@ export function ConnectDriveDialog({
     setSyncing(true);
     setResult(null);
     try {
-      const { files } = await listDriveFiles();
-      const drafts: Draft[] = [];
-      let unsupported = 0;
-
-      files.forEach((file, index) => {
-        const fileType = fileTypeFor(file.name, file.mimeType);
-        if (!fileType) {
-          unsupported += 1;
-          return;
-        }
-        const cls = classifyDriveFile(file);
-        const title = titleFromName(file.name);
-        const primary = cls?.categories[0] ?? "Other";
-        drafts.push({
-          exhibitId: `Exhibit D-${index + 1}`,
-          fileName: file.name,
-          title,
-          category: primary,
-          categories: cls?.categories ?? ["Other"],
-          subCategory: file.parentFolders[0] || "Google Drive",
-          sourceType: cls?.sourceType ?? "Other",
-          people: cls?.people ?? ["Third party"],
-          fileType,
-          fileSizeBytes: file.size,
-          mimeType: file.mimeType,
-          pageCount: 1,
-          status: cls?.status ?? "Needs confirmation",
-          dateOfDocument: (file.modifiedTime || new Date().toISOString()).slice(0, 10),
-          tags: cls?.tags ?? [],
-          cloudDriveUrl: file.webViewLink || "",
-          driveFileId: file.id,
-          driveFolder: file.parentFolders[0],
-          aiConfidence: cls?.confidence,
-          notes: cls ? `Imported from Google Drive. ${cls.reason}` : "Imported from Google Drive.",
-        });
-      });
-
-      const { added, skipped } = await importItems(drafts);
-      const needsConfirmation = drafts.filter((d) => d.status === "Needs confirmation").length;
-      connectDrive({ accountLabel: "Google Drive", folderPath: "/My Drive/" });
-      setResult({ added, skipped, needsConfirmation, unsupported });
+      const synced = await syncDrive();
+      setResult({ added: synced.added, skipped: synced.files - synced.added, updated: synced.updated, removed: synced.removed });
       toast.success(`Drive sync complete`, {
-        description: `${added} new item(s) sorted · ${skipped} already imported · ${needsConfirmation} need your confirmation`,
+        description: `${synced.added} added · ${synced.updated} renamed or moved · ${synced.removed} removed`,
       });
     } catch (error) {
       console.error(error);
@@ -127,8 +80,8 @@ export function ConnectDriveDialog({
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
             <p>
               Originals are never changed — the app reads file names and details only. Anything it
-              can't sort with confidence is marked <em>Needs confirmation</em> so you can check it
-              yourself.
+              can't sort because an important person or hardship category is missing is marked
+              <em> Needs confirmation</em>. Everything else is treated as ready.
             </p>
           </div>
 
@@ -149,16 +102,16 @@ export function ConnectDriveDialog({
                 <p className="text-muted-foreground">New items imported</p>
               </div>
               <div className="rounded-md border border-border p-2">
-                <p className="text-lg font-semibold">{result.needsConfirmation}</p>
-                <p className="text-muted-foreground">Need your confirmation</p>
+                <p className="text-lg font-semibold">{result.updated}</p>
+                <p className="text-muted-foreground">Names or folders updated</p>
               </div>
               <div className="rounded-md border border-border p-2">
                 <p className="text-lg font-semibold">{result.skipped}</p>
                 <p className="text-muted-foreground">Already imported</p>
               </div>
               <div className="rounded-md border border-border p-2">
-                <p className="text-lg font-semibold">{result.unsupported}</p>
-                <p className="text-muted-foreground">Unsupported files skipped</p>
+                <p className="text-lg font-semibold">{result.removed}</p>
+                <p className="text-muted-foreground">Removed from Drive</p>
               </div>
               </div>
             </div>

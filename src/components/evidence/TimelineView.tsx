@@ -6,7 +6,7 @@ import { EvidencePicker, LinkedEvidenceChips } from "@/components/evidence/Evide
 import { formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { cn } from "@/lib/utils";
-import { PEOPLE } from "@/lib/evidence/types";
+import { PEOPLE, taskStatus } from "@/lib/evidence/types";
 
 type Range = "all" | "since" | "before";
 
@@ -64,7 +64,7 @@ export function TimelineView({
   const documentedGbp = finances
     .filter((f) => f.date >= separation)
     .reduce((s, f) => s + (f.currency === "USD" ? f.amount * 0.79 : f.amount), 0);
-  const openFollowUps = tasks.filter((t) => !t.done).length;
+  const openFollowUps = tasks.filter((t) => taskStatus(t) !== "Complete").length;
 
   const linkTarget = events.find((e) => e.id === linkFor) ?? null;
 

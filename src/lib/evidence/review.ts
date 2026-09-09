@@ -102,25 +102,25 @@ export function detectGaps(
         taskTitle: `Add a date to ${item.exhibitId}`,
       });
     }
-    if (!(item.people ?? []).length) {
+    if (!(item.people ?? []).length || (item.people ?? []).every((person) => person === "Third party")) {
       gaps.push({
         ...base,
         id: `${item.id}-person`,
         kind: "evidence-no-person",
         severity: "low",
-        label: "No person linked",
+        label: "Person needs confirmation",
         detail: name,
         taskTitle: `Record who ${item.exhibitId} is about`,
       });
     }
     const cats = catsOf(item).filter((c) => c && categories.includes(c));
-    if (!cats.length) {
+    if (!cats.length || cats.every((category) => category === "Other")) {
       gaps.push({
         ...base,
         id: `${item.id}-cat`,
         kind: "evidence-no-category",
         severity: "medium",
-        label: "Not filed under a hardship category",
+        label: "Hardship category needs confirmation",
         detail: name,
         taskTitle: `File ${item.exhibitId} under a hardship category`,
       });
@@ -169,15 +169,18 @@ export function detectGaps(
         taskTitle: `Review AI conflict on ${item.exhibitId}`,
       });
     }
-    if (!READY_STATUSES.includes(item.status) && item.status !== "Needs confirmation") {
+    const hasSpecificDetailGap = gaps.some(
+      (gap) => gap.recordId === item.id && ["evidence-no-date", "evidence-no-person", "evidence-no-category", "evidence-awaiting-confirmation", "evidence-ai-conflict"].includes(gap.kind),
+    );
+    if (item.status === "Needs confirmation" && !hasSpecificDetailGap) {
       gaps.push({
         ...base,
-        id: `${item.id}-review`,
-        kind: "evidence-unreviewed",
-        severity: "low",
-        label: "Not reviewed yet",
+        id: `${item.id}-detail`,
+        kind: "evidence-awaiting-confirmation",
+        severity: "medium",
+        label: "Important details need confirmation",
         detail: name,
-        taskTitle: `Review ${item.exhibitId}`,
+        taskTitle: `Confirm important details for ${item.exhibitId}`,
       });
     }
     if (

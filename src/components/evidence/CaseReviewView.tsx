@@ -133,7 +133,7 @@ export function CaseReviewView({
           <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
             <Stat label="Exhibits" value={String(stats.total)} hint={`${stats.totalPages} pages`} />
             <Stat label="Reviewed & ready" value={String(stats.ready)} />
-            <Stat label="Needs confirmation" value={String(stats.needsConfirmation)} />
+            <Stat label="Important details missing" value={String(stats.needsConfirmation)} />
             <Stat label="Missing supporting evidence" value={String(stats.gaps)} />
             <Stat label="Duplicate suspects" value={String(duplicates)} />
             <Stat label="Translation needed" value={String(stats.missingTranslation)} />
