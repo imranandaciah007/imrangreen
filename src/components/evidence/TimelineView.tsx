@@ -6,7 +6,7 @@ import { EvidencePicker, LinkedEvidenceChips } from "@/components/evidence/Evide
 import { formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { cn } from "@/lib/utils";
-import { PEOPLE } from "@/lib/evidence/types";
+import { PEOPLE, taskStatus } from "@/lib/evidence/types";
 
 type Range = "all" | "since" | "before";
 
