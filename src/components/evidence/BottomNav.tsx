@@ -1,16 +1,18 @@
-import { ClipboardCheck, Coins, Home, ListChecks, Plus, Vault } from "lucide-react";
+import { ClipboardCheck, Coins, Home, LayoutGrid, ListChecks, Plus, Vault } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export type MainTab = "home" | "timeline" | "finances" | "vault" | "review";
+export type MainTab = "home" | "board" | "timeline" | "finances" | "vault" | "review";
 
 const tabs: { id: MainTab; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
+  { id: "board", label: "Files", icon: LayoutGrid },
   { id: "timeline", label: "Timeline", icon: ListChecks },
   { id: "finances", label: "Finances", icon: Coins },
   { id: "vault", label: "Vault", icon: Vault },
   { id: "review", label: "Review", icon: ClipboardCheck },
 ];
+
 
 export function BottomNav({
   tab,
@@ -21,12 +23,13 @@ export function BottomNav({
   onTab: (t: MainTab) => void;
   onAdd: () => void;
 }) {
-  const left = tabs.slice(0, 2);
-  const right = tabs.slice(2);
+  const left = tabs.slice(0, 3);
+  const right = tabs.slice(3);
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_var(--border)] backdrop-blur-xl lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-6 items-end px-1 pt-1.5">
+      <div className="mx-auto grid max-w-md grid-cols-7 items-end px-1 pt-1.5">
+
         {left.map((t) => (
           <TabButton key={t.id} t={t} active={tab === t.id} onClick={() => onTab(t.id)} />
         ))}
