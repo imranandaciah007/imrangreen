@@ -348,9 +348,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
   const setProfile = useCallback((p: Profile) => {
     setProfileState(p);
-    setProfileChosen(true);
     if (typeof localStorage !== "undefined") localStorage.setItem(PROFILE_KEY, p);
   }, []);
+
 
   const auditEntry = useCallback(
     (action: string) => ({ id: rid("audit"), at: nowIso(), actor: profile, action }),
