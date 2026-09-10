@@ -60,7 +60,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CaseApp() {
-  const { loading, profile, setProfile, caseSettings, stats, syncDrive } = useEvidence();
+  const { loading, profile, setProfile, caseSettings, stats, syncDrive, scanAllDocuments } = useEvidence();
   const [tab, setTab] = useState<MainTab>("home");
   const [connectOpen, setConnectOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
