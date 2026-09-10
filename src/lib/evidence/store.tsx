@@ -181,7 +181,14 @@ interface EvidenceContextValue {
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
   driveTree: { folders: DriveFolderNode[]; files: DriveFileNode[]; syncedAt: string } | null;
   driveSyncing: boolean;
-  syncDrive: () => Promise<{ added: number; updated: number; removed: number; folders: number; files: number }>;
+  syncDrive: () => Promise<{
+    added: number;
+    updated: number;
+    removed: number;
+    duplicates: number;
+    folders: number;
+    files: number;
+  }>;
   /** Reads every Drive document with AI, then builds its detailed clone PDF. */
   scanAllDocuments: (opts?: { rescanAll?: boolean }) => Promise<{
     scanned: number;
@@ -229,6 +236,11 @@ function rid(prefix: string) {
 function groupOf(exhibitId: string) {
   const match = /Exhibit\s+([A-Z]+)/i.exec(exhibitId);
   return match ? match[1]!.toUpperCase() : "—";
+}
+
+/** Fingerprint used to recognise the same document stored in more than one folder. */
+function contentKeyOf(fileName: string, size: number | undefined, mimeType: string | undefined) {
+  return `${fileName.trim().toLowerCase()}|${size ?? 0}|${mimeType ?? ""}`;
 }
 
 const PROFILE_KEY = "i601.profile";
@@ -1343,7 +1355,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
   const syncDrive = useCallback(async () => {
     if (driveSyncInFlight.current) {
-      return { added: 0, updated: 0, removed: 0, folders: driveTree?.folders.length ?? 0, files: driveTree?.files.length ?? 0 };
+      return {
+        added: 0,
+        updated: 0,
+        removed: 0,
+        duplicates: 0,
+        folders: driveTree?.folders.length ?? 0,
+        files: driveTree?.files.length ?? 0,
+      };
     }
     driveSyncInFlight.current = true;
     setDriveSyncing(true);
@@ -1398,7 +1417,19 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           };
         });
 
-      const fresh = originalFiles.filter((file) => !existingByDriveId.has(file.id));
+      // One exhibit per identical document, even when the same file sits in several folders.
+      const seenContent = new Set(
+        updatedItems
+          .filter((item) => item.driveFileId)
+          .map((item) => contentKeyOf(item.fileName, item.fileSizeBytes, item.mimeType)),
+      );
+      const fresh = originalFiles.filter((file) => {
+        if (existingByDriveId.has(file.id)) return false;
+        const key = contentKeyOf(file.name, file.size, file.mimeType);
+        if (seenContent.has(key)) return false;
+        seenContent.add(key);
+        return true;
+      });
       const created: EvidenceItem[] = [];
       for (const [index, file] of fresh.entries()) {
         const classification = classifyDriveFile({
@@ -1462,11 +1493,35 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         return { ...item, status: "Ready" as EvidenceStatus };
       });
 
-      setItems(reconciled);
-      await documentProvider.remove(removedIds);
-      const finalById = new Map(reconciled.map((item) => [item.id, item]));
+      // Clear out any duplicate exhibits already stored from earlier syncs.
+      const keptByContent = new Map<string, EvidenceItem>();
+      const duplicateIds: string[] = [];
+      for (const item of reconciled) {
+        const key = contentKeyOf(item.fileName, item.fileSizeBytes, item.mimeType);
+        const held = keptByContent.get(key);
+        if (!held) {
+          keptByContent.set(key, item);
+          continue;
+        }
+        const preferItem =
+          (Boolean(item.cloneFileId) && !held.cloneFileId) ||
+          (Boolean(item.cloneFileId) === Boolean(held.cloneFileId) &&
+            item.createdAt.localeCompare(held.createdAt) < 0);
+        if (preferItem) {
+          keptByContent.set(key, item);
+          duplicateIds.push(held.id);
+        } else {
+          duplicateIds.push(item.id);
+        }
+      }
+      const duplicateSet = new Set(duplicateIds);
+      const deduped = reconciled.filter((item) => !duplicateSet.has(item.id));
+
+      setItems(deduped);
+      await documentProvider.remove([...removedIds, ...duplicateIds]);
+      const finalById = new Map(deduped.map((item) => [item.id, item]));
       await Promise.all(
-        reconciled
+        deduped
           .filter((item) => updatedItems.some((updatedItem) => updatedItem.id === item.id) || statusCorrectedIds.has(item.id))
           .map((item) => documentProvider.update(item.id, finalById.get(item.id) ?? item)),
       );
@@ -1476,6 +1531,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         added: created.length,
         updated,
         removed: removedIds.length,
+        duplicates: duplicateIds.length,
         folders: next.folders.length,
         files: originalFiles.length,
       };

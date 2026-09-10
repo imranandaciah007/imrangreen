@@ -20,8 +20,10 @@ export type Database = {
           clone_file_id: string | null
           clone_link: string | null
           clone_name: string | null
+          content_key: string | null
           created_at: string
           drive_file_id: string
+          duplicate_of: string | null
           error: string | null
           exhibit_id: string
           file_name: string
@@ -37,8 +39,10 @@ export type Database = {
           clone_file_id?: string | null
           clone_link?: string | null
           clone_name?: string | null
+          content_key?: string | null
           created_at?: string
           drive_file_id: string
+          duplicate_of?: string | null
           error?: string | null
           exhibit_id: string
           file_name: string
@@ -54,8 +58,10 @@ export type Database = {
           clone_file_id?: string | null
           clone_link?: string | null
           clone_name?: string | null
+          content_key?: string | null
           created_at?: string
           drive_file_id?: string
+          duplicate_of?: string | null
           error?: string | null
           exhibit_id?: string
           file_name?: string
@@ -92,6 +98,8 @@ export type Database = {
           folders: number
           id: boolean
           last_run_at: string | null
+          last_run_cloned: number
+          last_run_queued: number
           last_tree_sync_at: string | null
           lease_until: string | null
           note: string | null
@@ -104,6 +112,8 @@ export type Database = {
           folders?: number
           id?: boolean
           last_run_at?: string | null
+          last_run_cloned?: number
+          last_run_queued?: number
           last_tree_sync_at?: string | null
           lease_until?: string | null
           note?: string | null
@@ -116,6 +126,8 @@ export type Database = {
           folders?: number
           id?: boolean
           last_run_at?: string | null
+          last_run_cloned?: number
+          last_run_queued?: number
           last_tree_sync_at?: string | null
           lease_until?: string | null
           note?: string | null

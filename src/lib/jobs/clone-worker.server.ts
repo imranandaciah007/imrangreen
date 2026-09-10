@@ -57,13 +57,21 @@ function supportedFile(name: string, mimeType: string): boolean {
   );
 }
 
-function titleFromName(name: string) {
-  return name
+function titleFromName(name: string, folderPath = "") {
+  const base = name
     .replace(/\.[a-z0-9]+$/i, "")
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (c) => c.toUpperCase());
+  // Names like "2" or "IMG 4821" say nothing, so lead with the folder it sits in.
+  const weak = base.length < 4 || /^(img|image|photo|scan|doc|pdf)?\s*\d+$/i.test(base);
+  const folder = folderPath.split("/").filter(Boolean).pop();
+  if (weak && folder) {
+    const pretty = folder.replace(/\s+/g, " ").trim();
+    return `${pretty.charAt(0).toUpperCase()}${pretty.slice(1).toLowerCase()} — ${base || name}`;
+  }
+  return base || name;
 }
 
 /** A 402/403 from Drive or the AI gateway means: stop the whole job. */
@@ -131,23 +139,92 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         (file) => !file.path.startsWith(CLONE_ROOT) && supportedFile(file.name, file.mimeType),
       );
 
-      const { data: known } = await supabaseAdmin.from("gc_clone_jobs").select("drive_file_id");
-      const knownIds = new Set((known ?? []).map((row) => row.drive_file_id));
+      const { data: known } = await supabaseAdmin
+        .from("gc_clone_jobs")
+        .select("drive_file_id,content_key,status,duplicate_of");
       const liveIds = new Set(originals.map((file) => file.id));
 
-      const rows = originals
-        .filter((file) => !knownIds.has(file.id))
-        .map((file) => ({
-          drive_file_id: file.id,
-          file_name: file.name,
-          folder_path: file.path,
-          mime_type: file.mimeType,
-          exhibit_id: exhibitIdFor(file.id),
-          status: "pending",
-        }));
+      // One exhibit per identical document: Drive checksum first, else name + byte size.
+      const contentKeyOf = (file: (typeof originals)[number]) =>
+        file.checksum
+          ? `md5:${file.checksum}`
+          : `ns:${file.name.trim().toLowerCase()}|${file.size}|${file.mimeType}`;
 
-      for (let index = 0; index < rows.length; index += 200) {
-        const slice = rows.slice(index, index + 200);
+      // Whichever copy sits in the shallowest, then alphabetically first folder wins.
+      const canonical = new Map<string, (typeof originals)[number]>();
+      for (const file of originals) {
+        const key = contentKeyOf(file);
+        const held = canonical.get(key);
+        if (!held) {
+          canonical.set(key, file);
+          continue;
+        }
+        const depth = (p: string) => p.split("/").length;
+        const better =
+          depth(file.path) < depth(held.path) ||
+          (depth(file.path) === depth(held.path) && file.path.localeCompare(held.path) < 0);
+        if (better) canonical.set(key, file);
+      }
+
+      // Keep any copy that already has a clone as the canonical one, so nothing is rebuilt twice.
+      for (const row of known ?? []) {
+        if (row.status === "done" && row.content_key && !row.duplicate_of) {
+          const existing = originals.find((file) => file.id === row.drive_file_id);
+          if (existing) canonical.set(row.content_key, existing);
+        }
+      }
+
+      const knownRows = new Map((known ?? []).map((row) => [row.drive_file_id, row]));
+
+      const newRows: {
+        drive_file_id: string;
+        file_name: string;
+        folder_path: string;
+        mime_type: string;
+        exhibit_id: string;
+        content_key: string;
+        duplicate_of: string | null;
+        status: string;
+      }[] = [];
+      for (const file of originals) {
+        const key = contentKeyOf(file);
+        const winner = canonical.get(key)!;
+        const isCopy = winner.id !== file.id;
+        const existing = knownRows.get(file.id);
+
+        if (!existing) {
+          newRows.push({
+            drive_file_id: file.id,
+            file_name: file.name,
+            folder_path: file.path,
+            mime_type: file.mimeType,
+            exhibit_id: exhibitIdFor(winner.id),
+            content_key: key,
+            duplicate_of: isCopy ? winner.id : null,
+            status: isCopy ? "duplicate" : "pending",
+          });
+          continue;
+        }
+
+        // Only correct what changed, so finished clones are never rebuilt.
+        const wasCopy = Boolean(existing.duplicate_of);
+        if (existing.content_key !== key || wasCopy !== isCopy) {
+          await supabaseAdmin
+            .from("gc_clone_jobs")
+            .update({
+              file_name: file.name,
+              folder_path: file.path,
+              content_key: key,
+              duplicate_of: isCopy ? winner.id : null,
+              status: isCopy ? "duplicate" : existing.status === "duplicate" ? "pending" : existing.status,
+              updated_at: now.toISOString(),
+            })
+            .eq("drive_file_id", file.id);
+        }
+      }
+
+      for (let index = 0; index < newRows.length; index += 200) {
+        const slice = newRows.slice(index, index + 200);
         await supabaseAdmin.from("gc_clone_jobs").upsert(slice, { onConflict: "drive_file_id" });
         queued += slice.length;
       }
@@ -196,7 +273,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
           mimeType: job.mime_type,
           meta: {
             exhibitId: job.exhibit_id,
-            title: titleFromName(job.file_name),
+            title: titleFromName(job.file_name, job.folder_path),
             documentDate: "",
             person: classification?.people[0] ?? "",
             categories: classification?.categories ?? ["Other"],
@@ -258,6 +335,8 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         lease_until: null,
         folders,
         files,
+        last_run_cloned: cloned,
+        last_run_queued: queued,
         note: `${cloned} clone(s) built, ${pendingAfter ?? 0} waiting`,
         updated_at: new Date().toISOString(),
       })
@@ -293,9 +372,13 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
 
 export async function readJobStatus() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [{ data: state }, total, done, pendingCount, failedCount] = await Promise.all([
+  const [{ data: state }, total, done, pendingCount, failedCount, duplicateCount] = await Promise.all([
     supabaseAdmin.from("gc_job_state").select("*").eq("id", true).maybeSingle(),
-    supabaseAdmin.from("gc_clone_jobs").select("drive_file_id", { count: "exact", head: true }),
+    // Duplicate copies are not separate documents, so they stay out of every count.
+    supabaseAdmin
+      .from("gc_clone_jobs")
+      .select("drive_file_id", { count: "exact", head: true })
+      .is("duplicate_of", null),
     supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
@@ -308,6 +391,10 @@ export async function readJobStatus() {
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
       .eq("status", "failed"),
+    supabaseAdmin
+      .from("gc_clone_jobs")
+      .select("drive_file_id", { count: "exact", head: true })
+      .eq("status", "duplicate"),
   ]);
 
   return {
@@ -322,5 +409,8 @@ export async function readJobStatus() {
     clonesBuilt: done.count ?? 0,
     waiting: pendingCount.count ?? 0,
     failed: failedCount.count ?? 0,
+    duplicates: duplicateCount.count ?? 0,
+    lastRunCloned: state?.last_run_cloned ?? 0,
+    lastRunQueued: state?.last_run_queued ?? 0,
   };
 }

@@ -40,3 +40,10 @@
 - [x] Dashboard panel shows clones built / waiting / last run
 - [ ] Confirm scheduled run returns 200 once this build is deployed
 - [ ] Use full two-pass AI extraction (not name/folder heuristics) for background clone metadata
+
+## Exhibit display
+- [ ] Show each exhibit short summary (same as clone cover sheet) on the front end
+- [ ] Preview the PDF in-app with an Open externally button
+
+- [ ] Redesign clone cover page: large clear headline details, routine metadata at the bottom
+- [ ] Build all remaining clones and show cloned / pending / new-this-run counters
