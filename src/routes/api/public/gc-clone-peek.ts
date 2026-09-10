@@ -20,7 +20,9 @@ export const Route = createFileRoute("/api/public/gc-clone-peek")({
         if (!fileId) return new Response("Missing id", { status: 400 });
         const { fetchDriveBytes } = await import("@/lib/drive-core.server");
         const bytes = await fetchDriveBytes(fileId);
-        return new Response(bytes, { headers: { "content-type": "application/pdf" } });
+        return new Response(bytes.slice().buffer as ArrayBuffer, {
+          headers: { "content-type": "application/pdf" },
+        });
       },
     },
   },
