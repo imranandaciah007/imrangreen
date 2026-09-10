@@ -948,7 +948,46 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const scanAllDocuments = useCallback(
     async (opts?: { rescanAll?: boolean }) => {
       const rescan = opts?.rescanAll ?? false;
-      if (scanInFlight.current) return { scanned: 0, cloned: 0, failed: 0, total: 0 };
+      if (scanInFlight.current)
+        return { scanned: 0, cloned: 0, failed: 0, total: 0, verified: 0 };
+
+      // Step 1 — verify: adopt clones that already exist on record before building anything.
+      let verified = 0;
+      if (!rescan) {
+        setScanProgress({
+          running: true,
+          phase: "Verifying existing exhibits",
+          done: 0,
+          total: 0,
+          scanned: 0,
+          cloned: 0,
+          failed: 0,
+        });
+        try {
+          const { listCloneLedger } = await import("@/lib/jobs/background.functions");
+          const { clones } = await listCloneLedger();
+          const byDriveId = new Map(clones.map((row) => [row.drive_file_id, row]));
+          for (const item of itemsRef.current) {
+            if (!item.driveFileId || item.cloneFileId) continue;
+            const row = byDriveId.get(item.driveFileId);
+            if (!row?.clone_file_id) continue;
+            applyPatch(
+              [item.id],
+              {
+                cloneFileId: row.clone_file_id,
+                cloneUrl: row.clone_link ?? undefined,
+                cloneFileName: row.clone_name ?? undefined,
+                cloneGeneratedAt: row.updated_at ?? nowIso(),
+              },
+              `Existing clone verified — ${row.clone_name ?? row.clone_file_id}`,
+            );
+            verified += 1;
+          }
+        } catch {
+          // Verification is best effort; fall through to the normal build queue.
+        }
+      }
+
       const queue = itemsRef.current.filter(
         (item) =>
           item.driveFileId &&
@@ -956,9 +995,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       );
       if (!queue.length) {
         setScanProgress({ running: false, phase: "", done: 0, total: 0, scanned: 0, cloned: 0, failed: 0 });
-        return { scanned: 0, cloned: 0, failed: 0, total: 0 };
+        return { scanned: 0, cloned: 0, failed: 0, total: 0, verified };
       }
       scanInFlight.current = true;
+
       let scanned = 0;
       let cloned = 0;
       let failed = 0;
