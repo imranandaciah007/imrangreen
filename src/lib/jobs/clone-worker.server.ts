@@ -390,5 +390,6 @@ export async function readJobStatus() {
     clonesBuilt: done.count ?? 0,
     waiting: pendingCount.count ?? 0,
     failed: failedCount.count ?? 0,
+    duplicates: duplicateCount.count ?? 0,
   };
 }
