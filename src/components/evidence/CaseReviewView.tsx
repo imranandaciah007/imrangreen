@@ -141,11 +141,17 @@ export function CaseReviewView({
           <TabsTrigger value="overview" className="text-xs">
             Overview
           </TabsTrigger>
-          <TabsTrigger value="gaps" className="text-xs">
+          <TabsTrigger
+            value="gaps"
+            className={`text-xs ${gaps.length ? "text-destructive data-[state=active]:text-destructive" : ""}`}
+          >
             Gaps ({gaps.length})
           </TabsTrigger>
-          <TabsTrigger value="aciah" className="text-xs">
-            Aciah impact
+          <TabsTrigger
+            value="aciah"
+            className={`text-xs ${needsExplanation.length ? "text-destructive data-[state=active]:text-destructive" : ""}`}
+          >
+            Aciah impact{needsExplanation.length ? ` (${needsExplanation.length})` : ""}
           </TabsTrigger>
           <TabsTrigger value="tasks" className="text-xs">
             Tasks ({tasks.filter((t) => taskStatus(t) !== "Complete").length})
@@ -279,7 +285,11 @@ export function CaseReviewView({
               {gaps.map((gap) => (
                 <li
                   key={gap.id}
-                  className="rounded-xl border border-border bg-card p-3 shadow-panel"
+                  className={`rounded-xl border p-3 shadow-panel ${
+                    gap.severity === "high"
+                      ? "border-destructive/60 bg-destructive/10"
+                      : "border-border bg-card"
+                  }`}
                 >
                   <div className="flex items-start gap-2">
                     <AlertTriangle
@@ -343,9 +353,12 @@ export function CaseReviewView({
           ) : (
             <ul className="space-y-2">
               {needsExplanation.map((c) => (
-                <li key={c.id} className="rounded-xl border border-border bg-card p-3">
+                <li
+                  key={c.id}
+                  className="rounded-xl border border-destructive/60 bg-destructive/10 p-3"
+                >
                   <p className="text-xs font-medium text-foreground">{c.title}</p>
-                  <p className="font-mono text-[10px] text-muted-foreground">
+                  <p className="font-mono text-[10px] text-destructive">
                     {c.kind} · {c.date ? formatDate(c.date) : "no date"} · Needs explanation
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
