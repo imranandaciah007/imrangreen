@@ -613,6 +613,8 @@ export async function buildClone(data: {
       for (const p of copied) doc.addPage(p);
       originalPages = copied.length;
       originalNote = "";
+      const [firstPage] = await doc.embedPdf(src, [0]);
+      if (firstPage) preview = { width: firstPage.width, height: firstPage.height, page: firstPage };
     } else if (source) {
       const image =
         source.kind === "png" ? await doc.embedPng(source.bytes) : await doc.embedJpg(source.bytes);
@@ -626,6 +628,7 @@ export async function buildClone(data: {
       });
       originalPages = 1;
       originalNote = "";
+      preview = { width: image.width, height: image.height, image };
     }
   } catch (error) {
     originalNote = `The original could not be embedded (${error instanceof Error ? error.message : "unknown error"}); it stays in Drive unchanged.`;
