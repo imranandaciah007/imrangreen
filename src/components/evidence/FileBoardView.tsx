@@ -774,6 +774,8 @@ function FolderCard({
   onMoveForward,
   onDragStart,
   onDrop,
+  onRename,
+  onMoveTo,
 }: {
   folder: DriveFolderNode;
   favourite: boolean;
@@ -785,6 +787,8 @@ function FolderCard({
   onMoveForward?: () => void;
   onDragStart?: () => void;
   onDrop?: () => void;
+  onRename?: () => void;
+  onMoveTo?: () => void;
 }) {
   return (
     <div
