@@ -112,14 +112,16 @@ export function HomeView({
   onAddTask,
   onBuildPacket,
   onSyncDrive,
+  onOpenCategory,
 }: {
   onNavigate: (tab: "timeline" | "finances" | "vault" | "review") => void;
   onUpload: () => void;
   onAddTask: () => void;
   onBuildPacket: () => void;
   onSyncDrive: () => Promise<void>;
+  onOpenCategory: (category: string) => void;
 }) {
-  const { stats, caseSettings, tasks, events, items, gaps, connection, driveSyncing, driveTree, scanProgress } = useEvidence();
+  const { stats, caseSettings, tasks, events, items, gaps, connection, driveSyncing, driveTree, scanProgress, openInspector } = useEvidence();
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const openTasks = tasks.filter(isOpenTask);
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
@@ -129,6 +131,7 @@ export function HomeView({
   const attentionRecords = new Set(gaps.map((gap) => `${gap.recordType}:${gap.recordId}`)).size;
   const indexedDriveIds = new Set(items.map((item) => item.driveFileId).filter(Boolean)).size;
   const otherDriveFiles = Math.max(0, (driveTree?.files.length ?? 0) - indexedDriveIds);
+
 
   return (
     <div className="case-home space-y-4">
@@ -266,9 +269,10 @@ export function HomeView({
           </div>
           <div className="case-list">
             {recentEvidence.length ? recentEvidence.map((item) => (
-              <button key={item.id} className="case-document-row" onClick={() => onNavigate("vault")}>
+              <button key={item.id} className="case-document-row" onClick={() => openInspector(item.id)}>
                 <span className="case-doc-icon"><FileText /></span>
                 <span className="min-w-0 flex-1 text-left"><strong>{item.title}</strong><small>{item.exhibitId || item.fileName} · {formatDate(item.updatedAt)}</small></span>
+
                 <span className="case-pill-green">{item.status}</span>
               </button>
             )) : <div className="case-empty"><FileText /> No evidence added yet.</div>}
