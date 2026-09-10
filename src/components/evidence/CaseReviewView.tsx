@@ -60,9 +60,11 @@ const COVERAGE_STYLE: Record<string, string> = {
 export function CaseReviewView({
   onAddTask,
   onBuildPacket,
+  onOpenCategory,
 }: {
   onAddTask: () => void;
   onBuildPacket: () => void;
+  onOpenCategory: (category: string) => void;
 }) {
   const {
     stats,
@@ -77,7 +79,9 @@ export function CaseReviewView({
     profile,
     resolveConflict,
     markAllReady,
+    ignoreGap,
   } = useEvidence();
+
 
   const uncategorised = items.filter(
     (i) => !(i.categories?.length ? i.categories : [i.category]).filter(Boolean).length,
