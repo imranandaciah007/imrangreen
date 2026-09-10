@@ -96,11 +96,15 @@ function CaseApp() {
       const { toast } = await import("sonner");
       toast.success("Drive synched successfully", { description });
       const scan = await scanAllDocuments();
-      if (scan.total) {
-        toast.success(`Scanned ${scan.scanned} document(s)`, {
-          description: `${scan.cloned} detailed clone(s) built${scan.failed ? ` · ${scan.failed} could not be read` : ""}`,
-        });
+      if (scan.verified || scan.total) {
+        toast.success(
+          scan.total ? `Checked ${scan.total} document(s)` : `Verified ${scan.verified} exhibit(s)`,
+          {
+            description: `${scan.verified} already built and verified · ${scan.cloned} newly built${scan.failed ? ` · ${scan.failed} could not be read` : ""}`,
+          },
+        );
       }
+
     } catch (error) {
       const { toast } = await import("sonner");
       toast.error("Drive sync failed", { description: error instanceof Error ? error.message : "Please try again." });
