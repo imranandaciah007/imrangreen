@@ -35,7 +35,22 @@ export interface JsonModelRequest {
    * spends Lovable AI credits on hundreds of documents.
    */
   allowFallback?: boolean;
+  /**
+   * Fields that must come back filled. When the free Gemini read leaves any of
+   * them empty, the paid built-in reader is asked once for the same document and
+   * only the still-missing fields are merged in (Gemini's answers always win).
+   */
+  requiredFields?: string[];
 }
+
+/** Empty string, empty list, or nothing at all. */
+function blank(value: unknown) {
+  if (value === null || value === undefined) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
+}
+
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
