@@ -44,6 +44,8 @@ function exhibitIdFor(driveFileId: string): string {
 
 function supportedFile(name: string, mimeType: string): boolean {
   const lower = name.toLowerCase();
+  // Email archives, videos and archives cannot become page-accurate exhibits.
+  if (/\.(msg|eml|zip|rar|7z|mp4|mov|m4a|mp3|wav|heic|numbers|pages|key)$/.test(lower)) return false;
   return (
     mimeType === "application/pdf" ||
     lower.endsWith(".pdf") ||
