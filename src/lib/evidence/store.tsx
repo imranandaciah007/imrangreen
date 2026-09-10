@@ -274,8 +274,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const [finances, setFinances] = useState<FinancialEntry[]>([]);
   const [tasks, setTasks] = useState<CaseTask[]>([]);
   const [income, setIncome] = useState<IncomeSettings>(DEFAULT_INCOME);
-  const [profile, setProfileState] = useState<Profile>("Imran");
-  const [profileChosen, setProfileChosen] = useState(false);
+  const [profile, setProfileState] = useState<Profile>("Imran & Aciah");
+  const [profileChosen] = useState(true);
+
   const [extractingIds, setExtractingIds] = useState<string[]>([]);
   const [packets, setPackets] = useState<PacketVersion[]>([]);
   const [diaryImports, setDiaryImports] = useState<DiaryImport[]>([]);
@@ -311,11 +312,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       setCustomCategories(
         (records.categories ?? []).filter((c) => !DEFAULT_CATEGORIES.includes(c)),
       );
-      const saved = typeof localStorage !== "undefined" ? localStorage.getItem(PROFILE_KEY) : null;
-      if (saved === "Imran" || saved === "Aciah") {
-        setProfileState(saved);
-        setProfileChosen(true);
-      }
+      // Users are merged: nothing to restore, everything is attributed to the shared identity.
+
       if (typeof localStorage !== "undefined") {
         try {
           const cachedTree = localStorage.getItem(DRIVE_TREE_KEY);
@@ -350,9 +348,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
   const setProfile = useCallback((p: Profile) => {
     setProfileState(p);
-    setProfileChosen(true);
     if (typeof localStorage !== "undefined") localStorage.setItem(PROFILE_KEY, p);
   }, []);
+
 
   const auditEntry = useCallback(
     (action: string) => ({ id: rid("audit"), at: nowIso(), actor: profile, action }),

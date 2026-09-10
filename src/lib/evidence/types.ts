@@ -7,7 +7,9 @@ export const CASE_SETTINGS = {
   secondaryCurrency: "USD",
 } as const;
 
-export const PROFILES = ["Imran", "Aciah"] as const;
+/** Users are merged for now: one shared identity, no sign-in or switching. */
+export const PROFILES = ["Imran & Aciah"] as const;
+
 export type Profile = (typeof PROFILES)[number];
 
 export const PEOPLE = ["Aciah", "Imran", "Jibril", "Other family", "Third party"] as const;

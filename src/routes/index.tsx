@@ -1,15 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bell, ChevronDown, Plus, Search, ShieldCheck } from "lucide-react";
+import { Bell, Plus, Search, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BottomNav, mainTabs, type MainTab } from "@/components/evidence/BottomNav";
 import { CaseReviewView } from "@/components/evidence/CaseReviewView";
@@ -28,14 +22,13 @@ import { FileBoardView } from "@/components/evidence/FileBoardView";
 
 import { InspectorDrawer } from "@/components/evidence/InspectorDrawer";
 import { KanbanBoard } from "@/components/evidence/KanbanBoard";
-import { ProfileGate } from "@/components/evidence/ProfileGate";
 import { AddSheet, EventDialog, ExpenseDialog, TaskDialog } from "@/components/evidence/QuickAdd";
 import { TimelineView } from "@/components/evidence/TimelineView";
 import { TaskReminderManager } from "@/components/evidence/TaskReminderManager";
 import { DiaryImportDialog } from "@/components/evidence/DiaryImportDialog";
 import { UploadDialog } from "@/components/evidence/UploadDialog";
 import { EvidenceStoreProvider, useEvidence } from "@/lib/evidence/store";
-import { PROFILES, type EvidenceItem, type Profile } from "@/lib/evidence/types";
+import { type EvidenceItem } from "@/lib/evidence/types";
 
 const title = "I-601 Evidence Portal — Imran & Aciah";
 const description =
@@ -60,7 +53,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CaseApp() {
-  const { loading, profile, setProfile, caseSettings, stats, syncDrive, scanAllDocuments, setFilters } = useEvidence();
+  const { loading, caseSettings, stats, syncDrive, scanAllDocuments, setFilters } = useEvidence();
   const [tab, setTab] = useState<MainTab>("home");
   const [connectOpen, setConnectOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -166,19 +159,10 @@ function CaseApp() {
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Button variant="ghost" size="icon" className="size-10 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={() => setAskOpen(true)} aria-label="Open reminders" title="Open reminders"><Bell className="size-4" /></Button>
-              <Select value={profile} onValueChange={(v) => setProfile(v as Profile)}>
-                <SelectTrigger className="h-10 w-[108px] border-white/10 bg-white/5 text-xs font-bold text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROFILES.map((p) => (
-                    <SelectItem key={p} value={p} className="text-xs">
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <ChevronDown className="hidden size-3 text-white/50" />
+              <span className="hidden rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-white sm:inline">
+                Imran &amp; Aciah
+              </span>
+
             </div>
           </div>
         </header>
@@ -245,14 +229,13 @@ function CaseApp() {
             )}
 
             <p className="pt-2 text-center text-[10px] font-semibold text-muted-foreground">
-              {stats.total} exhibits · {stats.totalPages} pages · signed in as {profile}
+              {stats.total} exhibits · {stats.totalPages} pages
             </p>
           </>
         )}
         </main>
       </div>
 
-      <ProfileGate />
       <TaskReminderManager />
       <InspectorDrawer onEdit={openEdit} />
       <CommandPalette onConnectDrive={() => setConnectOpen(true)} />
