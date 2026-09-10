@@ -418,6 +418,56 @@ export function FileBoardView() {
     }
   }
 
+  function startRename(node: { id: string; name: string }) {
+    setRenameFor(node);
+    setRenameValue(node.name);
+  }
+
+  async function saveRename() {
+    if (!renameFor) return;
+    const name = renameValue.trim();
+    if (!name || name === renameFor.name) {
+      setRenameFor(null);
+      return;
+    }
+    setBusy(renameFor.id);
+    try {
+      await renameDriveNode({ data: { fileId: renameFor.id, name } });
+      toast.success(`Renamed in Drive: ${name}`);
+      setRenameFor(null);
+      await sync("auto");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The rename could not be saved to Drive.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveMove(targetFolderId: string, targetName: string) {
+    if (!moveFor) return;
+    setBusy(moveFor.id);
+    try {
+      await moveDriveNode({ data: { fileId: moveFor.id, targetFolderId } });
+      toast.success(`Moved in Drive to ${targetName}`);
+      setMoveFor(null);
+      setMoveQuery("");
+      await sync("auto");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The move could not be saved to Drive.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const moveChoices = useMemo(() => {
+    const all = tree?.folders ?? [];
+    const query = moveQuery.trim().toLowerCase();
+    return all
+      .filter((f) => f.id !== moveFor?.id)
+      .filter((f) => !query || f.name.toLowerCase().includes(query) || f.path.toLowerCase().includes(query))
+      .slice(0, 40);
+  }, [tree, moveQuery, moveFor]);
+
   const favouriteFolders = favourites
     .map((id) => folderById.get(id))
     .filter((f): f is DriveFolderNode => Boolean(f));
