@@ -8,8 +8,12 @@
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 const GATEWAY_MODEL = "openai/gpt-6-astra";
+/** Everyday reading (interactive uploads, diary, questions). */
 const GEMINI_MODEL = "gemini-3.6-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+/** Bulk background reading of hundreds of Drive files — cheapest capable model. */
+const GEMINI_BULK_MODEL = "gemini-3.1-flash-lite";
+const geminiUrl = (model: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
 export interface JsonModelFile {
   fileName: string;
@@ -24,7 +28,16 @@ export interface JsonModelRequest {
   /** Schema name used by the gateway path. */
   name: string;
   file?: JsonModelFile | null;
+  /** "bulk" uses the cheapest Gemini model; "standard" is the default reader. */
+  tier?: "bulk" | "standard";
+  /**
+   * Background/bulk work sets this to false so a Gemini outage never quietly
+   * spends Lovable AI credits on hundreds of documents.
+   */
+  allowFallback?: boolean;
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Gemini accepts a subset of JSON Schema — drop the keywords it rejects. */
 function geminiSchema(node: unknown): unknown {
