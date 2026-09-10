@@ -147,6 +147,11 @@ interface EvidenceContextValue {
   /** Organisation gaps and hardship-coverage labels (never legal predictions). */
   gaps: CaseGap[];
   coverage: CategoryCoverage[];
+  /** Gap ids the user chose to ignore, so they stop being flagged. */
+  ignoredGaps: string[];
+  ignoreGap: (id: string) => void;
+  restoreGap: (id: string) => void;
+
 
   /** AI text-extraction run for one document (two-pass verification). */
   runExtraction: (id: string) => Promise<void>;
@@ -247,6 +252,8 @@ function contentKeyOf(fileName: string, size: number | undefined, mimeType: stri
 
 const PROFILE_KEY = "i601.profile";
 const DRIVE_TREE_KEY = "gc.driveTree";
+const IGNORED_GAPS_KEY = "gc.ignoredGaps";
+
 
 const EXPENSE_CATEGORY_SET = new Set<string>(EXPENSE_CATEGORIES);
 
