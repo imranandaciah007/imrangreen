@@ -251,9 +251,11 @@ export function CaseReviewView({
             </h3>
             <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
               {coverage.map((row) => (
-                <div
+                <button
+                  type="button"
                   key={row.category}
-                  className={`rounded-lg border p-2.5 ${COVERAGE_STYLE[row.label] ?? "border-border"}`}
+                  onClick={() => onOpenCategory(row.category)}
+                  className={`rounded-lg border p-2.5 text-left transition-shadow hover:shadow-panel ${COVERAGE_STYLE[row.label] ?? "border-border"}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-xs font-medium text-foreground">{row.category}</p>
@@ -273,8 +275,9 @@ export function CaseReviewView({
                   <p className="mt-1 font-mono text-[10px] text-muted-foreground">
                     Most recent: {row.recentDate ? formatDate(row.recentDate) : "—"}
                   </p>
-                </div>
+                </button>
               ))}
+
             </div>
           </section>
         </TabsContent>
