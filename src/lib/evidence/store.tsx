@@ -978,18 +978,56 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           const { clones } = await listCloneLedger();
           const byDriveId = new Map(clones.map((row) => [row.drive_file_id, row]));
           for (const item of itemsRef.current) {
-            if (!item.driveFileId || item.cloneFileId) continue;
+            if (!item.driveFileId) continue;
             const row = byDriveId.get(item.driveFileId);
-            if (!row?.clone_file_id) continue;
+            if (!row) continue;
+            const alreadyClone = Boolean(item.cloneFileId) || !row.clone_file_id;
+            const alreadyRead = Boolean(item.aiExtraction?.contentRead) || !row.ai_read_at;
+            if (alreadyClone && alreadyRead) continue;
+
+            const confirmed = item.confirmedFields ?? [];
+            const patch: Partial<EvidenceItem> = {};
+            if (row.clone_file_id && !item.cloneFileId) {
+              patch.cloneFileId = row.clone_file_id;
+              patch.cloneUrl = row.clone_link ?? undefined;
+              patch.cloneFileName = row.clone_name ?? undefined;
+              patch.cloneGeneratedAt = row.updated_at ?? nowIso();
+            }
+            // The background reader already read this file — adopt its details
+            // instead of paying to read the same document again in the app.
+            if (row.ai_read_at && !item.aiExtraction?.contentRead) {
+              const aiCats = (row.ai_categories ?? []).filter((c) =>
+                categories.includes(c as Category),
+              ) as Category[];
+              if (row.ai_title && !confirmed.includes("title")) patch.title = row.ai_title;
+              if (row.ai_date && !confirmed.includes("dateOfDocument"))
+                patch.dateOfDocument = row.ai_date;
+              if (row.ai_people?.length && !confirmed.includes("people"))
+                patch.people = row.ai_people;
+              if (aiCats.length && !confirmed.includes("categories")) {
+                patch.categories = aiCats;
+                patch.category = aiCats[0] as Category;
+              }
+              if (row.ai_page_count && row.ai_page_count > 0) patch.pageCount = row.ai_page_count;
+              if (row.ai_summary && !item.notes) patch.notes = row.ai_summary;
+              if (row.ai_aciah_impact && !item.affectsAciah)
+                patch.affectsAciah = row.ai_aciah_impact;
+              patch.aiExtraction = {
+                ranAt: row.ai_read_at,
+                contentRead: true,
+                summary: row.ai_summary ?? "",
+                language: "",
+                applied: ["title", "dateOfDocument", "people", "categories"],
+                uncertain: [],
+              };
+            }
+            if (!Object.keys(patch).length) continue;
             applyPatch(
               [item.id],
-              {
-                cloneFileId: row.clone_file_id,
-                cloneUrl: row.clone_link ?? undefined,
-                cloneFileName: row.clone_name ?? undefined,
-                cloneGeneratedAt: row.updated_at ?? nowIso(),
-              },
-              `Existing clone verified — ${row.clone_name ?? row.clone_file_id}`,
+              patch,
+              row.ai_read_at
+                ? "Background AI read adopted — exhibit details verified"
+                : `Existing clone verified — ${row.clone_name ?? row.clone_file_id}`,
             );
             verified += 1;
           }

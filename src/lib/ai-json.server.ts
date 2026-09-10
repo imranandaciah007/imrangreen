@@ -8,8 +8,12 @@
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 const GATEWAY_MODEL = "openai/gpt-6-astra";
+/** Everyday reading (interactive uploads, diary, questions). */
 const GEMINI_MODEL = "gemini-3.6-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+/** Bulk background reading of hundreds of Drive files — cheapest capable model. */
+const GEMINI_BULK_MODEL = "gemini-3.1-flash-lite";
+const geminiUrl = (model: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
 export interface JsonModelFile {
   fileName: string;
@@ -24,7 +28,16 @@ export interface JsonModelRequest {
   /** Schema name used by the gateway path. */
   name: string;
   file?: JsonModelFile | null;
+  /** "bulk" uses the cheapest Gemini model; "standard" is the default reader. */
+  tier?: "bulk" | "standard";
+  /**
+   * Background/bulk work sets this to false so a Gemini outage never quietly
+   * spends Lovable AI credits on hundreds of documents.
+   */
+  allowFallback?: boolean;
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Gemini accepts a subset of JSON Schema — drop the keywords it rejects. */
 function geminiSchema(node: unknown): unknown {
@@ -47,7 +60,8 @@ async function runGemini(req: JsonModelRequest, key: string) {
   if (req.file?.base64) {
     parts.push({ inlineData: { mimeType: req.file.mimeType, data: req.file.base64 } });
   }
-  const res = await fetch(GEMINI_URL, {
+  const model = req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
+  const res = await fetch(geminiUrl(model), {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
@@ -119,20 +133,38 @@ async function runGateway(req: JsonModelRequest, key: string) {
 }
 
 /** Which reader answered — useful for audit trails. */
-export function jsonModelName() {
-  return process.env["GEMINI_API_KEY"] ? `google/${GEMINI_MODEL}` : GATEWAY_MODEL;
+export function jsonModelName(tier: "bulk" | "standard" = "standard") {
+  if (!process.env["GEMINI_API_KEY"]) return GATEWAY_MODEL;
+  return `google/${tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL}`;
+}
+
+export function geminiConfigured() {
+  return Boolean(process.env["GEMINI_API_KEY"]);
+}
+
+/** Rate limits and brief upstream blips are retried; wrong requests are not. */
+function retryable(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\[(429|500|502|503|504)\]/.test(msg) || /fetch failed|network/i.test(msg);
 }
 
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const geminiKey = process.env["GEMINI_API_KEY"];
   const lovableKey = process.env["LOVABLE_API_KEY"];
+  const allowFallback = req.allowFallback !== false;
   if (geminiKey) {
-    try {
-      return await runGemini(req, geminiKey);
-    } catch (err) {
-      if (!lovableKey) throw err;
-      console.error("Gemini read failed, falling back to built-in AI:", err);
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await runGemini(req, geminiKey);
+      } catch (err) {
+        lastErr = err;
+        if (!retryable(err) || attempt === 2) break;
+        await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
+      }
     }
+    if (!allowFallback || !lovableKey) throw lastErr;
+    console.error("Gemini read failed, falling back to built-in AI:", lastErr);
   }
   if (!lovableKey) throw new Error("AI is not configured for this project.");
   return runGateway(req, lovableKey);

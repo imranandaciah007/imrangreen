@@ -16,6 +16,16 @@ export type Database = {
     Tables: {
       gc_clone_jobs: {
         Row: {
+          ai_aciah_impact: string | null
+          ai_categories: string[] | null
+          ai_date: string | null
+          ai_model: string | null
+          ai_page_count: number | null
+          ai_people: string[] | null
+          ai_read_at: string | null
+          ai_source_type: string | null
+          ai_summary: string | null
+          ai_title: string | null
           attempts: number
           clone_file_id: string | null
           clone_link: string | null
@@ -35,6 +45,16 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_aciah_impact?: string | null
+          ai_categories?: string[] | null
+          ai_date?: string | null
+          ai_model?: string | null
+          ai_page_count?: number | null
+          ai_people?: string[] | null
+          ai_read_at?: string | null
+          ai_source_type?: string | null
+          ai_summary?: string | null
+          ai_title?: string | null
           attempts?: number
           clone_file_id?: string | null
           clone_link?: string | null
@@ -54,6 +74,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_aciah_impact?: string | null
+          ai_categories?: string[] | null
+          ai_date?: string | null
+          ai_model?: string | null
+          ai_page_count?: number | null
+          ai_people?: string[] | null
+          ai_read_at?: string | null
+          ai_source_type?: string | null
+          ai_summary?: string | null
+          ai_title?: string | null
           attempts?: number
           clone_file_id?: string | null
           clone_link?: string | null
