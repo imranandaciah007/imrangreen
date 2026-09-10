@@ -44,3 +44,6 @@
 ## Exhibit display
 - [ ] Show each exhibit short summary (same as clone cover sheet) on the front end
 - [ ] Preview the PDF in-app with an Open externally button
+
+- [ ] Redesign clone cover page: large clear headline details, routine metadata at the bottom
+- [ ] Build all remaining clones and show cloned / pending / new-this-run counters
