@@ -198,6 +198,16 @@ interface EvidenceContextValue {
   };
 }
 
+export interface ScanProgress {
+  running: boolean;
+  phase: string;
+  done: number;
+  total: number;
+  scanned: number;
+  cloned: number;
+  failed: number;
+}
+
 const EvidenceContext = createContext<EvidenceContextValue | null>(null);
 
 function nowIso() {
