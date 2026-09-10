@@ -899,6 +899,131 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     });
   }, [applyPatch, categories, items, runOne, selectedIds]);
 
+  // ---- Deep scan: read every document, then build its detailed clone --------
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const scanInFlight = useRef(false);
+  const [scanProgress, setScanProgress] = useState<ScanProgress>({
+    running: false,
+    phase: "",
+    done: 0,
+    total: 0,
+    scanned: 0,
+    cloned: 0,
+    failed: 0,
+  });
+
+  const scanAllDocuments = useCallback(
+    async (opts?: { rescanAll?: boolean }) => {
+      const rescan = opts?.rescanAll ?? false;
+      if (scanInFlight.current) return { scanned: 0, cloned: 0, failed: 0, total: 0 };
+      const queue = itemsRef.current.filter(
+        (item) =>
+          item.driveFileId &&
+          (rescan || !item.aiExtraction?.contentRead || !item.cloneFileId),
+      );
+      if (!queue.length) {
+        setScanProgress({ running: false, phase: "", done: 0, total: 0, scanned: 0, cloned: 0, failed: 0 });
+        return { scanned: 0, cloned: 0, failed: 0, total: 0 };
+      }
+      scanInFlight.current = true;
+      let scanned = 0;
+      let cloned = 0;
+      let failed = 0;
+      let done = 0;
+      setScanProgress({
+        running: true,
+        phase: `Reading ${queue.length} document(s)`,
+        done: 0,
+        total: queue.length,
+        scanned: 0,
+        cloned: 0,
+        failed: 0,
+      });
+      try {
+        for (const item of queue) {
+          let latest = item;
+          try {
+            if (rescan || !item.aiExtraction?.contentRead) {
+              setExtractingIds((prev) => [...prev, item.id]);
+              setScanProgress((prev) => ({ ...prev, phase: `Reading ${item.fileName}` }));
+              try {
+                const result = await runOne(item, categories);
+                const a = result.agreed;
+                const validCategories = (a.categories ?? []).filter((c) =>
+                  categories.includes(c as Category),
+                ) as Category[];
+                latest = {
+                  ...item,
+                  title: a.title || item.title,
+                  dateOfDocument:
+                    a.documentDate && /^\d{4}-\d{2}-\d{2}$/.test(a.documentDate)
+                      ? a.documentDate
+                      : item.dateOfDocument,
+                  people: a.people?.length ? a.people : item.people,
+                  categories: validCategories.length ? validCategories : item.categories,
+                  pageCount: a.pageCount && a.pageCount > 0 ? a.pageCount : item.pageCount,
+                  notes: item.notes || result.summary || item.notes,
+                };
+                scanned += 1;
+              } finally {
+                setExtractingIds((prev) => prev.filter((x) => x !== item.id));
+              }
+            }
+
+            if (rescan || !latest.cloneFileId) {
+              setScanProgress((prev) => ({ ...prev, phase: `Building clone for ${latest.exhibitId}` }));
+              const clone = await generateCloneDocument({
+                data: {
+                  driveFileId: latest.driveFileId,
+                  fileName: latest.fileName,
+                  folderPath: latest.driveFolder ?? "",
+                  mimeType: latest.mimeType,
+                  meta: {
+                    exhibitId: latest.exhibitId,
+                    title: latest.title,
+                    documentDate: latest.dateOfDocument,
+                    person: latest.people?.[0] ?? "Aciah",
+                    categories: latest.categories ?? [],
+                    people: latest.people ?? [],
+                    sourceType: latest.sourceType ?? "",
+                    status: latest.status ?? "",
+                    summary: latest.aiExtraction?.summary || latest.notes || "",
+                    tags: latest.tags ?? [],
+                    affectsAciah: latest.affectsAciah,
+                    addedBy: profile,
+                  },
+                },
+              });
+              applyPatch(
+                [item.id],
+                {
+                  cloneFileId: clone.id,
+                  cloneUrl: clone.webViewLink,
+                  cloneFileName: clone.name,
+                  cloneGeneratedAt: nowIso(),
+                },
+                `Detailed clone generated — ${clone.name}`,
+              );
+              cloned += 1;
+            }
+          } catch {
+            failed += 1;
+          } finally {
+            done += 1;
+            setScanProgress((prev) => ({ ...prev, done, scanned, cloned, failed }));
+          }
+        }
+      } finally {
+        scanInFlight.current = false;
+        setScanProgress((prev) => ({ ...prev, running: false, phase: "" }));
+      }
+      return { scanned, cloned, failed, total: queue.length };
+    },
+    [applyPatch, categories, profile, runOne],
+  );
+
+
   const applyConfirmed = useCallback((item: EvidenceItem, field: string, value: string) => {
     const patch: Partial<EvidenceItem> = {};
     if (field === "title") patch.title = value;
