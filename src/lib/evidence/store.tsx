@@ -1507,7 +1507,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       await documentProvider.remove([...removedIds, ...duplicateIds]);
       const finalById = new Map(deduped.map((item) => [item.id, item]));
       await Promise.all(
-        reconciled
+        deduped
           .filter((item) => updatedItems.some((updatedItem) => updatedItem.id === item.id) || statusCorrectedIds.has(item.id))
           .map((item) => documentProvider.update(item.id, finalById.get(item.id) ?? item)),
       );
