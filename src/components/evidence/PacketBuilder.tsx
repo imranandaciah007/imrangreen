@@ -37,6 +37,7 @@ import {
 import { useEvidence } from "@/lib/evidence/store";
 import { CASE_SETTINGS, EXPENSE_GROUPS, DEFAULT_CATEGORIES } from "@/lib/evidence/types";
 import { uploadPacketFile } from "@/lib/drive.functions";
+import { draftFilingLanguage, type FilingLanguage } from "@/lib/filing.functions";
 
 const STEPS = ["Audit", "Sections", "Exhibit index", "Generate", "Saved"] as const;
 
@@ -79,6 +80,8 @@ export function PacketBuilder({
   const [sections, setSections] = useState<string[]>(DEFAULT_CATEGORIES);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<{ name: string; link: string; drive: boolean }[]>([]);
+  const [narrative, setNarrative] = useState<FilingLanguage | null>(null);
+  const [drafting, setDrafting] = useState(false);
 
   const findings = useMemo<AuditFinding[]>(
     () => preflightAudit(items, events, finances, tasks, gaps),
@@ -129,6 +132,7 @@ export function PacketBuilder({
     sections,
     exhibits,
     events,
+    narrative: narrative ?? undefined,
     finances,
     gaps,
     totals,
@@ -143,6 +147,45 @@ export function PacketBuilder({
         (income.otherObligations ?? 0),
     },
   };
+
+  async function draftLanguage() {
+    setDrafting(true);
+    try {
+      const result = await draftFilingLanguage({
+        data: {
+          version: nextVersion,
+          caseName: CASE_SETTINGS.caseName,
+          qualifyingRelative: CASE_SETTINGS.primaryQualifyingRelative,
+          applicant: "Imran",
+          child: CASE_SETTINGS.child,
+          separationStartDate: CASE_SETTINGS.separationStartDate,
+          sections,
+          exhibits: exhibits.map((e) => ({
+            number: e.number,
+            title: e.item.title || e.item.fileName,
+            date: e.item.dateOfDocument ?? "",
+            sourceType: e.item.sourceType ?? "",
+            people: e.item.people ?? [],
+            categories: e.item.categories?.length ? e.item.categories : [e.item.category],
+            pages: `${e.firstPage}-${e.lastPage}`,
+            summary: e.item.aiExtraction?.summary || e.item.notes || "",
+          })),
+          totals: { documented: totals.documented },
+          timelineEvents: events.length,
+        },
+      });
+      setNarrative(result);
+      toast.success("Filing language drafted", {
+        description: `${result.coverLetter.length} cover-letter paragraph(s) and ${result.exhibitNotes.length} exhibit description(s). Read them before filing.`,
+      });
+    } catch (err) {
+      toast.error("Could not draft the filing language", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setDrafting(false);
+    }
+  }
 
   async function generate() {
     setBusy(true);
@@ -455,6 +498,35 @@ export function PacketBuilder({
                   ? " Files are also saved to /I601 Evidence/Generated Case Packets/."
                   : " Google Drive is not connected, so files are saved to this device only."}
               </p>
+              <div className="space-y-2 rounded-lg border border-border bg-card p-2.5">
+                <p className="text-[11px] font-semibold text-foreground">
+                  Cover letter and index wording
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {narrative
+                    ? `Drafted ${formatDateTime(narrative.generatedAt)} — ${narrative.coverLetter.length} paragraph(s), ${narrative.exhibitNotes.length} exhibit description(s). Included in the packet and index.`
+                    : "Writes a formal cover letter and a one-line description for every exhibit, using only the details already recorded. Nothing is invented and no outcome is predicted."}
+                </p>
+                <Button
+                  variant="outline"
+                  className="h-11 w-full"
+                  disabled={drafting || !exhibits.length}
+                  onClick={() => void draftLanguage()}
+                >
+                  {drafting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <ClipboardList className="size-4" />
+                  )}
+                  {narrative ? "Redraft the filing language" : "Draft the filing language"}
+                </Button>
+                {narrative?.coverLetter[0] && (
+                  <p className="rounded-md border border-border bg-secondary/40 p-2 text-[11px] text-muted-foreground">
+                    {narrative.coverLetter[0].slice(0, 260)}
+                    {narrative.coverLetter[0].length > 260 ? "…" : ""}
+                  </p>
+                )}
+              </div>
               <Button variant="outline" className="h-11 w-full" onClick={printPacket}>
                 <FileText className="size-4" /> Preview / save as PDF
               </Button>

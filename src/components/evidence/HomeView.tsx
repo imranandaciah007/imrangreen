@@ -7,6 +7,7 @@ import {
   FileText,
   ListChecks,
   Loader2,
+  PauseCircle,
   RefreshCw,
   Upload,
 } from "lucide-react";
@@ -122,7 +123,8 @@ export function HomeView({
   onSyncDrive: () => Promise<void>;
   onOpenCategory: (category: string) => void;
 }) {
-  const { stats, caseSettings, tasks, events, items, gaps, connection, driveSyncing, driveTree, scanProgress, openInspector } = useEvidence();
+  const { stats, caseSettings, tasks, events, items, gaps, connection, driveSyncing, driveTree, scanProgress, pauseSync, openInspector } = useEvidence();
+  const busy = driveSyncing || scanProgress.running;
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const openTasks = tasks.filter(isOpenTask);
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
@@ -146,8 +148,12 @@ export function HomeView({
         </div>
         <div className="case-hero-actions">
           <div className="flex flex-col items-start gap-1">
-            <Button onClick={() => void onSyncDrive()} variant="outline" className="case-secondary-action" disabled={driveSyncing || scanProgress.running}>
-               {driveSyncing || scanProgress.running ? <Loader2 className="animate-spin" /> : <RefreshCw />} {driveSyncing || scanProgress.running ? "Synching…" : "Synch now"}
+            <Button
+              onClick={() => (busy ? pauseSync() : void onSyncDrive())}
+              variant="outline"
+              className="case-secondary-action"
+            >
+              {busy ? <PauseCircle /> : <RefreshCw />} {busy ? "Pause synch" : "Synch now"}
             </Button>
             <span className="pl-1 text-[11px] font-semibold text-navy/60" aria-live="polite">
               {scanProgress.running

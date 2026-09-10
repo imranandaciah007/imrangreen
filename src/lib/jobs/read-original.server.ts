@@ -123,6 +123,10 @@ export async function readOriginal(input: {
       file: { fileName: input.fileName, mimeType: input.mimeType, base64 },
       tier: "bulk",
       allowFallback: false,
+      // If the free read leaves the essentials blank, the paid reader is asked
+      // once for just those fields rather than re-reading everything.
+      allowGapFill: true,
+      requiredFields: ["title", "summary"],
     });
   } catch (err) {
     console.error(`Background read failed for ${input.fileName}:`, err);
