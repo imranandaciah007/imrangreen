@@ -199,6 +199,51 @@ function retryable(err: unknown) {
   return /\[(429|500|502|503|504)\]/.test(msg) || /fetch failed|network/i.test(msg);
 }
 
+/**
+ * Free reader first, paid reader only for the holes it left. Gemini's own answers
+ * are never overwritten, and nothing is sent to any third party beyond Google
+ * (the case owner's own API key) and the built-in reader.
+ */
+async function topUp(
+  req: JsonModelRequest,
+  value: Record<string, unknown>,
+  lovableKey: string | undefined,
+  allowFallback: boolean,
+): Promise<Record<string, unknown>> {
+  const wanted = req.requiredFields ?? [];
+  if (!wanted.length || !allowFallback || !lovableKey) return value;
+  const missing = wanted.filter((field) => blank(value[field]));
+  if (!missing.length) return value;
+  try {
+    const extra = await runGateway(
+      {
+        ...req,
+        prompt: `${req.prompt}\n\nA first reading of this material could not establish: ${missing.join(", ")}. Establish only those, strictly from the material itself. Leave anything the material does not show empty rather than guessing.`,
+      },
+      lovableKey,
+    );
+    const merged = { ...value };
+    for (const field of missing) if (!blank(extra[field])) merged[field] = extra[field];
+    await logUsage({
+      provider: "lovable",
+      model: GATEWAY_MODEL,
+      purpose: `${req.name}:fill-gaps`,
+      ok: true,
+    });
+    return merged;
+  } catch (err) {
+    await logUsage({
+      provider: "lovable",
+      model: GATEWAY_MODEL,
+      purpose: `${req.name}:fill-gaps`,
+      ok: false,
+      statusCode: statusFrom(err),
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return value;
+  }
+}
+
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const geminiKey = process.env["GEMINI_API_KEY"];
   const lovableKey = process.env["LOVABLE_API_KEY"];
@@ -216,7 +261,7 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
           ok: true,
           tokens: out.tokens,
         });
-        return out.value;
+        return await topUp(req, out.value, lovableKey, allowFallback);
       } catch (err) {
         lastErr = err;
         await logUsage({
