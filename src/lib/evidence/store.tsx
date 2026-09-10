@@ -147,6 +147,11 @@ interface EvidenceContextValue {
   /** Organisation gaps and hardship-coverage labels (never legal predictions). */
   gaps: CaseGap[];
   coverage: CategoryCoverage[];
+  /** Gap ids the user chose to ignore, so they stop being flagged. */
+  ignoredGaps: string[];
+  ignoreGap: (id: string) => void;
+  restoreGap: (id: string) => void;
+
 
   /** AI text-extraction run for one document (two-pass verification). */
   runExtraction: (id: string) => Promise<void>;
@@ -247,6 +252,8 @@ function contentKeyOf(fileName: string, size: number | undefined, mimeType: stri
 
 const PROFILE_KEY = "i601.profile";
 const DRIVE_TREE_KEY = "gc.driveTree";
+const IGNORED_GAPS_KEY = "gc.ignoredGaps";
+
 
 const EXPENSE_CATEGORY_SET = new Set<string>(EXPENSE_CATEGORIES);
 
@@ -278,6 +285,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     syncedAt: string;
   } | null>(null);
   const [driveSyncing, setDriveSyncing] = useState(false);
+  const [ignoredGaps, setIgnoredGaps] = useState<string[]>([]);
+
   const [autoSyncNonce, setAutoSyncNonce] = useState(0);
   const hydrated = useRef(false);
   const driveSyncInFlight = useRef(false);
@@ -311,6 +320,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         try {
           const cachedTree = localStorage.getItem(DRIVE_TREE_KEY);
           if (cachedTree) setDriveTree(JSON.parse(cachedTree));
+          const savedIgnored = localStorage.getItem(IGNORED_GAPS_KEY);
+          if (savedIgnored) setIgnoredGaps(JSON.parse(savedIgnored));
+
         } catch {
           localStorage.removeItem(DRIVE_TREE_KEY);
         }
@@ -1674,13 +1686,33 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     [packets.length, profile],
   );
 
+  const ignoreGap = useCallback((id: string) => {
+    setIgnoredGaps((prev) => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem(IGNORED_GAPS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const restoreGap = useCallback((id: string) => {
+    setIgnoredGaps((prev) => {
+      const next = prev.filter((g) => g !== id);
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem(IGNORED_GAPS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const gaps = useMemo(
-    () => [
-      ...detectGaps(items, events, finances, tasks, categories),
-      ...detectDiaryGaps(diaryImports, items),
-    ],
-    [items, events, finances, tasks, categories, diaryImports],
+    () =>
+      [
+        ...detectGaps(items, events, finances, tasks, categories),
+        ...detectDiaryGaps(diaryImports, items),
+      ].filter((gap) => !ignoredGaps.includes(gap.id)),
+    [items, events, finances, tasks, categories, diaryImports, ignoredGaps],
   );
+
 
   const coverage = useMemo(
     () => categoryCoverage(items, events, categories, gaps),
@@ -1779,6 +1811,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     updateTask,
     gaps,
     coverage,
+    ignoredGaps,
+    ignoreGap,
+    restoreGap,
+
 
     deleteTask,
     runExtraction,

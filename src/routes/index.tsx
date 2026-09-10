@@ -60,7 +60,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CaseApp() {
-  const { loading, profile, setProfile, caseSettings, stats, syncDrive, scanAllDocuments } = useEvidence();
+  const { loading, profile, setProfile, caseSettings, stats, syncDrive, scanAllDocuments, setFilters } = useEvidence();
   const [tab, setTab] = useState<MainTab>("home");
   const [connectOpen, setConnectOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -85,6 +85,12 @@ function CaseApp() {
     setEditItem(item);
     setUploadOpen(true);
   }
+
+  function openCategory(category: string) {
+    setFilters({ categories: [category] });
+    setTab("vault");
+  }
+
 
   async function handleDriveSync() {
     try {
@@ -183,7 +189,7 @@ function CaseApp() {
         ) : (
           <>
             {tab === "home" && (
-              <HomeView onNavigate={(t) => setTab(t)} onUpload={() => openUpload()} onAddTask={() => setTaskOpen(true)} onBuildPacket={() => setPacketOpen(true)} onSyncDrive={handleDriveSync} />
+              <HomeView onNavigate={(t) => setTab(t)} onUpload={() => openUpload()} onAddTask={() => setTaskOpen(true)} onBuildPacket={() => setPacketOpen(true)} onSyncDrive={handleDriveSync} onOpenCategory={openCategory} />
             )}
 
             {tab === "board" && <FileBoardView />}
@@ -202,8 +208,10 @@ function CaseApp() {
               <CaseReviewView
                 onAddTask={() => setTaskOpen(true)}
                 onBuildPacket={() => setPacketOpen(true)}
+                onOpenCategory={openCategory}
               />
             )}
+
 
             {tab === "vault" && (
               <div className="space-y-4 lg:grid lg:grid-cols-[320px_1fr] lg:items-start lg:gap-4 lg:space-y-0">

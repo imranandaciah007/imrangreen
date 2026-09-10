@@ -1,4 +1,4 @@
-import { AlertTriangle, ClipboardList, HeartHandshake, Sparkles } from "lucide-react";
+import { AlertTriangle, ClipboardList, EyeOff, HeartHandshake, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,9 +60,11 @@ const COVERAGE_STYLE: Record<string, string> = {
 export function CaseReviewView({
   onAddTask,
   onBuildPacket,
+  onOpenCategory,
 }: {
   onAddTask: () => void;
   onBuildPacket: () => void;
+  onOpenCategory: (category: string) => void;
 }) {
   const {
     stats,
@@ -77,7 +79,9 @@ export function CaseReviewView({
     profile,
     resolveConflict,
     markAllReady,
+    ignoreGap,
   } = useEvidence();
+
 
   const uncategorised = items.filter(
     (i) => !(i.categories?.length ? i.categories : [i.category]).filter(Boolean).length,
@@ -247,9 +251,11 @@ export function CaseReviewView({
             </h3>
             <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
               {coverage.map((row) => (
-                <div
+                <button
+                  type="button"
                   key={row.category}
-                  className={`rounded-lg border p-2.5 ${COVERAGE_STYLE[row.label] ?? "border-border"}`}
+                  onClick={() => onOpenCategory(row.category)}
+                  className={`rounded-lg border p-2.5 text-left transition-shadow hover:shadow-panel ${COVERAGE_STYLE[row.label] ?? "border-border"}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-xs font-medium text-foreground">{row.category}</p>
@@ -269,8 +275,9 @@ export function CaseReviewView({
                   <p className="mt-1 font-mono text-[10px] text-muted-foreground">
                     Most recent: {row.recentDate ? formatDate(row.recentDate) : "—"}
                   </p>
-                </div>
+                </button>
               ))}
+
             </div>
           </section>
         </TabsContent>
@@ -325,6 +332,15 @@ export function CaseReviewView({
                     >
                       <ClipboardList className="size-3.5" /> Create task
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 text-[11px] text-muted-foreground"
+                      onClick={() => ignoreGap(gap.id)}
+                    >
+                      <EyeOff className="size-3.5" /> Ignore
+                    </Button>
+
                   </div>
                 </li>
               ))}
