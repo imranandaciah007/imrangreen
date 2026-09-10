@@ -64,3 +64,49 @@ export const listCloneLedger = createServerFn({ method: "GET" }).handler(async (
   }
   return { clones: rows };
 });
+
+export interface CloneFolderRow {
+  /** Folder path inside the clones root ("" is the root itself). */
+  path: string;
+  total: number;
+  built: number;
+  pending: number;
+  duplicates: number;
+  failed: number;
+}
+
+/**
+ * The folder structure inside the "I601 Evidence Clones" root, with how many
+ * exhibits in each folder are already built. Case progress mirrors this.
+ */
+export const listCloneFolders = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const byPath = new Map<string, CloneFolderRow>();
+  const page = 1000;
+  for (let from = 0; from < 20000; from += page) {
+    const { data, error } = await supabaseAdmin
+      .from("gc_clone_jobs")
+      .select("folder_path,status")
+      .range(from, from + page - 1);
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+    for (const row of data as { folder_path: string | null; status: string }[]) {
+      const path = (row.folder_path ?? "").replace(/^\/+|\/+$/g, "");
+      const entry =
+        byPath.get(path) ??
+        ({ path, total: 0, built: 0, pending: 0, duplicates: 0, failed: 0 } as CloneFolderRow);
+      if (row.status === "duplicate") entry.duplicates += 1;
+      else {
+        entry.total += 1;
+        if (row.status === "done") entry.built += 1;
+        else if (row.status === "error") entry.failed += 1;
+        else entry.pending += 1;
+      }
+      byPath.set(path, entry);
+    }
+    if (data.length < page) break;
+  }
+  const folders = [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+  return { root: "I601 Evidence Clones", folders };
+});
+
