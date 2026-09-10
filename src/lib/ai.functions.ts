@@ -1,8 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import { runJsonModel } from "./ai-json.server";
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 const DRIVE_GATEWAY = "https://connector-gateway.lovable.dev/google_drive";
-const MODEL = "openai/gpt-6-astra";
 const MAX_BYTES = 12 * 1024 * 1024;
 
 export interface ExtractionPass {
