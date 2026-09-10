@@ -194,35 +194,7 @@ export function similarity(a: string, b: string) {
 }
 
 async function runChunkPass(prompt: string) {
-  const key = process.env["LOVABLE_API_KEY"];
-  if (!key) throw new Error("AI is not configured for this project.");
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
-    body: JSON.stringify({
-      model: MODEL,
-      reasoning: { effort: "low" },
-      input: [{ role: "user", content: [{ type: "input_text", text: prompt }] }],
-      text: {
-        format: { type: "json_schema", name: "diary_chunk", strict: true, schema: CHUNK_SCHEMA },
-      },
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`AI request failed [${res.status}]: ${body.slice(0, 300)}`);
-  }
-  const data = (await res.json()) as {
-    output?: { content?: { type?: string; text?: string }[] }[];
-    output_text?: string;
-  };
-  let text = data.output_text ?? "";
-  if (!text) {
-    for (const part of data.output ?? []) {
-      for (const c of part.content ?? []) if (c.type === "output_text" && c.text) text += c.text;
-    }
-  }
-  const parsed = JSON.parse(text) as Record<string, unknown>;
+  const parsed = await runJsonModel({ prompt, schema: CHUNK_SCHEMA, name: "diary_chunk" });
   const events = (Array.isArray(parsed["events"]) ? parsed["events"] : []).map((raw) => {
     const e = raw as Record<string, unknown>;
     return {
