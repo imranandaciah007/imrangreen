@@ -28,14 +28,13 @@ import { FileBoardView } from "@/components/evidence/FileBoardView";
 
 import { InspectorDrawer } from "@/components/evidence/InspectorDrawer";
 import { KanbanBoard } from "@/components/evidence/KanbanBoard";
-import { ProfileGate } from "@/components/evidence/ProfileGate";
 import { AddSheet, EventDialog, ExpenseDialog, TaskDialog } from "@/components/evidence/QuickAdd";
 import { TimelineView } from "@/components/evidence/TimelineView";
 import { TaskReminderManager } from "@/components/evidence/TaskReminderManager";
 import { DiaryImportDialog } from "@/components/evidence/DiaryImportDialog";
 import { UploadDialog } from "@/components/evidence/UploadDialog";
 import { EvidenceStoreProvider, useEvidence } from "@/lib/evidence/store";
-import { PROFILES, type EvidenceItem, type Profile } from "@/lib/evidence/types";
+import { type EvidenceItem } from "@/lib/evidence/types";
 
 const title = "I-601 Evidence Portal — Imran & Aciah";
 const description =
@@ -60,7 +59,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CaseApp() {
-  const { loading, profile, setProfile, caseSettings, stats, syncDrive, scanAllDocuments, setFilters } = useEvidence();
+  const { loading, caseSettings, stats, syncDrive, scanAllDocuments, setFilters } = useEvidence();
   const [tab, setTab] = useState<MainTab>("home");
   const [connectOpen, setConnectOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -237,14 +236,13 @@ function CaseApp() {
             )}
 
             <p className="pt-2 text-center text-[10px] font-semibold text-muted-foreground">
-              {stats.total} exhibits · {stats.totalPages} pages · signed in as {profile}
+              {stats.total} exhibits · {stats.totalPages} pages
             </p>
           </>
         )}
         </main>
       </div>
 
-      <ProfileGate />
       <TaskReminderManager />
       <InspectorDrawer onEdit={openEdit} />
       <CommandPalette onConnectDrive={() => setConnectOpen(true)} />
