@@ -718,7 +718,28 @@ export async function buildClone(data: {
   const clonePath = [CLONE_ROOT, data.folderPath].filter(Boolean).join("/");
   const folderId = await ensureFolder(clonePath);
 
-  const pdfBase64 = await doc.saveAsBase64();
+  // A few originals use compression pdf-lib only rejects while writing. Keep the
+  // cover sheet in that case rather than losing the exhibit entirely.
+  let pdfBase64: string;
+  try {
+    pdfBase64 = await doc.saveAsBase64();
+  } catch (error) {
+    const pageCount = doc.getPageCount();
+    for (let index = pageCount - 1; index >= 1; index -= 1) doc.removePage(index);
+    const cover = doc.getPage(0);
+    cover.drawRectangle({ x: 34, y: 14, width: 528, height: 14, color: rgb(1, 1, 1) });
+    cover.drawText(`${meta.exhibitId} · cover sheet only · page 1 of 1`, {
+      x: 40,
+      y: 20,
+      size: 7.5,
+      font: body,
+      color: rgb(0.45, 0.47, 0.53),
+    });
+    originalPages = 0;
+    totalPages = 1;
+    originalNote = `The original pages could not be copied (${error instanceof Error ? error.message : "unreadable PDF"}); the untouched original stays in Drive.`;
+    pdfBase64 = await doc.saveAsBase64();
+  }
   const uploaded = await uploadMultipart({
     name,
     mimeType: "application/pdf",
