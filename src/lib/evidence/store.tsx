@@ -1517,6 +1517,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         added: created.length,
         updated,
         removed: removedIds.length,
+        duplicates: duplicateIds.length,
         folders: next.folders.length,
         files: originalFiles.length,
       };
