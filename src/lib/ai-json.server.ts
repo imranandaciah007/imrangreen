@@ -39,6 +39,37 @@ export interface JsonModelRequest {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Records every model call so the app can show honest usage figures. */
+async function logUsage(entry: {
+  provider: string;
+  model: string;
+  purpose?: string | undefined;
+  ok: boolean;
+  statusCode?: number | null;
+  tokens?: number | null;
+  error?: string | null;
+}) {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("gc_ai_usage").insert({
+      provider: entry.provider,
+      model: entry.model,
+      purpose: entry.purpose ?? null,
+      ok: entry.ok,
+      status_code: entry.statusCode ?? null,
+      tokens: entry.tokens ?? null,
+      error: entry.error ? entry.error.slice(0, 300) : null,
+    });
+  } catch {
+    /* usage tracking must never break a real read */
+  }
+}
+
+function statusFrom(err: unknown) {
+  const m = /\[(\d{3})\]/.exec(err instanceof Error ? err.message : String(err));
+  return m ? Number(m[1]) : null;
+}
+
 /** Gemini accepts a subset of JSON Schema — drop the keywords it rejects. */
 function geminiSchema(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(geminiSchema);
@@ -78,13 +109,18 @@ async function runGemini(req: JsonModelRequest, key: string) {
   }
   const data = (await res.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: { totalTokenCount?: number };
   };
   let text = "";
   for (const part of data.candidates?.[0]?.content?.parts ?? []) {
     if (part.text) text += part.text;
   }
   if (!text.trim()) throw new Error("Gemini returned an empty response.");
-  return JSON.parse(text) as Record<string, unknown>;
+  return {
+    value: JSON.parse(text) as Record<string, unknown>,
+    tokens: data.usageMetadata?.totalTokenCount ?? null,
+    model,
+  };
 }
 
 async function runGateway(req: JsonModelRequest, key: string) {
@@ -152,13 +188,30 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
   const geminiKey = process.env["GEMINI_API_KEY"];
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const allowFallback = req.allowFallback !== false;
+  const geminiModel = req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
   if (geminiKey) {
     let lastErr: unknown = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        return await runGemini(req, geminiKey);
+        const out = await runGemini(req, geminiKey);
+        await logUsage({
+          provider: "gemini",
+          model: out.model,
+          purpose: req.name,
+          ok: true,
+          tokens: out.tokens,
+        });
+        return out.value;
       } catch (err) {
         lastErr = err;
+        await logUsage({
+          provider: "gemini",
+          model: geminiModel,
+          purpose: req.name,
+          ok: false,
+          statusCode: statusFrom(err),
+          error: err instanceof Error ? err.message : String(err),
+        });
         if (!retryable(err) || attempt === 2) break;
         await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
       }
@@ -167,5 +220,19 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
     console.error("Gemini read failed, falling back to built-in AI:", lastErr);
   }
   if (!lovableKey) throw new Error("AI is not configured for this project.");
-  return runGateway(req, lovableKey);
+  try {
+    const value = await runGateway(req, lovableKey);
+    await logUsage({ provider: "lovable", model: GATEWAY_MODEL, purpose: req.name, ok: true });
+    return value;
+  } catch (err) {
+    await logUsage({
+      provider: "lovable",
+      model: GATEWAY_MODEL,
+      purpose: req.name,
+      ok: false,
+      statusCode: statusFrom(err),
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }

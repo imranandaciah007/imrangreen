@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bell, Plus, Search, ShieldCheck } from "lucide-react";
+import { Plus, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppHeader } from "@/components/evidence/AppHeader";
 import { BottomNav, mainTabs, type MainTab } from "@/components/evidence/BottomNav";
 import { CaseReviewView } from "@/components/evidence/CaseReviewView";
 import { PacketBuilder } from "@/components/evidence/PacketBuilder";
@@ -53,7 +54,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CaseApp() {
-  const { loading, caseSettings, stats, syncDrive, scanAllDocuments, setFilters } = useEvidence();
+  const { loading, stats, syncDrive, scanAllDocuments, setFilters } = useEvidence();
   const [tab, setTab] = useState<MainTab>("home");
   const [connectOpen, setConnectOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -140,32 +141,12 @@ function CaseApp() {
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
-        <header className="case-topbar sticky top-0 z-30 pt-[env(safe-area-inset-top)]">
-          <div className="flex min-h-[68px] items-center gap-3 px-4 py-2 sm:px-6 lg:px-8">
-            <div className="flex min-w-0 items-center gap-3 sm:flex-1">
-               <img src="/favicon.png" alt="GC" className="size-10 shrink-0 rounded-lg lg:hidden" />
-              <div className="min-w-0">
-                <h1 className="truncate font-display text-base font-black text-white sm:text-lg">
-                  {caseSettings.caseName}
-                </h1>
-                <p className="mt-0.5 truncate text-[10px] font-bold text-white/50">
-                   Private evidence portal
-                </p>
-              </div>
-            </div>
-
-            <div className="ml-auto hidden max-w-sm flex-1 items-center rounded-lg border border-white/10 bg-white/5 px-3 text-white/60 md:flex">
-              <Search className="size-4" /><button onClick={() => setAskOpen(true)} className="h-10 flex-1 text-left text-xs">Search evidence, tasks, notes...</button><kbd>⌘K</kbd>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button variant="ghost" size="icon" className="size-10 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={() => setAskOpen(true)} aria-label="Open reminders" title="Open reminders"><Bell className="size-4" /></Button>
-              <span className="hidden rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-white sm:inline">
-                Imran &amp; Aciah
-              </span>
-
-            </div>
-          </div>
-        </header>
+        <AppHeader
+          tab={tab}
+          onSearch={() => setAskOpen(true)}
+          onOpenTasks={() => setTab("review")}
+          onAddTask={() => setTaskOpen(true)}
+        />
 
          <main className="mx-auto max-w-[1440px] space-y-4 p-3 sm:p-5 lg:p-7">
         {loading ? (
