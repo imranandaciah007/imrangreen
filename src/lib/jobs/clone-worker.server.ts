@@ -327,6 +327,8 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         lease_until: null,
         folders,
         files,
+        last_run_cloned: cloned,
+        last_run_queued: queued,
         note: `${cloned} clone(s) built, ${pendingAfter ?? 0} waiting`,
         updated_at: new Date().toISOString(),
       })
