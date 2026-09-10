@@ -273,7 +273,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
           mimeType: job.mime_type,
           meta: {
             exhibitId: job.exhibit_id,
-            title: titleFromName(job.file_name),
+            title: titleFromName(job.file_name, job.folder_path),
             documentDate: "",
             person: classification?.people[0] ?? "",
             categories: classification?.categories ?? ["Other"],
