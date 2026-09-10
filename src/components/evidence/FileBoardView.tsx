@@ -194,7 +194,7 @@ export function FileBoardView() {
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
-    const timer = window.setInterval(() => void sync("auto"), 120_000);
+    const timer = window.setInterval(() => void sync("auto"), 20_000);
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
