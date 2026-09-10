@@ -68,6 +68,24 @@ export type Database = {
         }
         Relationships: []
       }
+      gc_job_secret: {
+        Row: {
+          created_at: string
+          id: boolean
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: boolean
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          id?: boolean
+          token?: string
+        }
+        Relationships: []
+      }
       gc_job_state: {
         Row: {
           files: number
