@@ -644,6 +644,81 @@ export function FileBoardView() {
           </p>
         )}
       </Section>
+
+      <Dialog open={Boolean(renameFor)} onOpenChange={(v) => !v && setRenameFor(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Rename in Drive</DialogTitle>
+            <DialogDescription className="text-xs">
+              The new name is saved straight to your Google Drive. The contents stay untouched.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void saveRename()}
+            className="h-11 text-sm"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setRenameFor(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => void saveRename()} disabled={busy === renameFor?.id}>
+              {busy === renameFor?.id ? <Loader2 className="size-4 animate-spin" /> : null}
+              Save name
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(moveFor)}
+        onOpenChange={(v) => {
+          if (!v) {
+            setMoveFor(null);
+            setMoveQuery("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="truncate text-base">Move “{moveFor?.name}”</DialogTitle>
+            <DialogDescription className="text-xs">
+              Pick where it should live. The move happens in your Google Drive too.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={moveQuery}
+            onChange={(e) => setMoveQuery(e.target.value)}
+            placeholder="Search folders"
+            className="h-11 text-sm"
+          />
+          <div className="max-h-72 space-y-1 overflow-y-auto">
+            <button
+              onClick={() => void saveMove("root", "My Drive")}
+              className="flex min-h-11 w-full items-center gap-2 rounded-md border border-border px-3 text-left text-sm font-bold hover:bg-accent/40"
+            >
+              <Folder className="size-4 text-primary" /> My Drive
+            </button>
+            {moveChoices.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => void saveMove(f.id, f.name)}
+                className="flex min-h-11 w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-left hover:bg-accent/40"
+              >
+                <Folder className="size-4 shrink-0 text-primary" />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold text-foreground">{f.name}</span>
+                  <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    {f.path || "My Drive"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
