@@ -169,6 +169,48 @@ async function ensureFolder(path: string): Promise<string> {
   return parent;
 }
 
+/** Rename a Drive file or folder (originals keep their contents untouched). */
+export const renameDriveNode = createServerFn({ method: "POST" })
+  .inputValidator((data: { fileId: string; name: string }) => {
+    if (!data?.fileId || !data?.name?.trim()) throw new Error("A file and a new name are required.");
+    return { fileId: data.fileId, name: data.name.trim() };
+  })
+  .handler(async ({ data }) => {
+    const updated = await driveJson<{ id: string; name: string }>(
+      `${GATEWAY}/drive/v3/files/${data.fileId}?fields=id,name&supportsAllDrives=true`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name }),
+      },
+    );
+    return updated;
+  });
+
+/** Move a Drive file or folder into another folder (by id, or "root"). */
+export const moveDriveNode = createServerFn({ method: "POST" })
+  .inputValidator((data: { fileId: string; targetFolderId: string; currentParentId?: string | null }) => {
+    if (!data?.fileId || !data?.targetFolderId) throw new Error("A file and a destination are required.");
+    return data;
+  })
+  .handler(async ({ data }) => {
+    const current = await driveJson<{ parents?: string[] }>(
+      `${GATEWAY}/drive/v3/files/${data.fileId}?fields=parents&supportsAllDrives=true`,
+    );
+    const removeParents = (current.parents ?? []).join(",");
+    const params = new URLSearchParams({
+      fields: "id,name,parents",
+      addParents: data.targetFolderId,
+      supportsAllDrives: "true",
+    });
+    if (removeParents) params.set("removeParents", removeParents);
+    const moved = await driveJson<{ id: string; name: string; parents?: string[] }>(
+      `${GATEWAY}/drive/v3/files/${data.fileId}?${params.toString()}`,
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" },
+    );
+    return moved;
+  });
+
 /** Create a folder anywhere in the mirrored tree. */
 export const createDriveFolder = createServerFn({ method: "POST" })
   .inputValidator((data: { path: string }) => {
