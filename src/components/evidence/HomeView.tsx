@@ -111,6 +111,8 @@ export function HomeView({
         </span>
       </section>
 
+      <BackgroundBuildPanel />
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Total Exhibits" value={String(stats.total)} icon={<FileText />} tone="yellow" onClick={() => onNavigate("vault")} />
         <Metric label="Reviewed & Ready" value={String(stats.ready)} icon={<CheckCircle2 />} tone="blue" onClick={() => onNavigate("vault")} />
