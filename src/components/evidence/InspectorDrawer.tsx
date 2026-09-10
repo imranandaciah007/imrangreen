@@ -24,6 +24,7 @@ import { formatBytes, formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { TAGS, type EvidenceItem } from "@/lib/evidence/types";
 import { toast } from "sonner";
+import { DocumentPreview, shortSummaryOf } from "./DocumentPreview";
 import { StatusSelect, TagChip } from "./status-ui";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
