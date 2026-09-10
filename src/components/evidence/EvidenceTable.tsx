@@ -111,6 +111,9 @@ export function EvidenceTable({ onEdit }: { onEdit: (item: EvidenceItem) => void
                 <span className="mt-0.5 block text-sm font-medium text-foreground">
                   {item.title}
                 </span>
+                <span className="mt-0.5 block line-clamp-2 text-[11px] text-foreground/75">
+                  {shortSummaryOf(item)}
+                </span>
                 <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                   {item.category} · {item.pageCount} pg · {formatBytes(item.fileSizeBytes)}
                 </span>
