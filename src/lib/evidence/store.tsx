@@ -1355,7 +1355,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
   const syncDrive = useCallback(async () => {
     if (driveSyncInFlight.current) {
-      return { added: 0, updated: 0, removed: 0, folders: driveTree?.folders.length ?? 0, files: driveTree?.files.length ?? 0 };
+      return {
+        added: 0,
+        updated: 0,
+        removed: 0,
+        duplicates: 0,
+        folders: driveTree?.folders.length ?? 0,
+        files: driveTree?.files.length ?? 0,
+      };
     }
     driveSyncInFlight.current = true;
     setDriveSyncing(true);
