@@ -1,4 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
+import { runJsonModel } from "./ai-json.server";
+
 
 /**
  * Hardship Diary master import — server side analysis.
