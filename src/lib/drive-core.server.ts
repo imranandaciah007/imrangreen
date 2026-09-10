@@ -617,6 +617,9 @@ export async function buildClone(data: {
 
     if (source?.kind === "pdf") {
       const src = await PDFDocument.load(source.bytes, { ignoreEncryption: true });
+      // Some originals only reveal broken compression when their streams are
+      // rewritten. Probe here so a bad original degrades to a cover sheet.
+      await src.save({ useObjectStreams: false });
       const copied = await doc.copyPages(src, src.getPageIndices());
       for (const p of copied) doc.addPage(p);
       originalPages = copied.length;
