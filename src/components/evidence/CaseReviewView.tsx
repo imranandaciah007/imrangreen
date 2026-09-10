@@ -153,18 +153,39 @@ export function CaseReviewView({
         </TabsList>
 
         <TabsContent value="overview" className="mt-3 space-y-4">
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
+          {(() => {
+            const attention: { label: string; value: number; hint?: string }[] = [
+              { label: "Important details missing", value: stats.needsConfirmation },
+              { label: "Missing supporting evidence", value: stats.gaps },
+              { label: "Events without evidence", value: eventsNoEvidence },
+              { label: "Expenses without proof", value: financeNoProof },
+              { label: "Unresolved gaps", value: gaps.length },
+              { label: "Translation needed", value: stats.missingTranslation },
+              { label: "Duplicate suspects", value: duplicates },
+              { label: "Uncategorised", value: uncategorised },
+            ].filter((s) => s.value > 0);
+            return attention.length ? (
+              <section className="rounded-xl border border-destructive/50 bg-destructive/5 p-3">
+                <h3 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-destructive uppercase">
+                  <AlertTriangle className="size-3.5" /> Needs your attention
+                </h3>
+                <div className="mt-2.5 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
+                  {attention.map((s) => (
+                    <Stat key={s.label} label={s.label} value={String(s.value)} attention />
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <p className="rounded-xl border border-success/50 bg-success/10 p-3 text-xs font-medium text-foreground">
+                Nothing needs your attention right now.
+              </p>
+            );
+          })()}
+
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <Stat label="Exhibits" value={String(stats.total)} hint={`${stats.totalPages} pages`} />
             <Stat label="Reviewed & ready" value={String(stats.ready)} />
-            <Stat label="Important details missing" value={String(stats.needsConfirmation)} />
-            <Stat label="Missing supporting evidence" value={String(stats.gaps)} />
-            <Stat label="Duplicate suspects" value={String(duplicates)} />
-            <Stat label="Translation needed" value={String(stats.missingTranslation)} />
-            <Stat label="Uncategorised" value={String(uncategorised)} />
-            <Stat label="Events without evidence" value={String(eventsNoEvidence)} />
-            <Stat label="Expenses without proof" value={String(financeNoProof)} />
             <Stat label="Open tasks" value={String(stats.openTasks)} />
-            <Stat label="Unresolved gaps" value={String(gaps.length)} />
             <Stat
               label="Last edited"
               value={stats.lastEditedAt ? formatDate(stats.lastEditedAt) : "—"}
