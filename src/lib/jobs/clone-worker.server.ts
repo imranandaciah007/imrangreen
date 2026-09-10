@@ -131,20 +131,56 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         (file) => !file.path.startsWith(CLONE_ROOT) && supportedFile(file.name, file.mimeType),
       );
 
-      const { data: known } = await supabaseAdmin.from("gc_clone_jobs").select("drive_file_id");
-      const knownIds = new Set((known ?? []).map((row) => row.drive_file_id));
+      const { data: known } = await supabaseAdmin
+        .from("gc_clone_jobs")
+        .select("drive_file_id,content_key,status,duplicate_of");
       const liveIds = new Set(originals.map((file) => file.id));
 
-      const rows = originals
-        .filter((file) => !knownIds.has(file.id))
-        .map((file) => ({
+      // One exhibit per identical document: Drive checksum first, else name + byte size.
+      const contentKeyOf = (file: (typeof originals)[number]) =>
+        file.checksum
+          ? `md5:${file.checksum}`
+          : `ns:${file.name.trim().toLowerCase()}|${file.size}|${file.mimeType}`;
+
+      // Whichever copy sits in the shallowest, then alphabetically first folder wins.
+      const canonical = new Map<string, (typeof originals)[number]>();
+      for (const file of originals) {
+        const key = contentKeyOf(file);
+        const held = canonical.get(key);
+        if (!held) {
+          canonical.set(key, file);
+          continue;
+        }
+        const depth = (p: string) => p.split("/").length;
+        const better =
+          depth(file.path) < depth(held.path) ||
+          (depth(file.path) === depth(held.path) && file.path.localeCompare(held.path) < 0);
+        if (better) canonical.set(key, file);
+      }
+
+      // Keep any copy that already has a clone as the canonical one, so nothing is rebuilt twice.
+      for (const row of known ?? []) {
+        if (row.status === "done" && row.content_key && !row.duplicate_of) {
+          const existing = originals.find((file) => file.id === row.drive_file_id);
+          if (existing) canonical.set(row.content_key, existing);
+        }
+      }
+
+      const rows = originals.map((file) => {
+        const key = contentKeyOf(file);
+        const winner = canonical.get(key)!;
+        const isCopy = winner.id !== file.id;
+        return {
           drive_file_id: file.id,
           file_name: file.name,
           folder_path: file.path,
           mime_type: file.mimeType,
-          exhibit_id: exhibitIdFor(file.id),
-          status: "pending",
-        }));
+          exhibit_id: exhibitIdFor(winner.id),
+          content_key: key,
+          duplicate_of: isCopy ? winner.id : null,
+          ...(isCopy ? { status: "duplicate" as const } : {}),
+        };
+      });
 
       for (let index = 0; index < rows.length; index += 200) {
         const slice = rows.slice(index, index + 200);
