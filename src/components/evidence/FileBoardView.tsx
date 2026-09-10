@@ -8,6 +8,7 @@ import {
   FilePlus2,
   FileText,
   Folder,
+  FolderInput,
   FolderPlus,
   GripVertical,
   Loader2,
