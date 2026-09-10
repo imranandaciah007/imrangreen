@@ -182,6 +182,14 @@ interface EvidenceContextValue {
   driveTree: { folders: DriveFolderNode[]; files: DriveFileNode[]; syncedAt: string } | null;
   driveSyncing: boolean;
   syncDrive: () => Promise<{ added: number; updated: number; removed: number; folders: number; files: number }>;
+  /** Reads every Drive document with AI, then builds its detailed clone PDF. */
+  scanAllDocuments: (opts?: { rescanAll?: boolean }) => Promise<{
+    scanned: number;
+    cloned: number;
+    failed: number;
+    total: number;
+  }>;
+  scanProgress: ScanProgress;
   exhibitGroups: string[];
   stats: {
     total: number;
