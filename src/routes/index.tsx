@@ -86,6 +86,12 @@ function CaseApp() {
     setUploadOpen(true);
   }
 
+  function openCategory(category: string) {
+    setFilters({ categories: [category] });
+    setTab("vault");
+  }
+
+
   async function handleDriveSync() {
     try {
       const result = await syncDrive();
