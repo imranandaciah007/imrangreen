@@ -1,8 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import { runJsonModel } from "./ai-json.server";
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
 const DRIVE_GATEWAY = "https://connector-gateway.lovable.dev/google_drive";
-const MODEL = "openai/gpt-6-astra";
 const MAX_BYTES = 12 * 1024 * 1024;
 
 export interface ExtractionPass {
@@ -101,56 +100,12 @@ async function runPass(input: {
   mimeType: string;
   base64: string | null;
 }) {
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  if (!lovableKey) throw new Error("AI is not configured for this project.");
-
-  const content: Record<string, unknown>[] = [{ type: "input_text", text: input.prompt }];
-  if (input.base64) {
-    if (input.mimeType.startsWith("image/")) {
-      content.push({
-        type: "input_image",
-        image_url: `data:${input.mimeType};base64,${input.base64}`,
-      });
-    } else {
-      content.push({
-        type: "input_file",
-        filename: input.fileName,
-        file_data: `data:${input.mimeType};base64,${input.base64}`,
-      });
-    }
-  }
-
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
-    body: JSON.stringify({
-      model: MODEL,
-      reasoning: { effort: "low" },
-      input: [{ role: "user", content }],
-      text: {
-        format: { type: "json_schema", name: "evidence_extraction", strict: true, schema: SCHEMA },
-      },
-    }),
+  const parsed = await runJsonModel({
+    prompt: input.prompt,
+    schema: SCHEMA,
+    name: "evidence_extraction",
+    file: { fileName: input.fileName, mimeType: input.mimeType, base64: input.base64 },
   });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`AI request failed [${res.status}]: ${body.slice(0, 400)}`);
-  }
-
-  const data = (await res.json()) as {
-    output?: { type?: string; content?: { type?: string; text?: string }[] }[];
-    output_text?: string;
-  };
-  let text = data.output_text ?? "";
-  if (!text) {
-    for (const part of data.output ?? []) {
-      for (const c of part.content ?? []) {
-        if (c.type === "output_text" && c.text) text += c.text;
-      }
-    }
-  }
-  const parsed = JSON.parse(text) as Record<string, unknown>;
   return {
     title: String(parsed["title"] ?? "").trim(),
     documentDate: String(parsed["documentDate"] ?? "").slice(0, 10),
@@ -297,33 +252,7 @@ async function twoPass(data: {
  * ------------------------------------------------------------------ */
 
 async function runJson(prompt: string, schema: unknown, name: string) {
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  if (!lovableKey) throw new Error("AI is not configured for this project.");
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
-    body: JSON.stringify({
-      model: MODEL,
-      reasoning: { effort: "low" },
-      input: [{ role: "user", content: [{ type: "input_text", text: prompt }] }],
-      text: { format: { type: "json_schema", name, strict: true, schema } },
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`AI request failed [${res.status}]: ${body.slice(0, 400)}`);
-  }
-  const json = (await res.json()) as {
-    output?: { content?: { type?: string; text?: string }[] }[];
-    output_text?: string;
-  };
-  let text = json.output_text ?? "";
-  if (!text) {
-    for (const part of json.output ?? []) {
-      for (const c of part.content ?? []) if (c.type === "output_text" && c.text) text += c.text;
-    }
-  }
-  return JSON.parse(text) as Record<string, unknown>;
+  return runJsonModel({ prompt, schema, name });
 }
 
 const EVENT_SCHEMA = {
@@ -563,50 +492,12 @@ async function receiptPass(input: {
   mimeType: string;
   base64: string | null;
 }) {
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  if (!lovableKey) throw new Error("AI is not configured for this project.");
-  const content: Record<string, unknown>[] = [{ type: "input_text", text: input.prompt }];
-  if (input.base64) {
-    if (input.mimeType.startsWith("image/")) {
-      content.push({
-        type: "input_image",
-        image_url: `data:${input.mimeType};base64,${input.base64}`,
-      });
-    } else {
-      content.push({
-        type: "input_file",
-        filename: input.fileName,
-        file_data: `data:${input.mimeType};base64,${input.base64}`,
-      });
-    }
-  }
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
-    body: JSON.stringify({
-      model: MODEL,
-      reasoning: { effort: "low" },
-      input: [{ role: "user", content }],
-      text: {
-        format: { type: "json_schema", name: "receipt_read", strict: true, schema: RECEIPT_SCHEMA },
-      },
-    }),
+  const parsed = await runJsonModel({
+    prompt: input.prompt,
+    schema: RECEIPT_SCHEMA,
+    name: "receipt_read",
+    file: { fileName: input.fileName, mimeType: input.mimeType, base64: input.base64 },
   });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`AI request failed [${res.status}]: ${body.slice(0, 400)}`);
-  }
-  const data = (await res.json()) as {
-    output?: { content?: { type?: string; text?: string }[] }[];
-    output_text?: string;
-  };
-  let text = data.output_text ?? "";
-  if (!text) {
-    for (const part of data.output ?? []) {
-      for (const c of part.content ?? []) if (c.type === "output_text" && c.text) text += c.text;
-    }
-  }
-  const parsed = JSON.parse(text) as Record<string, unknown>;
   const lines = Array.isArray(parsed["lineItems"]) ? parsed["lineItems"] : [];
   return {
     merchant: String(parsed["merchant"] ?? "").trim(),
