@@ -98,6 +98,8 @@ export type Database = {
           folders: number
           id: boolean
           last_run_at: string | null
+          last_run_cloned: number
+          last_run_queued: number
           last_tree_sync_at: string | null
           lease_until: string | null
           note: string | null
@@ -110,6 +112,8 @@ export type Database = {
           folders?: number
           id?: boolean
           last_run_at?: string | null
+          last_run_cloned?: number
+          last_run_queued?: number
           last_tree_sync_at?: string | null
           lease_until?: string | null
           note?: string | null
@@ -122,6 +126,8 @@ export type Database = {
           folders?: number
           id?: boolean
           last_run_at?: string | null
+          last_run_cloned?: number
+          last_run_queued?: number
           last_tree_sync_at?: string | null
           lease_until?: string | null
           note?: string | null
