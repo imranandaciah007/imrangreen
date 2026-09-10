@@ -81,11 +81,13 @@ export function HomeView({
         </div>
         <div className="case-hero-actions">
           <div className="flex flex-col items-start gap-1">
-            <Button onClick={() => void onSyncDrive()} variant="outline" className="case-secondary-action" disabled={driveSyncing}>
-               {driveSyncing ? <Loader2 className="animate-spin" /> : <RefreshCw />} {driveSyncing ? "Synching…" : "Synch now"}
+            <Button onClick={() => void onSyncDrive()} variant="outline" className="case-secondary-action" disabled={driveSyncing || scanProgress.running}>
+               {driveSyncing || scanProgress.running ? <Loader2 className="animate-spin" /> : <RefreshCw />} {driveSyncing || scanProgress.running ? "Synching…" : "Synch now"}
             </Button>
             <span className="pl-1 text-[11px] font-semibold text-navy/60" aria-live="polite">
-              {driveSyncing
+              {scanProgress.running
+                ? `Scanning documents ${scanProgress.done}/${scanProgress.total} · ${scanProgress.cloned} clone(s) built`
+                : driveSyncing
                 ? "Synching with Drive…"
                 : connection?.lastSyncedAt
                   ? `Last updated ${new Date(connection.lastSyncedAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
