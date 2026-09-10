@@ -204,6 +204,8 @@ interface EvidenceContextValue {
   }>;
 
   scanProgress: ScanProgress;
+  /** Stops the run in progress (and the always-on builder) after the current file. */
+  pauseSync: () => void;
   exhibitGroups: string[];
   stats: {
     total: number;
@@ -945,6 +947,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const scanInFlight = useRef(false);
+  const scanCancelled = useRef(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress>({
     running: false,
     phase: "",
@@ -958,6 +961,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const scanAllDocuments = useCallback(
     async (opts?: { rescanAll?: boolean }) => {
       const rescan = opts?.rescanAll ?? false;
+      scanCancelled.current = false;
       if (scanInFlight.current)
         return { scanned: 0, cloned: 0, failed: 0, total: 0, verified: 0 };
 
@@ -1062,6 +1066,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       });
       try {
         for (const item of queue) {
+          if (scanCancelled.current) break;
           let latest = item;
           try {
             if (rescan || !item.aiExtraction?.contentRead) {
@@ -1872,6 +1877,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     syncDrive,
     scanAllDocuments,
     scanProgress,
+    pauseSync,
     exhibitGroups,
     stats,
   };
