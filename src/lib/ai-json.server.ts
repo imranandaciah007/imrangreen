@@ -41,6 +41,11 @@ export interface JsonModelRequest {
    * only the still-missing fields are merged in (Gemini's answers always win).
    */
   requiredFields?: string[];
+  /**
+   * Allows the gap-filling top-up above even when a full paid fallback is off
+   * (background reading of hundreds of files).
+   */
+  allowGapFill?: boolean;
 }
 
 /** Empty string, empty list, or nothing at all. */
@@ -211,7 +216,8 @@ async function topUp(
   allowFallback: boolean,
 ): Promise<Record<string, unknown>> {
   const wanted = req.requiredFields ?? [];
-  if (!wanted.length || !allowFallback || !lovableKey) return value;
+  if (!wanted.length || !lovableKey) return value;
+  if (!allowFallback && req.allowGapFill !== true) return value;
   const missing = wanted.filter((field) => blank(value[field]));
   if (!missing.length) return value;
   try {
