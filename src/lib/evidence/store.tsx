@@ -1448,6 +1448,18 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /** Stops the current run after the file in progress, and parks the always-on builder. */
+  const pauseSync = useCallback(() => {
+    scanCancelled.current = true;
+    setScanProgress((prev) => ({ ...prev, phase: "Pausing after this document…" }));
+    void import("@/lib/jobs/background.functions")
+      .then(({ pauseBackgroundSync }) => pauseBackgroundSync())
+      .catch(() => {});
+    toast.success("Synch paused", {
+      description: "Nothing is lost — press Synch now to pick up where it stopped.",
+    });
+  }, []);
+
   const syncDrive = useCallback(async () => {
     if (driveSyncInFlight.current) {
       return {
