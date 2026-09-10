@@ -135,7 +135,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
     const { count: pendingBefore } = await supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
-      .eq("status", "pending");
+      .in("status", ["pending", "processing"]);
 
     const treeStale = now.getTime() - lastTree > TREE_REFRESH_MINUTES * 60_000;
     if (treeStale || !pendingBefore) {
@@ -428,7 +428,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
     const { count: pendingAfter } = await supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
-      .eq("status", "pending");
+      .in("status", ["pending", "processing"]);
 
     await supabaseAdmin
       .from("gc_job_state")
@@ -489,7 +489,7 @@ export async function readJobStatus() {
     supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
-      .eq("status", "pending"),
+      .in("status", ["pending", "processing"]),
     supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
