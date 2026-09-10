@@ -1,15 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bell, ChevronDown, Plus, Search, ShieldCheck } from "lucide-react";
+import { Bell, Plus, Search, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BottomNav, mainTabs, type MainTab } from "@/components/evidence/BottomNav";
 import { CaseReviewView } from "@/components/evidence/CaseReviewView";
