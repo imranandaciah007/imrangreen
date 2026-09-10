@@ -28,6 +28,8 @@ export interface DriveFileNode {
   webViewLink: string;
   parentId: string | null;
   path: string;
+  /** Drive content checksum, when Drive provides one (binary uploads only). */
+  checksum?: string;
 }
 
 export function driveHeaders() {
@@ -60,6 +62,7 @@ interface RawFile {
   modifiedTime?: string;
   webViewLink?: string;
   parents?: string[];
+  md5Checksum?: string;
 }
 
 /** Whole-Drive folder tree plus files, each with its full folder path. */
@@ -74,7 +77,8 @@ export async function listTree(): Promise<{
   for (let page = 0; page < 25; page += 1) {
     const params = new URLSearchParams({
       q: "trashed = false",
-      fields: "nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,parents)",
+      fields:
+        "nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,parents,md5Checksum)",
       pageSize: "1000",
       orderBy: "folder,name",
     });
@@ -130,6 +134,7 @@ export async function listTree(): Promise<{
         webViewLink: f.webViewLink ?? "",
         parentId: folderMeta.has(parentId ?? "") ? parentId : null,
         path: pathOf(parentId),
+        ...(f.md5Checksum ? { checksum: f.md5Checksum } : {}),
       });
     }
   }
