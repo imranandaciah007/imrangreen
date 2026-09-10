@@ -26,6 +26,75 @@ export const resumeBackgroundSync = createServerFn({ method: "POST" }).handler(a
   return { ok: true };
 });
 
+/** Stop the always-on builder until the next Synch now. */
+export const pauseBackgroundSync = createServerFn({ method: "POST" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  await supabaseAdmin
+    .from("gc_job_state")
+    .update({ status: "paused", paused_reason: "Paused by you", lease_until: null })
+    .eq("id", true);
+  return { ok: true };
+});
+
+export interface CloneFileRow {
+  driveFileId: string;
+  /** Link to the untouched original PDF in your Drive. */
+  originalLink: string;
+  fileName: string;
+  exhibitTitle: string;
+  documentDate: string | null;
+  summary: string | null;
+  pageCount: number | null;
+  cloneName: string | null;
+  cloneLink: string | null;
+  status: string;
+}
+
+/** The exhibits filed inside one folder of the clones root. */
+export const listCloneFiles = createServerFn({ method: "GET" })
+  .inputValidator((data: { path?: string } | undefined) => ({
+    path: (data?.path ?? "").replace(/^\/+|\/+$/g, ""),
+  }))
+  .handler(async ({ data }): Promise<{ path: string; files: CloneFileRow[] }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("gc_clone_jobs")
+      .select(
+        "drive_file_id,file_name,clone_name,clone_link,status,ai_title,ai_date,ai_summary,ai_page_count",
+      )
+      .eq("folder_path", data.path)
+      .neq("status", "duplicate")
+      .limit(500);
+    if (error) throw new Error(error.message);
+    const files = (rows ?? []).map((row) => {
+      const r = row as {
+        drive_file_id: string;
+        file_name: string | null;
+        clone_name: string | null;
+        clone_link: string | null;
+        status: string;
+        ai_title: string | null;
+        ai_date: string | null;
+        ai_summary: string | null;
+        ai_page_count: number | null;
+      };
+      return {
+        driveFileId: r.drive_file_id,
+        originalLink: `https://drive.google.com/file/d/${r.drive_file_id}/view`,
+        fileName: r.file_name ?? r.drive_file_id,
+        exhibitTitle: r.ai_title ?? r.file_name ?? "Untitled document",
+        documentDate: r.ai_date,
+        summary: r.ai_summary,
+        pageCount: r.ai_page_count,
+        cloneName: r.clone_name,
+        cloneLink: r.clone_link,
+        status: r.status,
+      };
+    });
+    files.sort((a, b) => a.exhibitTitle.localeCompare(b.exhibitTitle));
+    return { path: data.path, files };
+  });
+
 /** Existing clones already on record, so Synch now can verify instead of rebuild. */
 export const listCloneLedger = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
