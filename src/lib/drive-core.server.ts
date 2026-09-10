@@ -642,6 +642,39 @@ export async function buildClone(data: {
     originalNote = `The original could not be embedded (${error instanceof Error ? error.message : "unknown error"}); it stays in Drive unchanged.`;
   }
 
+  // ---- Visual preview of the original's first page, filling the cover sheet.
+  const previewBottom = 224;
+  const availableH = previewTop - previewBottom - 26;
+  if (preview && availableH > 90) {
+    const availableW = contentW;
+    const scale = Math.min(availableW / preview.width, availableH / preview.height);
+    const drawW = preview.width * scale;
+    const drawH = preview.height * scale;
+    const frameX = left + (availableW - drawW) / 2;
+    const frameY = previewBottom + (availableH - drawH) / 2;
+    page.drawText("FIRST PAGE OF THE ORIGINAL", {
+      x: left,
+      y: previewTop - 8,
+      size: 7,
+      font: bold,
+      color: muted,
+    });
+    page.drawRectangle({
+      x: frameX - 5,
+      y: frameY - 5,
+      width: drawW + 10,
+      height: drawH + 10,
+      color: rgb(1, 1, 1),
+      borderColor: ruleColor,
+      borderWidth: 0.8,
+    });
+    if (preview.page) {
+      page.drawPage(preview.page, { x: frameX, y: frameY, width: drawW, height: drawH });
+    } else if (preview.image) {
+      page.drawImage(preview.image, { x: frameX, y: frameY, width: drawW, height: drawH });
+    }
+  }
+
   // ---- Page references so the cover sheet can be cited in the packet index.
   const totalPages = originalPages + 1;
   const pageReference = originalPages
