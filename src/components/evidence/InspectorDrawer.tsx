@@ -51,8 +51,12 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
     dismissExtractionField,
     addTask,
     profile,
+    gaps,
+    ignoreGap,
   } = useEvidence();
   const item = items.find((i) => i.id === inspectorId) ?? null;
+  const itemGaps = item ? gaps.filter((g) => g.recordType === "evidence" && g.recordId === item.id) : [];
+
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
