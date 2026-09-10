@@ -163,7 +163,6 @@ function CaseApp() {
                 Imran &amp; Aciah
               </span>
 
-              <ChevronDown className="hidden size-3 text-white/50" />
             </div>
           </div>
         </header>
