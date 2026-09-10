@@ -621,6 +621,8 @@ export function FileBoardView() {
               onFavourite={() => toggleFavourite(f.id)}
               onMoveBack={() => reorder(f.id, -1)}
               onMoveForward={() => reorder(f.id, 1)}
+              onRename={() => startRename(f)}
+              onMoveTo={() => setMoveFor({ id: f.id, name: f.name })}
             />
           ))}
           {childFiles.slice(0, Math.max(0, visible - orderedFolders.length)).map((file) => (
@@ -630,6 +632,8 @@ export function FileBoardView() {
               exhibit={byDriveId.get(file.id)?.exhibitId ?? exhibitFor(file.id)}
               busy={busy === file.id}
               onClone={() => void makeClone(file)}
+              onRename={() => startRename(file)}
+              onMoveTo={() => setMoveFor({ id: file.id, name: file.name })}
             />
           ))}
         </CardGrid>
