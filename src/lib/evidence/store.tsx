@@ -241,6 +241,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     syncedAt: string;
   } | null>(null);
   const [driveSyncing, setDriveSyncing] = useState(false);
+  const [autoSyncNonce, setAutoSyncNonce] = useState(0);
   const hydrated = useRef(false);
   const driveSyncInFlight = useRef(false);
 
@@ -1335,6 +1336,17 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       setDriveSyncing(false);
     }
   }, [auditEntry, driveTree, items, profile]);
+
+  // Auto-synch with Drive whenever a new evidence entry is created in the app.
+  const connectionRef = useRef(connection);
+  connectionRef.current = connection;
+  const syncDriveRef = useRef(syncDrive);
+  syncDriveRef.current = syncDrive;
+  useEffect(() => {
+    if (autoSyncNonce > 0 && connectionRef.current?.connected) {
+      void syncDriveRef.current();
+    }
+  }, [autoSyncNonce]);
 
   const exhibitGroups = useMemo(
     () => Array.from(new Set(items.map((i) => groupOf(i.exhibitId)))).sort(),
