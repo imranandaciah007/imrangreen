@@ -372,6 +372,10 @@ export async function readJobStatus() {
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
       .eq("status", "failed"),
+    supabaseAdmin
+      .from("gc_clone_jobs")
+      .select("drive_file_id", { count: "exact", head: true })
+      .eq("status", "duplicate"),
   ]);
 
   return {
