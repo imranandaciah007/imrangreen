@@ -353,9 +353,13 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
 
 export async function readJobStatus() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [{ data: state }, total, done, pendingCount, failedCount] = await Promise.all([
+  const [{ data: state }, total, done, pendingCount, failedCount, duplicateCount] = await Promise.all([
     supabaseAdmin.from("gc_job_state").select("*").eq("id", true).maybeSingle(),
-    supabaseAdmin.from("gc_clone_jobs").select("drive_file_id", { count: "exact", head: true }),
+    // Duplicate copies are not separate documents, so they stay out of every count.
+    supabaseAdmin
+      .from("gc_clone_jobs")
+      .select("drive_file_id", { count: "exact", head: true })
+      .is("duplicate_of", null),
     supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
