@@ -1686,13 +1686,33 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     [packets.length, profile],
   );
 
+  const ignoreGap = useCallback((id: string) => {
+    setIgnoredGaps((prev) => {
+      const next = prev.includes(id) ? prev : [...prev, id];
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem(IGNORED_GAPS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const restoreGap = useCallback((id: string) => {
+    setIgnoredGaps((prev) => {
+      const next = prev.filter((g) => g !== id);
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem(IGNORED_GAPS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const gaps = useMemo(
-    () => [
-      ...detectGaps(items, events, finances, tasks, categories),
-      ...detectDiaryGaps(diaryImports, items),
-    ],
-    [items, events, finances, tasks, categories, diaryImports],
+    () =>
+      [
+        ...detectGaps(items, events, finances, tasks, categories),
+        ...detectDiaryGaps(diaryImports, items),
+      ].filter((gap) => !ignoredGaps.includes(gap.id)),
+    [items, events, finances, tasks, categories, diaryImports, ignoredGaps],
   );
+
 
   const coverage = useMemo(
     () => categoryCoverage(items, events, categories, gaps),
