@@ -11,8 +11,12 @@ import {
   Upload,
 } from "lucide-react";
 
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { getBackgroundStatus } from "@/lib/jobs/background.functions";
 import { formatDate } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { isOpenTask } from "@/lib/task-reminders";
@@ -42,6 +46,48 @@ function Metric({
         <span className="mt-1.5 block text-[11px] font-extrabold uppercase tracking-[.08em] text-navy/65">{label}</span>
       </span>
     </Button>
+  );
+}
+
+/** Always-on exhibit and clone building, which keeps running while GC is closed. */
+function BackgroundBuildPanel() {
+  const fetchStatus = useServerFn(getBackgroundStatus);
+  const { data } = useQuery({
+    queryKey: ["gc-background-status"],
+    queryFn: () => fetchStatus(),
+    refetchInterval: 30_000,
+  });
+
+  if (!data) return null;
+  const total = data.totalDocuments;
+  const done = data.clonesBuilt;
+  const percent = total ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <section className="space-y-2 rounded-lg border border-border bg-card px-4 py-3 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-bold text-foreground">Always-on exhibit building</span>
+        <span className="text-muted-foreground">
+          {data.status === "paused"
+            ? "Paused"
+            : data.waiting
+              ? `${data.waiting} document${data.waiting === 1 ? "" : "s"} still to prepare`
+              : "Everything is up to date"}
+          {data.lastRunAt
+            ? ` · Last run ${new Date(data.lastRunAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+            : ""}
+        </span>
+      </div>
+      <Progress value={percent} className="h-1.5" />
+      <p className="text-muted-foreground">
+        {done} of {total} exhibit clone{total === 1 ? "" : "s"} built ({percent}%)
+        {data.failed ? ` · ${data.failed} could not be read` : ""}
+        {data.status === "paused" && data.pausedReason ? ` · ${data.pausedReason.slice(0, 120)}` : ""}
+      </p>
+      <p className="text-muted-foreground">
+        This keeps working in the background, even when GC is closed on your phone.
+      </p>
+    </section>
   );
 }
 
@@ -110,6 +156,8 @@ export function HomeView({
           {connection?.lastSyncedAt ? ` · Last synched ${new Date(connection.lastSyncedAt).toLocaleString()}` : ""}
         </span>
       </section>
+
+      <BackgroundBuildPanel />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Total Exhibits" value={String(stats.total)} icon={<FileText />} tone="yellow" onClick={() => onNavigate("vault")} />

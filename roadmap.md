@@ -28,3 +28,15 @@
 ## External limitation
 - Original files are never altered; clones are always separate PDFs.
 
+
+## Background processing
+- [ ] Keep syncing and building exhibits/clones while the app is closed (needs server-side scheduled job + shared storage)
+- [ ] Run a real Drive sync and confirm every clone PDF has its own cover sheet with page numbers matching the Drive original
+
+## Background exhibit building
+- [x] Server-only Drive core + clone builder shared by app and background job
+- [x] Job ledger tables (locked to backend) with lease, retries, self-pause
+- [x] Cron every 5 min -> /api/public/gc-clone-tick (dev URL; switch to production URL after publish)
+- [x] Dashboard panel shows clones built / waiting / last run
+- [ ] Confirm scheduled run returns 200 once this build is deployed
+- [ ] Use full two-pass AI extraction (not name/folder heuristics) for background clone metadata
