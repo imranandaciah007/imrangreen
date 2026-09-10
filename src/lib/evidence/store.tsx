@@ -231,6 +231,11 @@ function groupOf(exhibitId: string) {
   return match ? match[1]!.toUpperCase() : "—";
 }
 
+/** Fingerprint used to recognise the same document stored in more than one folder. */
+function contentKeyOf(fileName: string, size: number | undefined, mimeType: string | undefined) {
+  return `${fileName.trim().toLowerCase()}|${size ?? 0}|${mimeType ?? ""}`;
+}
+
 const PROFILE_KEY = "i601.profile";
 const DRIVE_TREE_KEY = "gc.driveTree";
 
