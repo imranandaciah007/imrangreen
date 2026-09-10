@@ -133,20 +133,38 @@ async function runGateway(req: JsonModelRequest, key: string) {
 }
 
 /** Which reader answered — useful for audit trails. */
-export function jsonModelName() {
-  return process.env["GEMINI_API_KEY"] ? `google/${GEMINI_MODEL}` : GATEWAY_MODEL;
+export function jsonModelName(tier: "bulk" | "standard" = "standard") {
+  if (!process.env["GEMINI_API_KEY"]) return GATEWAY_MODEL;
+  return `google/${tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL}`;
+}
+
+export function geminiConfigured() {
+  return Boolean(process.env["GEMINI_API_KEY"]);
+}
+
+/** Rate limits and brief upstream blips are retried; wrong requests are not. */
+function retryable(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\[(429|500|502|503|504)\]/.test(msg) || /fetch failed|network/i.test(msg);
 }
 
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const geminiKey = process.env["GEMINI_API_KEY"];
   const lovableKey = process.env["LOVABLE_API_KEY"];
+  const allowFallback = req.allowFallback !== false;
   if (geminiKey) {
-    try {
-      return await runGemini(req, geminiKey);
-    } catch (err) {
-      if (!lovableKey) throw err;
-      console.error("Gemini read failed, falling back to built-in AI:", err);
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await runGemini(req, geminiKey);
+      } catch (err) {
+        lastErr = err;
+        if (!retryable(err) || attempt === 2) break;
+        await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
+      }
     }
+    if (!allowFallback || !lovableKey) throw lastErr;
+    console.error("Gemini read failed, falling back to built-in AI:", lastErr);
   }
   if (!lovableKey) throw new Error("AI is not configured for this project.");
   return runGateway(req, lovableKey);
