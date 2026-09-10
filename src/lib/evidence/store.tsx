@@ -1700,6 +1700,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     driveTree,
     driveSyncing,
     syncDrive,
+    scanAllDocuments,
+    scanProgress,
     exhibitGroups,
     stats,
   };
