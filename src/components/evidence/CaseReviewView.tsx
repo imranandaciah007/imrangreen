@@ -1,4 +1,4 @@
-import { AlertTriangle, ClipboardList, HeartHandshake, Sparkles } from "lucide-react";
+import { AlertTriangle, ClipboardList, EyeOff, HeartHandshake, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -332,6 +332,15 @@ export function CaseReviewView({
                     >
                       <ClipboardList className="size-3.5" /> Create task
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 text-[11px] text-muted-foreground"
+                      onClick={() => ignoreGap(gap.id)}
+                    >
+                      <EyeOff className="size-3.5" /> Ignore
+                    </Button>
+
                   </div>
                 </li>
               ))}
