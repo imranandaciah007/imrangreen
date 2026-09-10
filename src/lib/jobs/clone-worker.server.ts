@@ -402,5 +402,7 @@ export async function readJobStatus() {
     waiting: pendingCount.count ?? 0,
     failed: failedCount.count ?? 0,
     duplicates: duplicateCount.count ?? 0,
+    lastRunCloned: state?.last_run_cloned ?? 0,
+    lastRunQueued: state?.last_run_queued ?? 0,
   };
 }
