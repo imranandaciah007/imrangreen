@@ -9,16 +9,44 @@ import { aciahImpactState, type CaseGap } from "@/lib/evidence/review";
 import { useEvidence } from "@/lib/evidence/store";
 import { taskStatus } from "@/lib/evidence/types";
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  attention,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  attention?: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-border bg-card p-3 shadow-panel">
-      <div className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+    <div
+      className={`rounded-xl border p-3 shadow-panel ${
+        attention ? "border-destructive/60 bg-destructive/10" : "border-border bg-card"
+      }`}
+    >
+      <div
+        className={`text-[10px] font-semibold tracking-wider uppercase ${
+          attention ? "text-destructive" : "text-muted-foreground"
+        }`}
+      >
         {label}
       </div>
-      <div className="mt-1 font-mono text-xl leading-none font-semibold text-foreground">
+      <div
+        className={`mt-1 font-mono text-xl leading-none font-semibold ${
+          attention ? "text-destructive" : "text-foreground"
+        }`}
+      >
         {value}
       </div>
-      {hint && <div className="mt-1 text-[10px] text-muted-foreground">{hint}</div>}
+      {hint && (
+        <div
+          className={`mt-1 text-[10px] ${attention ? "text-destructive/80" : "text-muted-foreground"}`}
+        >
+          {hint}
+        </div>
+      )}
     </div>
   );
 }
@@ -99,18 +127,13 @@ export function CaseReviewView({
 
   return (
     <div className="space-y-4">
-      <Button className="h-11 w-full" onClick={onBuildPacket}>
-        Build case packet
-      </Button>
-      <Button variant="outline" className="h-11 w-full" onClick={markAllReady}>
-        Mark every document as Ready
-      </Button>
-      <div>
-        <h2 className="text-sm font-semibold text-foreground">Case review</h2>
-        <p className="text-[11px] text-muted-foreground">
-          How complete and well organised the evidence is. These are organisation measures only —
-          they say nothing about how the application will be decided.
-        </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button className="h-10 flex-1 text-xs" onClick={onBuildPacket}>
+          Build case packet
+        </Button>
+        <Button variant="outline" className="h-10 flex-1 text-xs" onClick={markAllReady}>
+          Mark all as Ready
+        </Button>
       </div>
 
       <Tabs defaultValue="overview">
