@@ -1090,7 +1090,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         scanInFlight.current = false;
         setScanProgress((prev) => ({ ...prev, running: false, phase: "" }));
       }
-      return { scanned, cloned, failed, total: queue.length };
+      return { scanned, cloned, failed, total: queue.length, verified };
     },
     [applyPatch, categories, profile, runOne],
   );
