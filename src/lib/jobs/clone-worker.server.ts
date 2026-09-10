@@ -259,6 +259,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
       .limit(batch);
 
     for (const job of (pending ?? []) as JobRow[]) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) break;
       try {
         const classification = classifyDriveFile({
           id: job.drive_file_id,
