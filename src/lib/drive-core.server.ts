@@ -584,6 +584,14 @@ export async function buildClone(data: {
   // ---- Append the original, untouched.
   let originalPages = 0;
   let originalNote = "The original file could not be embedded; it stays in Drive unchanged.";
+  let preview:
+    | {
+        width: number;
+        height: number;
+        page?: Awaited<ReturnType<PDFDocument["embedPdf"]>>[number];
+        image?: Awaited<ReturnType<PDFDocument["embedPng"]>>;
+      }
+    | null = null;
   try {
     let source: { bytes: Uint8Array; kind: "pdf" | "png" | "jpg" } | null = null;
     if (data.base64) {
