@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   CheckSquare,
-  ExternalLink,
-  FileText,
   History,
   Languages,
   Link2,
