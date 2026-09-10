@@ -823,6 +823,12 @@ function FolderCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem className="text-xs" onSelect={() => onRename?.()}>
+                  <Pencil className="size-3.5" /> Rename in Drive
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-xs" onSelect={() => onMoveTo?.()}>
+                  <FolderInput className="size-3.5" /> Move to another folder
+                </DropdownMenuItem>
                 <DropdownMenuItem className="text-xs" onSelect={() => onMoveBack?.()}>
                   <MoveLeft className="size-3.5" /> Move earlier
                 </DropdownMenuItem>
