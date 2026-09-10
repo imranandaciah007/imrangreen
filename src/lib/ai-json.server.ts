@@ -60,7 +60,8 @@ async function runGemini(req: JsonModelRequest, key: string) {
   if (req.file?.base64) {
     parts.push({ inlineData: { mimeType: req.file.mimeType, data: req.file.base64 } });
   }
-  const res = await fetch(GEMINI_URL, {
+  const model = req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
+  const res = await fetch(geminiUrl(model), {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
