@@ -10,8 +10,17 @@ export const Route = createFileRoute("/api/public/gc-clone-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const unauthorized = await authenticateCronRequest(request);
-        if (unauthorized) return unauthorized;
+        const presented = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+        let jobTokenOk = false;
+        if (presented) {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data } = await supabaseAdmin.from("gc_job_secret").select("token").eq("id", true).maybeSingle();
+          jobTokenOk = Boolean(data?.token) && data!.token === presented;
+        }
+        if (!jobTokenOk) {
+          const unauthorized = await authenticateCronRequest(request);
+          if (unauthorized) return unauthorized;
+        }
 
         let batch = 6;
         try {
