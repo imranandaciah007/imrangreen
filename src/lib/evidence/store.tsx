@@ -1472,7 +1472,12 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       };
     }
     driveSyncInFlight.current = true;
+    scanCancelled.current = false;
     setDriveSyncing(true);
+    // Pressing Synch now also lifts a pause on the always-on builder.
+    void import("@/lib/jobs/background.functions")
+      .then(({ resumeBackgroundSync }) => resumeBackgroundSync())
+      .catch(() => {});
     try {
       const next = await listDriveTree();
       setDriveTree(next);
