@@ -37,12 +37,24 @@ export const listCloneLedger = createServerFn({ method: "GET" }).handler(async (
     status: string;
     duplicate_of: string | null;
     updated_at: string | null;
+    ai_title: string | null;
+    ai_date: string | null;
+    ai_people: string[] | null;
+    ai_categories: string[] | null;
+    ai_source_type: string | null;
+    ai_summary: string | null;
+    ai_aciah_impact: string | null;
+    ai_page_count: number | null;
+    ai_model: string | null;
+    ai_read_at: string | null;
   }[] = [];
   const page = 1000;
   for (let from = 0; from < 5000; from += page) {
     const { data, error } = await supabaseAdmin
       .from("gc_clone_jobs")
-      .select("drive_file_id,clone_file_id,clone_name,clone_link,status,duplicate_of,updated_at")
+      .select(
+        "drive_file_id,clone_file_id,clone_name,clone_link,status,duplicate_of,updated_at,ai_title,ai_date,ai_people,ai_categories,ai_source_type,ai_summary,ai_aciah_impact,ai_page_count,ai_model,ai_read_at",
+      )
       .in("status", ["done", "duplicate"])
       .range(from, from + page - 1);
     if (error) throw new Error(error.message);
