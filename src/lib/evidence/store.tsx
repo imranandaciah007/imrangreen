@@ -1398,7 +1398,19 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           };
         });
 
-      const fresh = originalFiles.filter((file) => !existingByDriveId.has(file.id));
+      // One exhibit per identical document, even when the same file sits in several folders.
+      const seenContent = new Set(
+        updatedItems
+          .filter((item) => item.driveFileId)
+          .map((item) => contentKeyOf(item.fileName, item.fileSizeBytes, item.mimeType)),
+      );
+      const fresh = originalFiles.filter((file) => {
+        if (existingByDriveId.has(file.id)) return false;
+        const key = contentKeyOf(file.name, file.size, file.mimeType);
+        if (seenContent.has(key)) return false;
+        seenContent.add(key);
+        return true;
+      });
       const created: EvidenceItem[] = [];
       for (const [index, file] of fresh.entries()) {
         const classification = classifyDriveFile({
