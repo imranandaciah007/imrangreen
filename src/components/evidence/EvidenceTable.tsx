@@ -237,6 +237,9 @@ export function EvidenceTable({ onEdit }: { onEdit: (item: EvidenceItem) => void
                     className="block w-full min-w-0 text-left"
                   >
                     <span className="block truncate font-medium text-foreground">{item.title}</span>
+                    <span className="block truncate text-[11px] text-foreground/70">
+                      {shortSummaryOf(item)}
+                    </span>
                     <span className="block truncate font-mono text-[10px] text-muted-foreground">
                       {item.fileName} · {item.fileType} · edited {formatDateTime(item.updatedAt)} by{" "}
                       {item.lastEditedBy}
