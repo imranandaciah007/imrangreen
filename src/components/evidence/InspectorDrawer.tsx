@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   CheckSquare,
+  EyeOff,
   History,
   Languages,
   Link2,
@@ -8,6 +9,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
+
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -146,6 +148,47 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                   <CheckSquare className="size-3.5" /> Create task
                 </Button>
               </div>
+
+              {itemGaps.length > 0 && (
+                <div className="rounded-lg border border-destructive/60 bg-destructive/10 p-3">
+                  <p className="text-[10px] font-semibold tracking-wider text-destructive uppercase">
+                    Needs your attention ({itemGaps.length})
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {itemGaps.map((gap) => (
+                      <li
+                        key={gap.id}
+                        className="rounded-md border border-destructive/40 bg-card p-2.5"
+                      >
+                        <p className="text-xs font-semibold text-destructive">{gap.label}</p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">{gap.detail}</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <Button
+                            size="sm"
+                            className="h-9 text-[11px]"
+                            onClick={() => onEdit(item)}
+                          >
+                            <Pencil className="size-3.5" /> Fix now
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-9 text-[11px]"
+                            onClick={() => {
+                              ignoreGap(gap.id);
+                              toast.success("Ignored", { description: gap.label });
+                            }}
+                          >
+                            <EyeOff className="size-3.5" /> Ignore
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+
 
               <div className="rounded-lg border border-border bg-secondary/40 p-3">
                 <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
