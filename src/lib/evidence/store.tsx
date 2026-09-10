@@ -11,7 +11,12 @@ import {
 import { toast } from "sonner";
 
 import { extractDocument } from "@/lib/ai.functions";
-import { listDriveTree, type DriveFileNode, type DriveFolderNode } from "@/lib/drive-tree.functions";
+import {
+  generateCloneDocument,
+  listDriveTree,
+  type DriveFileNode,
+  type DriveFolderNode,
+} from "@/lib/drive-tree.functions";
 import type { DiaryPlan } from "./diary-merge";
 import { classifyDriveFile, fileTypeFor, titleFromName } from "./drive-classify";
 import { documentProvider, type ProviderConnection } from "./provider";
