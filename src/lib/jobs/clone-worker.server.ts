@@ -168,7 +168,16 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
 
       const knownRows = new Map((known ?? []).map((row) => [row.drive_file_id, row]));
 
-      const newRows: Record<string, unknown>[] = [];
+      const newRows: {
+        drive_file_id: string;
+        file_name: string;
+        folder_path: string;
+        mime_type: string;
+        exhibit_id: string;
+        content_key: string;
+        duplicate_of: string | null;
+        status: string;
+      }[] = [];
       for (const file of originals) {
         const key = contentKeyOf(file);
         const winner = canonical.get(key)!;
