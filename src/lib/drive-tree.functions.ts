@@ -481,6 +481,27 @@ export const generateCloneDocument = createServerFn({ method: "POST" })
       originalNote = `The original could not be embedded (${error instanceof Error ? error.message : "unknown error"}); it stays in Drive unchanged.`;
     }
 
+    // Page references so the cover sheet can be cited in the packet index.
+    const totalPages = originalPages + 1;
+    const pageReference = originalPages
+      ? `Cover sheet: page 1 of ${totalPages} · Original document: pages 2–${totalPages} (${originalPages} page${originalPages > 1 ? "s" : ""})`
+      : `Cover sheet: page 1 of ${totalPages} · Original document held separately in Drive`;
+
+    page.drawText("PAGE REFERENCES", {
+      x: left,
+      y: 76,
+      size: 7.5,
+      font: bold,
+      color: rgb(0.42, 0.45, 0.52),
+    });
+    page.drawText(pageReference, {
+      x: left,
+      y: 62,
+      size: 9,
+      font: body,
+      color: rgb(0.1, 0.1, 0.14),
+    });
+
     if (originalNote) {
       page.drawText(originalNote, {
         x: left,
@@ -490,6 +511,19 @@ export const generateCloneDocument = createServerFn({ method: "POST" })
         color: rgb(0.55, 0.15, 0.15),
       });
     }
+
+    // Footer stamp on every page: exhibit number and page x of y.
+    const all = doc.getPages();
+    all.forEach((p, index) => {
+      p.drawText(`${meta.exhibitId} · page ${index + 1} of ${all.length}`, {
+        x: 40,
+        y: 20,
+        size: 7.5,
+        font: body,
+        color: rgb(0.45, 0.47, 0.53),
+      });
+    });
+
 
     doc.setTitle(`${meta.exhibitId} — ${meta.title || data.fileName}`);
     doc.setSubject(meta.summary || meta.title);
