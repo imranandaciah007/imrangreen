@@ -1010,8 +1010,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
               }
               if (row.ai_page_count && row.ai_page_count > 0) patch.pageCount = row.ai_page_count;
               if (row.ai_summary && !item.notes) patch.notes = row.ai_summary;
-              if (row.ai_aciah_impact && !item.affectsAciahNote)
-                patch.affectsAciahNote = row.ai_aciah_impact;
+              if (row.ai_aciah_impact && !item.affectsAciah)
+                patch.affectsAciah = row.ai_aciah_impact;
               patch.aiExtraction = {
                 ranAt: row.ai_read_at,
                 contentRead: true,
