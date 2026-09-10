@@ -8,11 +8,14 @@
 
 import { classifyDriveFile } from "@/lib/evidence/drive-classify";
 
-const LEASE_MINUTES = 10;
+const LEASE_MINUTES = 3;
+const STALE_CLAIM_MINUTES = 10;
+const CONCURRENCY = 4;
 const TREE_REFRESH_MINUTES = 15;
-const DEFAULT_BATCH = 6;
+const DEFAULT_BATCH = 12;
 const MAX_ATTEMPTS = 3;
 const CLONE_ROOT = "I601 Evidence Clones";
+
 
 export interface TickResult {
   ok: boolean;
@@ -34,7 +37,9 @@ interface JobRow {
   mime_type: string;
   exhibit_id: string;
   attempts: number;
+  content_key?: string | null;
 }
+
 
 function exhibitIdFor(driveFileId: string): string {
   let hash = 0;
@@ -130,7 +135,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
     const { count: pendingBefore } = await supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
-      .eq("status", "pending");
+      .in("status", ["pending", "processing"]);
 
     const treeStale = now.getTime() - lastTree > TREE_REFRESH_MINUTES * 60_000;
     if (treeStale || !pendingBefore) {
@@ -250,17 +255,69 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         .eq("id", true);
     }
 
-    // 2. Build a bounded batch of clones.
-    const { data: pending } = await supabaseAdmin
+    // 2. Recover rows a crashed run left mid-flight.
+    await supabaseAdmin
       .from("gc_clone_jobs")
-      .select("drive_file_id,file_name,folder_path,mime_type,exhibit_id,attempts")
+      .update({ status: "pending", updated_at: now.toISOString() })
+      .eq("status", "processing")
+      .lt("updated_at", new Date(now.getTime() - STALE_CLAIM_MINUTES * 60_000).toISOString());
+
+    // 3. Claim a bounded batch so no other run can pick up the same documents.
+    const { data: candidates } = await supabaseAdmin
+      .from("gc_clone_jobs")
+      .select("drive_file_id")
       .eq("status", "pending")
       .order("created_at", { ascending: true })
       .limit(batch);
 
-    for (const job of (pending ?? []) as JobRow[]) {
-      if (Date.now() - startedAt > TIME_BUDGET_MS) break;
+    const candidateIds = (candidates ?? []).map((row) => row.drive_file_id);
+    let claimed: JobRow[] = [];
+    if (candidateIds.length) {
+      const { data: claimedRows } = await supabaseAdmin
+        .from("gc_clone_jobs")
+        .update({ status: "processing", updated_at: now.toISOString() })
+        .in("drive_file_id", candidateIds)
+        .eq("status", "pending")
+        .select("drive_file_id,file_name,folder_path,mime_type,exhibit_id,attempts,content_key");
+      claimed = (claimedRows ?? []) as JobRow[];
+    }
+
+    let stop = false;
+
+    const processJob = async (job: JobRow) => {
+      if (stop || Date.now() - startedAt > TIME_BUDGET_MS) {
+        await supabaseAdmin
+          .from("gc_clone_jobs")
+          .update({ status: "pending", updated_at: new Date().toISOString() })
+          .eq("drive_file_id", job.drive_file_id)
+          .eq("status", "processing");
+        return;
+      }
       try {
+        // Never build a second clone of a document already filed as an exhibit.
+        if (job.content_key) {
+          const { data: twin } = await supabaseAdmin
+            .from("gc_clone_jobs")
+            .select("drive_file_id")
+            .eq("content_key", job.content_key)
+            .eq("status", "done")
+            .is("duplicate_of", null)
+            .neq("drive_file_id", job.drive_file_id)
+            .limit(1)
+            .maybeSingle();
+          if (twin?.drive_file_id) {
+            await supabaseAdmin
+              .from("gc_clone_jobs")
+              .update({
+                status: "duplicate",
+                duplicate_of: twin.drive_file_id,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("drive_file_id", job.drive_file_id);
+            return;
+          }
+        }
+
         const classification = classifyDriveFile({
           id: job.drive_file_id,
           name: job.file_name,
@@ -349,15 +406,29 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         failed += 1;
         if (blocked) {
           pauseReason = blocked;
-          break;
+          stop = true;
         }
       }
-    }
+    };
+
+    // Several documents at a time: reading and building are network-bound.
+    const queue = [...claimed];
+    const lanes = Math.min(CONCURRENCY, queue.length);
+    await Promise.all(
+      Array.from({ length: lanes }, async () => {
+        for (;;) {
+          const job = queue.shift();
+          if (!job) return;
+          await processJob(job);
+        }
+      }),
+    );
+
 
     const { count: pendingAfter } = await supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
-      .eq("status", "pending");
+      .in("status", ["pending", "processing"]);
 
     await supabaseAdmin
       .from("gc_job_state")
@@ -418,7 +489,7 @@ export async function readJobStatus() {
     supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })
-      .eq("status", "pending"),
+      .in("status", ["pending", "processing"]),
     supabaseAdmin
       .from("gc_clone_jobs")
       .select("drive_file_id", { count: "exact", head: true })

@@ -200,8 +200,10 @@ export function CaseProgressPanel({
   const { data, isLoading } = useQuery({
     queryKey: ["gc-clone-folders"],
     queryFn: () => fetchFolders(),
-    refetchInterval: 60_000,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
+
   const [path, setPath] = useState<string[]>([]);
 
   const tree = useMemo(() => buildTree(data?.folders ?? []), [data]);
