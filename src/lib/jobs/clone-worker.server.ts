@@ -266,6 +266,20 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
           parentFolders: job.folder_path.split("/").filter(Boolean),
         });
 
+        // Gemini reads the original first, so the clone carries real case details.
+        const { readOriginal } = await import("./read-original.server");
+        const read = await readOriginal({
+          driveFileId: job.drive_file_id,
+          fileName: job.file_name,
+          mimeType: job.mime_type,
+          folderPath: job.folder_path,
+        });
+
+        const categories = read?.categories.length
+          ? read.categories
+          : (classification?.categories ?? ["Other"]);
+        const people = read?.people.length ? read.people : (classification?.people ?? []);
+
         const result = await drive.buildClone({
           driveFileId: job.drive_file_id,
           fileName: job.file_name,
@@ -273,16 +287,19 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
           mimeType: job.mime_type,
           meta: {
             exhibitId: job.exhibit_id,
-            title: titleFromName(job.file_name, job.folder_path),
-            documentDate: "",
-            person: classification?.people[0] ?? "",
-            categories: classification?.categories ?? ["Other"],
-            people: classification?.people ?? [],
-            sourceType: classification?.sourceType ?? "Other",
+            title: read?.title || titleFromName(job.file_name, job.folder_path),
+            documentDate: read?.documentDate ?? "",
+            person: people[0] ?? "",
+            categories,
+            people,
+            sourceType: read?.sourceType || classification?.sourceType || "Other",
             status: classification?.status ?? "New",
-            summary: `Prepared automatically from the Drive original in "${job.folder_path || "Drive root"}".`,
+            summary:
+              read?.summary ||
+              `Prepared automatically from the Drive original in "${job.folder_path || "Drive root"}".`,
             tags: classification?.tags ?? [],
-            addedBy: "GC background sync",
+            affectsAciah: read?.aciahImpact || undefined,
+            addedBy: read ? "GC background sync (AI read)" : "GC background sync",
           },
         });
 
@@ -297,6 +314,16 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
             total_pages: result.totalPages,
             error: result.note || null,
             attempts: job.attempts + 1,
+            ai_title: read?.title || null,
+            ai_date: read?.documentDate || null,
+            ai_people: read?.people ?? null,
+            ai_categories: read?.categories ?? null,
+            ai_source_type: read?.sourceType || null,
+            ai_summary: read?.summary || null,
+            ai_aciah_impact: read?.aciahImpact || null,
+            ai_page_count: read?.pageCount ?? null,
+            ai_model: read?.model || null,
+            ai_read_at: read ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),
           })
           .eq("drive_file_id", job.drive_file_id);
