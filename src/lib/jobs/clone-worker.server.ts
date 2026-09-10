@@ -57,13 +57,21 @@ function supportedFile(name: string, mimeType: string): boolean {
   );
 }
 
-function titleFromName(name: string) {
-  return name
+function titleFromName(name: string, folderPath = "") {
+  const base = name
     .replace(/\.[a-z0-9]+$/i, "")
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (c) => c.toUpperCase());
+  // Names like "2" or "IMG 4821" say nothing, so lead with the folder it sits in.
+  const weak = base.length < 4 || /^(img|image|photo|scan|doc|pdf)?\s*\d+$/i.test(base);
+  const folder = folderPath.split("/").filter(Boolean).pop();
+  if (weak && folder) {
+    const pretty = folder.replace(/\s+/g, " ").trim();
+    return `${pretty.charAt(0).toUpperCase()}${pretty.slice(1).toLowerCase()} — ${base || name}`;
+  }
+  return base || name;
 }
 
 /** A 402/403 from Drive or the AI gateway means: stop the whole job. */
