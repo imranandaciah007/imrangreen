@@ -258,6 +258,13 @@ interface PacketInput {
     housing: number;
     immigration: number;
   };
+  /** Filing-ready wording drafted from the exhibit details (optional). */
+  narrative?: {
+    coverLetter: string[];
+    exhibitNotes: { number: string; description: string }[];
+    model: string;
+    generatedAt: string;
+  } | undefined;
   income: {
     netMonthlyIncome: number;
     mortgage: number;
@@ -270,7 +277,8 @@ interface PacketInput {
 const stamps = (p: PacketInput) =>
   `Generated: ${formatDateTime(p.generatedAt)} by ${p.generatedBy} · Source data last edited: ${p.lastEditedAt ? formatDateTime(p.lastEditedAt) : "—"} · Case Packet v${p.version}`;
 
-function exhibitRows(exhibits: PacketExhibit[]) {
+function exhibitRows(exhibits: PacketExhibit[], notes?: PacketInput["narrative"]) {
+  const drafted = new Map((notes?.exhibitNotes ?? []).map((n) => [n.number, n.description]));
   return exhibits
     .map(
       (e) => `<tr><td>${esc(e.number)}</td><td>${esc(e.item.title || e.item.fileName)}</td>
@@ -278,7 +286,7 @@ function exhibitRows(exhibits: PacketExhibit[]) {
       <td>${esc((e.item.people ?? []).join(", "))}</td>
       <td>${esc((e.item.categories?.length ? e.item.categories : [e.item.category]).join("; "))}</td>
       <td>${e.firstPage}–${e.lastPage}</td>
-      <td>${esc(e.item.aiExtraction?.summary || e.item.notes || "")}</td></tr>`,
+      <td>${esc(drafted.get(e.number) || e.item.aiExtraction?.summary || e.item.notes || "")}</td></tr>`,
     )
     .join("");
 }
@@ -287,7 +295,8 @@ export function exhibitIndexHtml(p: PacketInput) {
   const body = `<h1>Exhibit Index — Case Packet v${p.version}</h1>
     <p class="muted">${esc(CASE_SETTINGS.caseName)}</p>
     <table><thead><tr><th>Exhibit</th><th>Title</th><th>Date</th><th>Source</th><th>People</th><th>Categories</th><th>Pages</th><th>Description</th></tr></thead>
-    <tbody>${exhibitRows(p.exhibits)}</tbody></table>`;
+    <tbody>${exhibitRows(p.exhibits, p.narrative)}</tbody></table>
+    ${p.narrative ? `<p class="muted">Descriptions drafted from each exhibit's own recorded details (${esc(p.narrative.model)}, ${esc(formatDateTime(p.narrative.generatedAt))}) and reviewed by the filer.</p>` : ""}`;
   return docShell(`I601 Exhibit Index v${p.version}`, body, stamps(p));
 }
 
@@ -426,6 +435,14 @@ export function packetHtml(p: PacketInput) {
       <p class="note">This packet organises collected evidence and states factual figures only. It makes no legal argument or prediction about the outcome of the application. Original files in Google Drive are never altered.</p>
     </div>
 
+    ${
+      p.narrative?.coverLetter.length
+        ? `<div class="sep"><h2 style="border:none">Cover Letter</h2>
+            ${p.narrative.coverLetter.map((para) => `<p>${esc(para)}</p>`).join("")}
+            <p class="muted">Drafted from the recorded exhibit details (${esc(p.narrative.model)}, ${esc(formatDateTime(p.narrative.generatedAt))}). Read and confirm before filing.</p></div>`
+        : ""
+    }
+
     <h2 class="sep">Table of Contents</h2>
     <table><thead><tr><th>#</th><th>Section</th><th>Contents</th></tr></thead><tbody>${toc}</tbody></table>
 
@@ -450,7 +467,7 @@ export function packetHtml(p: PacketInput) {
 
     <h2 class="sep">Exhibit Index</h2>
     <table><thead><tr><th>Exhibit</th><th>Title</th><th>Date</th><th>Source</th><th>People</th><th>Categories</th><th>Pages</th><th>Description</th></tr></thead>
-    <tbody>${exhibitRows(p.exhibits)}</tbody></table>
+    <tbody>${exhibitRows(p.exhibits, p.narrative)}</tbody></table>
 
     ${sectionBlocks}
 
