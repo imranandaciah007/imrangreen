@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { formatBytes, formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence, type SortKey } from "@/lib/evidence/store";
 import type { EvidenceItem } from "@/lib/evidence/types";
+import { shortSummaryOf } from "./DocumentPreview";
 import { StatusBadge, StatusSelect, TagChip } from "./status-ui";
 
 const PAGE_SIZE = 25;
