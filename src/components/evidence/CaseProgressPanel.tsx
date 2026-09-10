@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, FileText, Folder, FolderOpen, Loader2 } from "lucide-react";
+import { ChevronRight, ExternalLink, FileText, Folder, FolderOpen, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { listCloneFolders, type CloneFolderRow } from "@/lib/jobs/background.functions";
+import {
+  listCloneFiles,
+  listCloneFolders,
+  type CloneFolderRow,
+} from "@/lib/jobs/background.functions";
 import { useEvidence } from "@/lib/evidence/store";
 
 interface FolderNode {
@@ -107,6 +111,76 @@ function FolderRow({
       </div>
       <ChevronRight className="size-4 shrink-0 text-navy/40" />
     </button>
+  );
+}
+
+/** Every exhibit filed in one folder: the original PDF, plus its enriched clone. */
+function FolderFiles({ path }: { path: string }) {
+  const fetchFiles = useServerFn(listCloneFiles);
+  const { data, isLoading } = useQuery({
+    queryKey: ["gc-clone-files", path],
+    queryFn: () => fetchFiles({ data: { path } }),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="case-empty">
+        <Loader2 className="animate-spin" /> Reading this folder…
+      </div>
+    );
+  }
+  if (!data?.files.length) {
+    return (
+      <div className="case-empty">
+        <FileText /> No documents recorded in this folder yet.
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1.5">
+      {data.files.map((file) => (
+        <div key={file.driveFileId} className="rounded-lg border border-border bg-card p-2.5">
+          <div className="flex items-start gap-2">
+            <FileText className="mt-0.5 size-3.5 shrink-0 text-navy/50" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11px] font-bold text-navy">{file.exhibitTitle}</p>
+              <p className="truncate font-mono text-[10px] text-navy/50">
+                {file.fileName}
+                {file.documentDate ? ` · ${file.documentDate}` : ""}
+                {file.pageCount ? ` · ${file.pageCount} page(s)` : ""}
+              </p>
+              {file.summary ? (
+                <p className="mt-1 line-clamp-2 text-[10px] text-navy/60">{file.summary}</p>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <a
+              className="case-view-link inline-flex items-center gap-1 text-[10px]"
+              href={file.originalLink}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink className="size-3" /> Original PDF
+            </a>
+            {file.cloneLink ? (
+              <a
+                className="case-view-link inline-flex items-center gap-1 text-[10px]"
+                href={file.cloneLink}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink className="size-3" /> Exhibit clone
+              </a>
+            ) : (
+              <span className="text-[10px] font-semibold text-navy/45">
+                {file.status === "error" ? "Could not be read" : "Clone still to build"}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -254,24 +328,26 @@ export function CaseProgressPanel({
             <div className="case-empty">
               <Loader2 className="animate-spin" /> Reading the mirror…
             </div>
-          ) : current.list.length ? (
-            <div className="case-coverage-list">
-              {current.list.map((node, index) => (
-                <FolderRow
-                  key={node.path}
-                  node={node}
-                  index={index}
-                  onOpen={() => setPath([...path, node.name])}
-                />
-              ))}
-            </div>
           ) : (
-            <div className="case-empty">
-              <FolderOpen />
-              {current.node
-                ? `${current.node.own.built} of ${current.node.own.total} exhibit${current.node.own.total === 1 ? "" : "s"} prepared here · no subfolders`
-                : "Nothing mirrored yet."}
-            </div>
+            <>
+              {current.list.length ? (
+                <div className="case-coverage-list">
+                  {current.list.map((node, index) => (
+                    <FolderRow
+                      key={node.path}
+                      node={node}
+                      index={index}
+                      onOpen={() => setPath([...path, node.name])}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="case-empty">
+                  <FolderOpen /> No subfolders here.
+                </div>
+              )}
+              <FolderFiles path={path.join("/")} />
+            </>
           )}
 
           <Button variant="outline" className="w-full" onClick={onOpenBoard}>
