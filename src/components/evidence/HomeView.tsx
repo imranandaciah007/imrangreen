@@ -58,7 +58,7 @@ export function HomeView({
   onBuildPacket: () => void;
   onSyncDrive: () => Promise<void>;
 }) {
-  const { stats, caseSettings, tasks, events, items, gaps, connection, driveSyncing, driveTree } = useEvidence();
+  const { stats, caseSettings, tasks, events, items, gaps, connection, driveSyncing, driveTree, scanProgress } = useEvidence();
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const openTasks = tasks.filter(isOpenTask);
   const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
