@@ -166,18 +166,10 @@ function CaseApp() {
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Button variant="ghost" size="icon" className="size-10 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={() => setAskOpen(true)} aria-label="Open reminders" title="Open reminders"><Bell className="size-4" /></Button>
-              <Select value={profile} onValueChange={(v) => setProfile(v as Profile)}>
-                <SelectTrigger className="h-10 w-[108px] border-white/10 bg-white/5 text-xs font-bold text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROFILES.map((p) => (
-                    <SelectItem key={p} value={p} className="text-xs">
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="hidden rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-white sm:inline">
+                Imran &amp; Aciah
+              </span>
+
               <ChevronDown className="hidden size-3 text-white/50" />
             </div>
           </div>
