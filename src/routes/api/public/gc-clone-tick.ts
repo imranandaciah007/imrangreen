@@ -22,10 +22,11 @@ export const Route = createFileRoute("/api/public/gc-clone-tick")({
           if (unauthorized) return unauthorized;
         }
 
-        let batch = 6;
+        let batch = 12;
         try {
           const body = (await request.json()) as { batch?: number };
-          if (typeof body?.batch === "number") batch = Math.min(Math.max(body.batch, 1), 12);
+          if (typeof body?.batch === "number") batch = Math.min(Math.max(body.batch, 1), 24);
+
         } catch {
           // no body — use the default batch size
         }

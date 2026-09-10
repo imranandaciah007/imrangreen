@@ -9,8 +9,9 @@ export const getBackgroundStatus = createServerFn({ method: "GET" }).handler(asy
 /** Kick one background batch by hand, e.g. from the Synch now button. */
 export const runBackgroundBatch = createServerFn({ method: "POST" })
   .inputValidator((data: { batch?: number } | undefined) => ({
-    batch: Math.min(Math.max(data?.batch ?? 6, 1), 12),
+    batch: Math.min(Math.max(data?.batch ?? 12, 1), 24),
   }))
+
   .handler(async ({ data }) => {
     const { runCloneTick } = await import("@/lib/jobs/clone-worker.server");
     return runCloneTick(data.batch);

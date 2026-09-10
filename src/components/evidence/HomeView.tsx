@@ -57,8 +57,12 @@ function BackgroundBuildPanel() {
   const { data } = useQuery({
     queryKey: ["gc-background-status"],
     queryFn: () => fetchStatus(),
-    refetchInterval: 30_000,
+    // Refresh itself quickly while work is outstanding, calmly when it is done.
+    refetchInterval: (query) => (query.state.data?.waiting ? 6_000 : 20_000),
+    refetchOnWindowFocus: true,
+    refetchIntervalInBackground: true,
   });
+
 
   if (!data) return null;
   const total = data.totalDocuments;
