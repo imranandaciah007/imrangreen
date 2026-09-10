@@ -848,11 +848,15 @@ function FileCard({
   exhibit,
   busy,
   onClone,
+  onRename,
+  onMoveTo,
 }: {
   file: DriveFileNode;
   exhibit: string;
   busy: boolean;
   onClone: () => void;
+  onRename: () => void;
+  onMoveTo: () => void;
 }) {
   return (
     <div className="grid min-h-[72px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:border-ring hover:bg-accent/40">
