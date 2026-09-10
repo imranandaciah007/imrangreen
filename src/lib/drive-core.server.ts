@@ -588,8 +588,8 @@ export async function buildClone(data: {
     | {
         width: number;
         height: number;
-        page?: Awaited<ReturnType<PDFDocument["embedPdf"]>>[number];
-        image?: Awaited<ReturnType<PDFDocument["embedPng"]>>;
+        page?: Awaited<ReturnType<InstanceType<typeof PDFDocument>["embedPdf"]>>[number];
+        image?: Awaited<ReturnType<InstanceType<typeof PDFDocument>["embedPng"]>>;
       }
     | null = null;
   try {
