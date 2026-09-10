@@ -26,11 +26,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useEvidence } from "@/lib/evidence/store";
 import {
   createDriveFolder,
   generateCloneDocument,
+  moveDriveNode,
+  renameDriveNode,
   uploadEvidenceToFolder,
   type DriveFileNode,
   type DriveFolderNode,
