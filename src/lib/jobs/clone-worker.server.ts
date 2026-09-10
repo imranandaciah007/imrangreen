@@ -166,24 +166,48 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         }
       }
 
-      const rows = originals.map((file) => {
+      const knownRows = new Map((known ?? []).map((row) => [row.drive_file_id, row]));
+
+      const newRows: Record<string, unknown>[] = [];
+      for (const file of originals) {
         const key = contentKeyOf(file);
         const winner = canonical.get(key)!;
         const isCopy = winner.id !== file.id;
-        return {
-          drive_file_id: file.id,
-          file_name: file.name,
-          folder_path: file.path,
-          mime_type: file.mimeType,
-          exhibit_id: exhibitIdFor(winner.id),
-          content_key: key,
-          duplicate_of: isCopy ? winner.id : null,
-          ...(isCopy ? { status: "duplicate" as const } : {}),
-        };
-      });
+        const existing = knownRows.get(file.id);
 
-      for (let index = 0; index < rows.length; index += 200) {
-        const slice = rows.slice(index, index + 200);
+        if (!existing) {
+          newRows.push({
+            drive_file_id: file.id,
+            file_name: file.name,
+            folder_path: file.path,
+            mime_type: file.mimeType,
+            exhibit_id: exhibitIdFor(winner.id),
+            content_key: key,
+            duplicate_of: isCopy ? winner.id : null,
+            status: isCopy ? "duplicate" : "pending",
+          });
+          continue;
+        }
+
+        // Only correct what changed, so finished clones are never rebuilt.
+        const wasCopy = Boolean(existing.duplicate_of);
+        if (existing.content_key !== key || wasCopy !== isCopy) {
+          await supabaseAdmin
+            .from("gc_clone_jobs")
+            .update({
+              file_name: file.name,
+              folder_path: file.path,
+              content_key: key,
+              duplicate_of: isCopy ? winner.id : null,
+              status: isCopy ? "duplicate" : existing.status === "duplicate" ? "pending" : existing.status,
+              updated_at: now.toISOString(),
+            })
+            .eq("drive_file_id", file.id);
+        }
+      }
+
+      for (let index = 0; index < newRows.length; index += 200) {
+        const slice = newRows.slice(index, index + 200);
         await supabaseAdmin.from("gc_clone_jobs").upsert(slice, { onConflict: "drive_file_id" });
         queued += slice.length;
       }
