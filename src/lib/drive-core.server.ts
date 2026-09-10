@@ -537,6 +537,9 @@ export async function buildClone(data: {
   if (meta.summary) drawBlock("FACTUAL SUMMARY", meta.summary, red);
   if (meta.affectsAciah) drawBlock("EFFECT ON ACIAH", meta.affectsAciah, navy);
 
+  // Space kept for the visual preview of the original, drawn once it is loaded.
+  const previewTop = y;
+
   // ---- Routine reference details, kept small at the foot of the page.
   const detailTop = 196;
   page.drawLine({
