@@ -14,7 +14,99 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      gc_clone_jobs: {
+        Row: {
+          attempts: number
+          clone_file_id: string | null
+          clone_link: string | null
+          clone_name: string | null
+          created_at: string
+          drive_file_id: string
+          error: string | null
+          exhibit_id: string
+          file_name: string
+          folder_path: string
+          mime_type: string
+          original_pages: number | null
+          status: string
+          total_pages: number | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          clone_file_id?: string | null
+          clone_link?: string | null
+          clone_name?: string | null
+          created_at?: string
+          drive_file_id: string
+          error?: string | null
+          exhibit_id: string
+          file_name: string
+          folder_path?: string
+          mime_type?: string
+          original_pages?: number | null
+          status?: string
+          total_pages?: number | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          clone_file_id?: string | null
+          clone_link?: string | null
+          clone_name?: string | null
+          created_at?: string
+          drive_file_id?: string
+          error?: string | null
+          exhibit_id?: string
+          file_name?: string
+          folder_path?: string
+          mime_type?: string
+          original_pages?: number | null
+          status?: string
+          total_pages?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      gc_job_state: {
+        Row: {
+          files: number
+          folders: number
+          id: boolean
+          last_run_at: string | null
+          last_tree_sync_at: string | null
+          lease_until: string | null
+          note: string | null
+          paused_reason: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          files?: number
+          folders?: number
+          id?: boolean
+          last_run_at?: string | null
+          last_tree_sync_at?: string | null
+          lease_until?: string | null
+          note?: string | null
+          paused_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          files?: number
+          folders?: number
+          id?: boolean
+          last_run_at?: string | null
+          last_tree_sync_at?: string | null
+          lease_until?: string | null
+          note?: string | null
+          paused_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
