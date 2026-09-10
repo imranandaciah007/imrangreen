@@ -885,6 +885,21 @@ function FileCard({
               <ExternalLink className="size-3.5" />
             </Button>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8" aria-label="More actions">
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="text-xs" onSelect={() => onRename()}>
+                <Pencil className="size-3.5" /> Rename in Drive
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-xs" onSelect={() => onMoveTo()}>
+                <FolderInput className="size-3.5" /> Move to another folder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
       </div>
     </div>
   );
