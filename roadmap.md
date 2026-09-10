@@ -28,3 +28,7 @@
 ## External limitation
 - Original files are never altered; clones are always separate PDFs.
 
+
+## Background processing
+- [ ] Keep syncing and building exhibits/clones while the app is closed (needs server-side scheduled job + shared storage)
+- [ ] Run a real Drive sync and confirm every clone PDF has its own cover sheet with page numbers matching the Drive original
