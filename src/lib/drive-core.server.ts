@@ -707,6 +707,15 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
       page.drawText(line, { x: left + 14, y: ny, size: 9, font: body, color: slate });
       ny -= 13;
     }
+    if (originalNote) {
+      page.drawText(originalNote.slice(0, 110), {
+        x: left + 14,
+        y: ny - 2,
+        size: 7.5,
+        font: italic,
+        color: label,
+      });
+    }
   }
 
 
@@ -731,7 +740,9 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
   });
   page.drawText(pageReference, { x: left, y: 86, size: 9, font: body, color: slate });
   page.drawText(
-    "This cover sheet was prepared from the original record; the original pages that follow are reproduced without alteration.",
+    originalPages
+      ? "This cover sheet was prepared from the original record; the original pages that follow are reproduced without alteration."
+      : "This cover sheet was prepared from the original record, which is retained unchanged in the case file.",
     { x: left, y: 74, size: 8, font: body, color: slate },
   );
 
@@ -754,7 +765,7 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
       color: slate,
     });
   });
-  if (originalNote) {
+  if (originalNote && originalPages) {
     page.drawText(originalNote.slice(0, 116), {
       x: left,
       y: 27,
