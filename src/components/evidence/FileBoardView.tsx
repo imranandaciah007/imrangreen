@@ -139,6 +139,10 @@ export function FileBoardView() {
   const [newFolder, setNewFolder] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [renameFor, setRenameFor] = useState<{ id: string; name: string } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [moveFor, setMoveFor] = useState<{ id: string; name: string } | null>(null);
+  const [moveQuery, setMoveQuery] = useState("");
   const uploadRef = useRef<HTMLInputElement>(null);
   const sentinel = useRef<HTMLDivElement | null>(null);
 
