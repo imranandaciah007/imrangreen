@@ -71,6 +71,9 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
               <SheetDescription className="text-sm leading-snug font-semibold text-navy-foreground">
                 {item.title}
               </SheetDescription>
+              <p className="text-[11px] leading-snug text-navy-foreground/80">
+                {shortSummaryOf(item)}
+              </p>
             </SheetHeader>
 
             <div className="space-y-4 p-4">
