@@ -676,7 +676,7 @@ export async function buildClone(data: {
   }
 
   // ---- Page references so the cover sheet can be cited in the packet index.
-  const totalPages = originalPages + 1;
+  let totalPages = originalPages + 1;
   const pageReference = originalPages
     ? `Cover sheet: page 1 of ${totalPages} · Original document: pages 2–${totalPages} (${originalPages} page${originalPages > 1 ? "s" : ""})`
     : `Cover sheet: page 1 of ${totalPages} · Original document held separately in Drive`;
