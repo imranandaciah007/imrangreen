@@ -80,9 +80,18 @@ export function HomeView({
           </p>
         </div>
         <div className="case-hero-actions">
-          <Button onClick={() => void onSyncDrive()} variant="outline" className="case-secondary-action" disabled={driveSyncing}>
-             {driveSyncing ? <Loader2 className="animate-spin" /> : <RefreshCw />} {driveSyncing ? "Synching…" : "Synch now"}
-          </Button>
+          <div className="flex flex-col items-start gap-1">
+            <Button onClick={() => void onSyncDrive()} variant="outline" className="case-secondary-action" disabled={driveSyncing}>
+               {driveSyncing ? <Loader2 className="animate-spin" /> : <RefreshCw />} {driveSyncing ? "Synching…" : "Synch now"}
+            </Button>
+            <span className="pl-1 text-[11px] font-semibold text-navy/60" aria-live="polite">
+              {driveSyncing
+                ? "Synching with Drive…"
+                : connection?.lastSyncedAt
+                  ? `Last updated ${new Date(connection.lastSyncedAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                  : "Not synched yet"}
+            </span>
+          </div>
           <Button onClick={onUpload} className="case-primary-action">
              <Upload /> Add evidence
           </Button>
