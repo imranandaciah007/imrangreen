@@ -285,6 +285,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     syncedAt: string;
   } | null>(null);
   const [driveSyncing, setDriveSyncing] = useState(false);
+  const [ignoredGaps, setIgnoredGaps] = useState<string[]>([]);
+
   const [autoSyncNonce, setAutoSyncNonce] = useState(0);
   const hydrated = useRef(false);
   const driveSyncInFlight = useRef(false);
@@ -318,6 +320,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         try {
           const cachedTree = localStorage.getItem(DRIVE_TREE_KEY);
           if (cachedTree) setDriveTree(JSON.parse(cachedTree));
+          const savedIgnored = localStorage.getItem(IGNORED_GAPS_KEY);
+          if (savedIgnored) setIgnoredGaps(JSON.parse(savedIgnored));
+
         } catch {
           localStorage.removeItem(DRIVE_TREE_KEY);
         }
