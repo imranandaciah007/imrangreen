@@ -402,14 +402,28 @@ export function wrap(text: string, perLine: number): string[] {
  * information and page references, followed by the original pages, with an
  * exhibit + page stamp on every page.
  */
-export async function buildClone(data: {
+type CloneInput = {
   driveFileId?: string | undefined;
   fileName: string;
   folderPath: string;
   mimeType?: string | undefined;
   base64?: string | undefined;
   meta: CloneMeta;
-}): Promise<CloneResult> {
+};
+
+/**
+ * A handful of originals use compression pdf-lib only rejects while writing the
+ * finished file. Retry once as a cover sheet only, so the exhibit still exists.
+ */
+export async function buildClone(data: CloneInput): Promise<CloneResult> {
+  try {
+    return await buildCloneOnce(data, true);
+  } catch {
+    return await buildCloneOnce(data, false);
+  }
+}
+
+async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise<CloneResult> {
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   const meta = data.meta;
 
