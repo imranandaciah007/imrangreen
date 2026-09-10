@@ -89,9 +89,9 @@ function CaseApp() {
   async function handleDriveSync() {
     try {
       const result = await syncDrive();
-      const changed = result.added + result.updated + result.removed;
+      const changed = result.added + result.updated + result.removed + result.duplicates;
       const description = changed
-        ? `${result.added} added · ${result.updated} renamed or moved · ${result.removed} removed`
+        ? `${result.added} added · ${result.updated} renamed or moved · ${result.removed} removed · ${result.duplicates} duplicate(s) merged`
         : `${result.folders} folders and ${result.files} original files already match`;
       const { toast } = await import("sonner");
       toast.success("Drive synched successfully", { description });
