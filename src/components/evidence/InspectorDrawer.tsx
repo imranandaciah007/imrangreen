@@ -208,23 +208,7 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                 )}
               </div>
 
-              <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-secondary/60 text-muted-foreground">
-                <FileText className="size-8 opacity-50" />
-                <p className="text-xs font-medium">Document preview</p>
-                <p className="max-w-[80%] text-center text-[10px]">
-                  A PDF viewer mounts here once Google Drive is connected.
-                </p>
-                {item.cloudDriveUrl && (
-                  <a
-                    href={item.cloudDriveUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 font-mono text-[10px] text-info underline"
-                  >
-                    Open original <ExternalLink className="size-3" />
-                  </a>
-                )}
-              </div>
+              <DocumentPreview item={item} />
 
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <Field
