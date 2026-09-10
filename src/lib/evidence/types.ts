@@ -132,6 +132,11 @@ export interface EvidenceItem {
   duplicateSuspected?: boolean | undefined;
   aiConfidence?: number | undefined;
   aiExtraction?: AiExtraction | undefined;
+  /** Enriched clone PDF generated from this original. */
+  cloneFileId?: string | undefined;
+  cloneUrl?: string | undefined;
+  cloneFileName?: string | undefined;
+  cloneGeneratedAt?: string | undefined;
   /** Fields a human has confirmed — AI must never silently overwrite these. */
   confirmedFields?: string[] | undefined;
   /** Later AI runs that disagree with a human-confirmed field, awaiting a decision. */

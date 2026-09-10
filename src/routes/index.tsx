@@ -60,7 +60,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CaseApp() {
-  const { loading, profile, setProfile, caseSettings, stats, syncDrive } = useEvidence();
+  const { loading, profile, setProfile, caseSettings, stats, syncDrive, scanAllDocuments } = useEvidence();
   const [tab, setTab] = useState<MainTab>("home");
   const [connectOpen, setConnectOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -95,6 +95,12 @@ function CaseApp() {
         : `${result.folders} folders and ${result.files} original files already match`;
       const { toast } = await import("sonner");
       toast.success("Drive synched successfully", { description });
+      const scan = await scanAllDocuments();
+      if (scan.total) {
+        toast.success(`Scanned ${scan.scanned} document(s)`, {
+          description: `${scan.cloned} detailed clone(s) built${scan.failed ? ` · ${scan.failed} could not be read` : ""}`,
+        });
+      }
     } catch (error) {
       const { toast } = await import("sonner");
       toast.error("Drive sync failed", { description: error instanceof Error ? error.message : "Please try again." });
