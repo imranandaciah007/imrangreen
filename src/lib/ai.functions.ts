@@ -253,33 +253,7 @@ async function twoPass(data: {
  * ------------------------------------------------------------------ */
 
 async function runJson(prompt: string, schema: unknown, name: string) {
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  if (!lovableKey) throw new Error("AI is not configured for this project.");
-  const res = await fetch(GATEWAY, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
-    body: JSON.stringify({
-      model: MODEL,
-      reasoning: { effort: "low" },
-      input: [{ role: "user", content: [{ type: "input_text", text: prompt }] }],
-      text: { format: { type: "json_schema", name, strict: true, schema } },
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`AI request failed [${res.status}]: ${body.slice(0, 400)}`);
-  }
-  const json = (await res.json()) as {
-    output?: { content?: { type?: string; text?: string }[] }[];
-    output_text?: string;
-  };
-  let text = json.output_text ?? "";
-  if (!text) {
-    for (const part of json.output ?? []) {
-      for (const c of part.content ?? []) if (c.type === "output_text" && c.text) text += c.text;
-    }
-  }
-  return JSON.parse(text) as Record<string, unknown>;
+  return runJsonModel({ prompt, schema, name });
 }
 
 const EVENT_SCHEMA = {
