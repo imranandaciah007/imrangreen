@@ -39,12 +39,12 @@ function Metric({
     <Button
       variant="ghost"
       onClick={onClick}
-      className={`case-metric case-metric-${tone}`}
+      className={`case-metric case-metric-${tone} min-w-0 whitespace-normal`}
     >
       <span className="case-metric-icon">{icon}</span>
       <span className="min-w-0 text-left">
         <span className="block font-display text-[2rem] font-black leading-none text-navy">{value}</span>
-        <span className="mt-1.5 block text-[11px] font-extrabold uppercase tracking-[.08em] text-navy/65">{label}</span>
+        <span className="mt-1.5 block break-words text-[10px] font-extrabold uppercase leading-tight tracking-[.06em] text-navy/65 sm:text-[11px]">{label}</span>
       </span>
     </Button>
   );
@@ -139,7 +139,7 @@ export function HomeView({
       <section className="case-hero">
         <div className="case-hero-copy">
           <span className="case-kicker">CASE OVERVIEW</span>
-          <h2>Good morning, Imran</h2>
+          <h2>Good morning, Imran &amp; Aciah</h2>
           <p>
              {attentionRecords} record{attentionRecords === 1 ? "" : "s"} need supporting evidence or important details.
           </p>

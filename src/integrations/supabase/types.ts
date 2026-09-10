@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      gc_ai_usage: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          model: string
+          ok: boolean
+          provider: string
+          purpose: string | null
+          status_code: number | null
+          tokens: number | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          model: string
+          ok?: boolean
+          provider: string
+          purpose?: string | null
+          status_code?: number | null
+          tokens?: number | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          model?: string
+          ok?: boolean
+          provider?: string
+          purpose?: string | null
+          status_code?: number | null
+          tokens?: number | null
+        }
+        Relationships: []
+      }
       gc_clone_jobs: {
         Row: {
           ai_aciah_impact: string | null
