@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiDiaryExtractRouteImport } from './routes/api/diary-extract'
+import { Route as ApiPublicGcCloneTickRouteImport } from './routes/api/public/gc-clone-tick'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const ApiDiaryExtractRoute = ApiDiaryExtractRouteImport.update({
   path: '/api/diary-extract',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicGcCloneTickRoute = ApiPublicGcCloneTickRouteImport.update({
+  id: '/api/public/gc-clone-tick',
+  path: '/api/public/gc-clone-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/diary-extract': typeof ApiDiaryExtractRoute
+  '/api/public/gc-clone-tick': typeof ApiPublicGcCloneTickRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/diary-extract': typeof ApiDiaryExtractRoute
+  '/api/public/gc-clone-tick': typeof ApiPublicGcCloneTickRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/diary-extract': typeof ApiDiaryExtractRoute
+  '/api/public/gc-clone-tick': typeof ApiPublicGcCloneTickRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/diary-extract'
+  fullPaths: '/' | '/api/diary-extract' | '/api/public/gc-clone-tick'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/diary-extract'
-  id: '__root__' | '/' | '/api/diary-extract'
+  to: '/' | '/api/diary-extract' | '/api/public/gc-clone-tick'
+  id: '__root__' | '/' | '/api/diary-extract' | '/api/public/gc-clone-tick'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiDiaryExtractRoute: typeof ApiDiaryExtractRoute
+  ApiPublicGcCloneTickRoute: typeof ApiPublicGcCloneTickRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDiaryExtractRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/gc-clone-tick': {
+      id: '/api/public/gc-clone-tick'
+      path: '/api/public/gc-clone-tick'
+      fullPath: '/api/public/gc-clone-tick'
+      preLoaderRoute: typeof ApiPublicGcCloneTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiDiaryExtractRoute: ApiDiaryExtractRoute,
+  ApiPublicGcCloneTickRoute: ApiPublicGcCloneTickRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
