@@ -363,6 +363,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         file,
       );
       setItems((prev) => [...prev, created]);
+      setAutoSyncNonce((n) => n + 1);
       toast.success(`${created.exhibitId} added`, { description: created.title });
       return created;
     },
