@@ -430,170 +430,157 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
   const doc = await PDFDocument.create();
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const body = await doc.embedFont(StandardFonts.Helvetica);
+  const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
 
   const page = doc.addPage([595.28, 841.89]);
   const { width, height } = page.getSize();
-  const left = 50;
-  const right = width - 50;
+  const left = 52;
+  const right = width - 52;
   const contentW = right - left;
 
-  const navy = rgb(0.06, 0.11, 0.25);
-  const red = rgb(0.72, 0.1, 0.13);
-  const ink = rgb(0.1, 0.11, 0.15);
-  const muted = rgb(0.42, 0.45, 0.52);
-  const ruleColor = rgb(0.86, 0.87, 0.9);
-  const soft = rgb(0.965, 0.972, 0.985);
-  const pale = rgb(0.72, 0.78, 0.88);
+  // Restrained federal palette: deep navy, muted crimson, slate.
+  const navy = rgb(0.043, 0.137, 0.255);
+  const crimson = rgb(0.545, 0, 0);
+  const slate = rgb(0.176, 0.216, 0.278);
+  const rule = rgb(0.78, 0.8, 0.84);
+  const label = rgb(0.36, 0.39, 0.45);
+  const paper = rgb(1, 1, 1);
+  const pale = rgb(0.78, 0.82, 0.88);
 
-  // ---- Header band: the exhibit number and date read at a glance.
-  page.drawRectangle({ x: 0, y: height - 124, width, height: 124, color: navy });
-  page.drawRectangle({ x: 0, y: height - 130, width, height: 6, color: red });
-  page.drawText("I-601 HARDSHIP EVIDENCE", {
-    x: left,
-    y: height - 40,
-    size: 10,
-    font: bold,
-    color: rgb(0.82, 0.86, 0.94),
+  const rightText = (text: string, y: number, size: number, font: typeof bold, color = paper) =>
+    page.drawText(text, { x: right - font.widthOfTextAtSize(text, size), y, size, font, color });
+
+  // ---- Top band: navy bar over a thin crimson stripe. No seals or emblems.
+  page.drawRectangle({ x: 0, y: height - 96, width, height: 96, color: navy });
+  page.drawRectangle({ x: 0, y: height - 99.5, width, height: 3.5, color: crimson });
+  // Hairline frame, inset, keeps the sheet looking like a filed document.
+  page.drawRectangle({
+    x: 30,
+    y: 30,
+    width: width - 60,
+    height: height - 130,
+    borderColor: rule,
+    borderWidth: 0.5,
   });
-  page.drawText("Annotated exhibit clone — original document unchanged", {
+
+  page.drawText("FORM I-601 — SUPPORTING EVIDENCE", {
     x: left,
-    y: height - 55,
-    size: 9,
+    y: height - 38,
+    size: 11,
+    font: bold,
+    color: paper,
+  });
+  page.drawText("Annotated exhibit cover sheet — the original document is unchanged", {
+    x: left,
+    y: height - 54,
+    size: 8.5,
     font: body,
     color: pale,
   });
-  page.drawText(meta.exhibitId, {
+  page.drawText("Filed in support of a waiver of inadmissibility (extreme hardship)", {
     x: left,
-    y: height - 104,
-    size: 34,
-    font: bold,
-    color: rgb(1, 1, 1),
+    y: height - 68,
+    size: 8.5,
+    font: body,
+    color: pale,
   });
+  rightText("APPLICANT", height - 38, 7.5, bold, pale);
+  rightText("Imran", height - 51, 10.5, bold);
+  rightText("U.S. CITIZEN SPOUSE (QUALIFYING RELATIVE)", height - 66, 7.5, bold, pale);
+  rightText("Aciah", height - 79, 10.5, bold);
+
+  // ---- Exhibit anchor: the first thing an officer cross-checks.
+  let y = height - 148;
+  page.drawText(meta.exhibitId.toUpperCase(), { x: left, y, size: 32, font: bold, color: navy });
   const dateValue = meta.documentDate || "Undated";
   page.drawText("DOCUMENT DATE", {
-    x: right - body.widthOfTextAtSize("DOCUMENT DATE", 8),
-    y: height - 78,
-    size: 8,
-    font: body,
-    color: pale,
+    x: right - bold.widthOfTextAtSize("DOCUMENT DATE", 7.5),
+    y: y + 20,
+    size: 7.5,
+    font: bold,
+    color: label,
   });
   page.drawText(dateValue, {
-    x: right - bold.widthOfTextAtSize(dateValue, 17),
-    y: height - 100,
-    size: 17,
+    x: right - bold.widthOfTextAtSize(dateValue, 15),
+    y: y + 2,
+    size: 15,
     font: bold,
-    color: rgb(1, 1, 1),
+    color: slate,
   });
+  y -= 16;
+  page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1.2, color: navy });
+  page.drawLine({
+    start: { x: left, y: y - 3 },
+    end: { x: left + 96, y: y - 3 },
+    thickness: 1.2,
+    color: crimson,
+  });
+  y -= 30;
 
-  let y = height - 168;
-
-  // ---- Title, large and clear.
-  for (const line of wrap(meta.title || data.fileName, 44)) {
-    if (y < 430) break;
-    page.drawText(line, { x: left, y, size: 20, font: bold, color: navy });
-    y -= 25;
+  // ---- Specific document title, left aligned.
+  for (const line of wrap(meta.title || data.fileName, 52).slice(0, 3)) {
+    page.drawText(line, { x: left, y, size: 18, font: bold, color: slate });
+    y -= 23;
   }
-  y -= 12;
+  y -= 8;
 
-  // ---- Three key-fact panels.
-  const panels: [string, string][] = [
-    ["HARDSHIP CATEGORIES", meta.categories.join(", ") || "Uncategorised"],
-    ["PEOPLE", meta.people.join(", ") || "Not stated"],
-    ["SOURCE", meta.sourceType || "Not stated"],
+  // ---- Evidentiary purpose.
+  page.drawText("PERTAINS TO", { x: left, y, size: 8.5, font: bold, color: navy });
+  y -= 14;
+  for (const line of wrap(meta.categories.join(" · ") || "Not yet categorised", 84).slice(0, 2)) {
+    page.drawText(line, { x: left, y, size: 10.5, font: body, color: slate });
+    y -= 14;
+  }
+  y -= 8;
+
+  // ---- Left-aligned metadata grid: faster to read than centred blocks.
+  const grid: [string, string][] = [
+    ["People named", meta.people.join(", ") || "Not stated"],
+    ["Source / issuing party", meta.sourceType || "Not stated"],
+    ["Original file", data.fileName],
+    ["Drive folder", data.folderPath || "Drive root"],
   ];
-  const panelW = (contentW - 20) / 3;
-  const panelH = 68;
-  panels.forEach(([label, value], index) => {
-    const x = left + index * (panelW + 10);
-    page.drawRectangle({
-      x,
-      y: y - panelH,
-      width: panelW,
-      height: panelH,
-      color: soft,
-      borderColor: ruleColor,
-      borderWidth: 0.7,
-    });
-    page.drawRectangle({ x, y: y - panelH, width: 3, height: panelH, color: red });
-    page.drawText(label, { x: x + 11, y: y - 17, size: 7, font: bold, color: muted });
-    let vy = y - 32;
-    for (const line of wrap(value, 24).slice(0, 3)) {
-      page.drawText(line, { x: x + 11, y: vy, size: 10, font: bold, color: ink });
-      vy -= 13;
+  const colW = contentW / 2 - 10;
+  grid.forEach(([key, value], index) => {
+    const col = index % 2;
+    const row = Math.floor(index / 2);
+    const x = left + col * (colW + 20);
+    const ry = y - row * 30;
+    page.drawText(key.toUpperCase(), { x, y: ry, size: 7, font: bold, color: label });
+    let vy = ry - 11;
+    for (const line of wrap(value, 46).slice(0, 2)) {
+      page.drawText(line, { x, y: vy, size: 9.5, font: body, color: slate });
+      vy -= 10.5;
     }
   });
-  y -= panelH + 22;
+  y -= 30 * Math.ceil(grid.length / 2) + 10;
 
-  // ---- Prominent factual summary.
-  function drawBlock(label: string, text: string, accent: ReturnType<typeof rgb>) {
-    const lines = wrap(text, 88).slice(0, 9);
-    const boxH = 30 + lines.length * 14;
-    if (y - boxH < 250) return;
-    page.drawRectangle({
-      x: left,
-      y: y - boxH,
-      width: contentW,
-      height: boxH,
-      color: soft,
-      borderColor: ruleColor,
-      borderWidth: 0.7,
+  // ---- Narrative blocks, hairline ruled rather than filled.
+  function drawBlock(heading: string, text: string) {
+    const lines = wrap(text, 92).slice(0, 9);
+    const boxH = 26 + lines.length * 13;
+    if (y - boxH < 300) return;
+    page.drawLine({
+      start: { x: left, y },
+      end: { x: right, y },
+      thickness: 0.5,
+      color: rule,
     });
-    page.drawRectangle({ x: left, y: y - boxH, width: 3.5, height: boxH, color: accent });
-    page.drawText(label, { x: left + 13, y: y - 18, size: 7.5, font: bold, color: muted });
-    let ly = y - 34;
+    page.drawRectangle({ x: left, y: y - boxH, width: 2, height: boxH, color: crimson });
+    page.drawText(heading, { x: left + 10, y: y - 14, size: 8.5, font: bold, color: navy });
+    let ly = y - 30;
     for (const line of lines) {
-      page.drawText(line, { x: left + 13, y: ly, size: 10.5, font: body, color: ink });
-      ly -= 14;
+      page.drawText(line, { x: left + 10, y: ly, size: 10, font: body, color: slate });
+      ly -= 13;
     }
-    y -= boxH + 16;
+    y -= boxH + 14;
   }
 
-  if (meta.summary) drawBlock("FACTUAL SUMMARY", meta.summary, red);
-  if (meta.affectsAciah) drawBlock("EFFECT ON ACIAH", meta.affectsAciah, navy);
+  if (meta.summary) drawBlock("FACTUAL SUMMARY OF THIS DOCUMENT", meta.summary);
+  if (meta.affectsAciah) drawBlock("BEARING ON HARDSHIP TO THE U.S. CITIZEN SPOUSE", meta.affectsAciah);
 
   // Space kept for the visual preview of the original, drawn once it is loaded.
   const previewTop = y;
-
-  // ---- Routine reference details, kept small at the foot of the page.
-  const detailTop = 196;
-  page.drawLine({
-    start: { x: left, y: detailTop + 16 },
-    end: { x: right, y: detailTop + 16 },
-    thickness: 0.7,
-    color: ruleColor,
-  });
-  page.drawText("RECORD DETAILS", {
-    x: left,
-    y: detailTop + 2,
-    size: 7,
-    font: bold,
-    color: muted,
-  });
-
-  const details: [string, string][] = [
-    ["Original file", data.fileName],
-    ["Drive folder", data.folderPath || "Drive root"],
-    ["Review status", meta.status || "Not stated"],
-    ["Tags", meta.tags.join(", ") || "None"],
-    ["Added by", meta.addedBy],
-    ["Clone generated", new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC"],
-  ];
-  if (data.driveFileId) details.push(["Drive file id", data.driveFileId]);
-
-  const colW = contentW / 2 - 8;
-  details.forEach(([label, value], index) => {
-    const col = index % 2;
-    const row = Math.floor(index / 2);
-    const x = left + col * (colW + 16);
-    const ry = detailTop - 14 - row * 32;
-    if (ry < 66) return;
-    page.drawText(label.toUpperCase(), { x, y: ry, size: 6.5, font: bold, color: muted });
-    let vy = ry - 10;
-    for (const line of wrap(value, 44).slice(0, 2)) {
-      page.drawText(line, { x, y: vy, size: 8.5, font: body, color: ink });
-      vy -= 10;
-    }
-  });
 
   // ---- Append the original, untouched.
   let originalPages = 0;
@@ -663,8 +650,8 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
   }
 
   // ---- Visual preview of the original's first page, filling the cover sheet.
-  const previewBottom = 224;
-  const availableH = previewTop - previewBottom - 26;
+  const previewBottom = 132;
+  const availableH = previewTop - previewBottom - 24;
   if (preview && availableH > 90) {
     const availableW = contentW;
     const scale = Math.min(availableW / preview.width, availableH / preview.height);
@@ -672,56 +659,149 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
     const drawH = preview.height * scale;
     const frameX = left + (availableW - drawW) / 2;
     const frameY = previewBottom + (availableH - drawH) / 2;
-    page.drawText("FIRST PAGE OF THE ORIGINAL", {
+    page.drawText("FIRST PAGE OF THE ORIGINAL, REPRODUCED FOR REFERENCE", {
       x: left,
-      y: previewTop - 8,
+      y: previewTop - 10,
       size: 7,
       font: bold,
-      color: muted,
+      color: label,
     });
     page.drawRectangle({
-      x: frameX - 5,
-      y: frameY - 5,
-      width: drawW + 10,
-      height: drawH + 10,
-      color: rgb(1, 1, 1),
-      borderColor: ruleColor,
-      borderWidth: 0.8,
+      x: frameX - 4,
+      y: frameY - 4,
+      width: drawW + 8,
+      height: drawH + 8,
+      color: paper,
+      borderColor: rule,
+      borderWidth: 0.6,
     });
     if (preview.page) {
       page.drawPage(preview.page, { x: frameX, y: frameY, width: drawW, height: drawH });
     } else if (preview.image) {
       page.drawImage(preview.image, { x: frameX, y: frameY, width: drawW, height: drawH });
     }
+  } else if (availableH > 60) {
+    // Nothing to reproduce: state it plainly rather than leaving a blank void.
+    const noticeH = Math.min(availableH, 96);
+    const noticeY = previewBottom + (availableH - noticeH) / 2;
+    page.drawRectangle({
+      x: left,
+      y: noticeY,
+      width: contentW,
+      height: noticeH,
+      borderColor: rule,
+      borderWidth: 0.6,
+    });
+    page.drawText("ORIGINAL PAGES NOT REPRODUCED IN THIS CLONE", {
+      x: left + 14,
+      y: noticeY + noticeH - 22,
+      size: 8.5,
+      font: bold,
+      color: navy,
+    });
+    let ny = noticeY + noticeH - 40;
+    for (const line of wrap(
+      `The original file "${data.fileName}" is retained unchanged in the case record and is available on request. This cover sheet indexes that original.`,
+      90,
+    ).slice(0, 3)) {
+      page.drawText(line, { x: left + 14, y: ny, size: 9, font: body, color: slate });
+      ny -= 13;
+    }
+    if (originalNote) {
+      page.drawText(originalNote.slice(0, 110), {
+        x: left + 14,
+        y: ny - 2,
+        size: 7.5,
+        font: italic,
+        color: label,
+      });
+    }
   }
 
-  // ---- Page references so the cover sheet can be cited in the packet index.
+
+  // ---- Verification zone: page references and the routine trail, kept last.
   let totalPages = originalPages + 1;
   const pageReference = originalPages
     ? `Cover sheet: page 1 of ${totalPages} · Original document: pages 2–${totalPages} (${originalPages} page${originalPages > 1 ? "s" : ""})`
     : `Cover sheet: page 1 of ${totalPages} · Original document held separately in Drive`;
 
-  page.drawText("PAGE REFERENCES", { x: left, y: 60, size: 6.5, font: bold, color: muted });
-  page.drawText(pageReference, { x: left, y: 48, size: 8.5, font: body, color: ink });
-  if (originalNote) {
-    page.drawText(originalNote.slice(0, 110), {
-      x: left,
-      y: 36,
-      size: 7.5,
+  page.drawLine({
+    start: { x: left, y: 112 },
+    end: { x: right, y: 112 },
+    thickness: 0.5,
+    color: rule,
+  });
+  page.drawText("VERIFICATION AND PAGE REFERENCES", {
+    x: left,
+    y: 100,
+    size: 7.5,
+    font: bold,
+    color: navy,
+  });
+  page.drawText(pageReference, { x: left, y: 86, size: 9, font: body, color: slate });
+  page.drawText(
+    originalPages
+      ? "This cover sheet was prepared from the original record; the original pages that follow are reproduced without alteration."
+      : "This cover sheet was prepared from the original record, which is retained unchanged in the case file.",
+    { x: left, y: 74, size: 8, font: body, color: slate },
+  );
+
+  const trail: [string, string][] = [
+    ["Review status", meta.status || "Not stated"],
+    ["Prepared by", meta.addedBy],
+    ["Prepared on", new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC"],
+    ["Drive file id", data.driveFileId ?? "Not recorded"],
+  ];
+  trail.forEach(([key, value], index) => {
+    const x = left + (index % 2) * (colW + 20);
+    const ry = 58 - Math.floor(index / 2) * 20;
+    const keyText = `${key.toUpperCase()}:`;
+    page.drawText(keyText, { x, y: ry, size: 6.5, font: bold, color: label });
+    page.drawText(wrap(value, 40)[0] ?? "", {
+      x: x + bold.widthOfTextAtSize(keyText, 6.5) + 4,
+      y: ry,
+      size: 6.5,
       font: body,
-      color: rgb(0.55, 0.15, 0.15),
+      color: slate,
+    });
+  });
+  if (originalNote && originalPages) {
+    page.drawText(originalNote.slice(0, 116), {
+      x: left,
+      y: 27,
+      size: 7,
+      font: italic,
+      color: crimson,
     });
   }
 
-  // Footer stamp on every page: exhibit number and page x of y.
+
+  // Footer stamp on every page, so any loose page can be traced back.
   const all = doc.getPages();
+  const stampRight = `I-601 · Imran & Aciah · ${data.folderPath || "Drive root"}`.slice(0, 78);
   all.forEach((p, index) => {
+    const size = p.getSize();
+    if (index > 0) {
+      p.drawLine({
+        start: { x: 40, y: 30 },
+        end: { x: size.width - 40, y: 30 },
+        thickness: 0.4,
+        color: rule,
+      });
+    }
     p.drawText(`${meta.exhibitId} · page ${index + 1} of ${all.length}`, {
       x: 40,
-      y: 20,
+      y: 19,
       size: 7.5,
-      font: body,
-      color: rgb(0.45, 0.47, 0.53),
+      font: italic,
+      color: label,
+    });
+    p.drawText(stampRight, {
+      x: size.width - 40 - italic.widthOfTextAtSize(stampRight, 7),
+      y: 19,
+      size: 7,
+      font: italic,
+      color: label,
     });
   });
 

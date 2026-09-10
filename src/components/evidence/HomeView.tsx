@@ -19,6 +19,7 @@ import { Progress } from "@/components/ui/progress";
 import { getBackgroundStatus } from "@/lib/jobs/background.functions";
 import { formatDate } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
+import { CaseProgressPanel } from "@/components/evidence/CaseProgressPanel";
 import { isOpenTask } from "@/lib/task-reminders";
 
 function Metric({
@@ -114,7 +115,7 @@ export function HomeView({
   onSyncDrive,
   onOpenCategory,
 }: {
-  onNavigate: (tab: "timeline" | "finances" | "vault" | "review") => void;
+  onNavigate: (tab: "timeline" | "finances" | "vault" | "review" | "board") => void;
   onUpload: () => void;
   onAddTask: () => void;
   onBuildPacket: () => void;
@@ -185,39 +186,11 @@ export function HomeView({
       </section>
 
       <div className="case-dashboard-grid">
-        <section className="case-panel">
-          <div className="case-panel-heading">
-            <div>
-              <span className="case-kicker">CASE PROGRESS</span>
-              <h3>Hardship Evidence Coverage</h3>
-            </div>
-            <Button variant="ghost" onClick={() => onNavigate("review")}>View details <ChevronRight /></Button>
-          </div>
-          <div className="case-coverage-list">
-            {stats.byCategory.slice(0, 6).map((row, index) => {
-              const percent = row.total ? row.percent : 0;
-              return (
-                <button
-                  type="button"
-                  className="case-coverage-row w-full text-left"
-                  key={row.category}
-                  onClick={() => onOpenCategory(row.category)}
-                >
-                  <div className={`case-coverage-icon case-tone-${index % 4}`}><FileText /></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex justify-between gap-3 text-xs font-extrabold text-navy">
-                      <span className="truncate">{row.category}</span>
-                      <span>{row.ready} / {row.total}</span>
-                    </div>
-                    <Progress value={percent} className="mt-2 h-2.5 bg-slate-100" />
-                  </div>
-                  <ChevronRight className="size-4 shrink-0 text-navy/40" />
-                </button>
-              );
-            })}
-          </div>
+        <CaseProgressPanel
+          onOpenCategory={onOpenCategory}
+          onOpenBoard={() => onNavigate("board")}
+        />
 
-        </section>
 
         <section className="case-panel">
           <div className="case-panel-heading">
