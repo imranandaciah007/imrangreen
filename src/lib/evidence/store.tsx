@@ -189,13 +189,15 @@ interface EvidenceContextValue {
     folders: number;
     files: number;
   }>;
-  /** Reads every Drive document with AI, then builds its detailed clone PDF. */
+  /** Verifies existing clones first, then only builds the ones genuinely missing. */
   scanAllDocuments: (opts?: { rescanAll?: boolean }) => Promise<{
     scanned: number;
     cloned: number;
     failed: number;
     total: number;
+    verified: number;
   }>;
+
   scanProgress: ScanProgress;
   exhibitGroups: string[];
   stats: {
