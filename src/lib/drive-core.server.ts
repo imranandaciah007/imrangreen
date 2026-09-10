@@ -578,6 +578,74 @@ export async function buildClone(data: {
     }
   });
 
+  // ---- Append the original, untouched.
+  let originalPages = 0;
+  let originalNote = "The original file could not be embedded; it stays in Drive unchanged.";
+  try {
+    let source: { bytes: Uint8Array; kind: "pdf" | "png" | "jpg" } | null = null;
+    if (data.base64) {
+      const bytes = Uint8Array.from(atob(data.base64), (c) => c.charCodeAt(0));
+      const mime = data.mimeType ?? "";
+      const name = data.fileName.toLowerCase();
+      if (mime === "application/pdf" || name.endsWith(".pdf")) source = { bytes, kind: "pdf" };
+      else if (/png/.test(mime) || name.endsWith(".png")) source = { bytes, kind: "png" };
+      else if (/jpe?g/.test(mime) || /\.jpe?g$/.test(name)) source = { bytes, kind: "jpg" };
+      else if (data.driveFileId)
+        source = await fetchOriginalForEmbedding({
+          fileId: data.driveFileId,
+          fileName: data.fileName,
+          mimeType: mime,
+        });
+    } else if (data.driveFileId) {
+      source = await fetchOriginalForEmbedding({
+        fileId: data.driveFileId,
+        fileName: data.fileName,
+        mimeType: data.mimeType ?? "",
+      });
+    }
+
+    if (source?.kind === "pdf") {
+      const src = await PDFDocument.load(source.bytes, { ignoreEncryption: true });
+      const copied = await doc.copyPages(src, src.getPageIndices());
+      for (const p of copied) doc.addPage(p);
+      originalPages = copied.length;
+      originalNote = "";
+    } else if (source) {
+      const image =
+        source.kind === "png" ? await doc.embedPng(source.bytes) : await doc.embedJpg(source.bytes);
+      const imgPage = doc.addPage([595.28, 841.89]);
+      const scale = Math.min((595.28 - 72) / image.width, (841.89 - 72) / image.height, 1);
+      imgPage.drawImage(image, {
+        x: (595.28 - image.width * scale) / 2,
+        y: (841.89 - image.height * scale) / 2,
+        width: image.width * scale,
+        height: image.height * scale,
+      });
+      originalPages = 1;
+      originalNote = "";
+    }
+  } catch (error) {
+    originalNote = `The original could not be embedded (${error instanceof Error ? error.message : "unknown error"}); it stays in Drive unchanged.`;
+  }
+
+  // ---- Page references so the cover sheet can be cited in the packet index.
+  const totalPages = originalPages + 1;
+  const pageReference = originalPages
+    ? `Cover sheet: page 1 of ${totalPages} · Original document: pages 2–${totalPages} (${originalPages} page${originalPages > 1 ? "s" : ""})`
+    : `Cover sheet: page 1 of ${totalPages} · Original document held separately in Drive`;
+
+  page.drawText("PAGE REFERENCES", { x: left, y: 60, size: 6.5, font: bold, color: muted });
+  page.drawText(pageReference, { x: left, y: 48, size: 8.5, font: body, color: ink });
+  if (originalNote) {
+    page.drawText(originalNote.slice(0, 110), {
+      x: left,
+      y: 36,
+      size: 7.5,
+      font: body,
+      color: rgb(0.55, 0.15, 0.15),
+    });
+  }
+
   // Footer stamp on every page: exhibit number and page x of y.
   const all = doc.getPages();
   all.forEach((p, index) => {
