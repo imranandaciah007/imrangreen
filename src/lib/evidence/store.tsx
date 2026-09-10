@@ -1479,9 +1479,33 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         return { ...item, status: "Ready" as EvidenceStatus };
       });
 
-      setItems(reconciled);
-      await documentProvider.remove(removedIds);
-      const finalById = new Map(reconciled.map((item) => [item.id, item]));
+      // Clear out any duplicate exhibits already stored from earlier syncs.
+      const keptByContent = new Map<string, EvidenceItem>();
+      const duplicateIds: string[] = [];
+      for (const item of reconciled) {
+        const key = contentKeyOf(item.fileName, item.fileSizeBytes, item.mimeType);
+        const held = keptByContent.get(key);
+        if (!held) {
+          keptByContent.set(key, item);
+          continue;
+        }
+        const preferItem =
+          (Boolean(item.cloneFileId) && !held.cloneFileId) ||
+          (Boolean(item.cloneFileId) === Boolean(held.cloneFileId) &&
+            item.createdAt.localeCompare(held.createdAt) < 0);
+        if (preferItem) {
+          keptByContent.set(key, item);
+          duplicateIds.push(held.id);
+        } else {
+          duplicateIds.push(item.id);
+        }
+      }
+      const duplicateSet = new Set(duplicateIds);
+      const deduped = reconciled.filter((item) => !duplicateSet.has(item.id));
+
+      setItems(deduped);
+      await documentProvider.remove([...removedIds, ...duplicateIds]);
+      const finalById = new Map(deduped.map((item) => [item.id, item]));
       await Promise.all(
         reconciled
           .filter((item) => updatedItems.some((updatedItem) => updatedItem.id === item.id) || statusCorrectedIds.has(item.id))
