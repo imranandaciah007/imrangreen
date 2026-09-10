@@ -169,6 +169,48 @@ async function ensureFolder(path: string): Promise<string> {
   return parent;
 }
 
+/** Rename a Drive file or folder (originals keep their contents untouched). */
+export const renameDriveNode = createServerFn({ method: "POST" })
+  .inputValidator((data: { fileId: string; name: string }) => {
+    if (!data?.fileId || !data?.name?.trim()) throw new Error("A file and a new name are required.");
+    return { fileId: data.fileId, name: data.name.trim() };
+  })
+  .handler(async ({ data }) => {
+    const updated = await driveJson<{ id: string; name: string }>(
+      `${GATEWAY}/drive/v3/files/${data.fileId}?fields=id,name&supportsAllDrives=true`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name }),
+      },
+    );
+    return updated;
+  });
+
+/** Move a Drive file or folder into another folder (by id, or "root"). */
+export const moveDriveNode = createServerFn({ method: "POST" })
+  .inputValidator((data: { fileId: string; targetFolderId: string; currentParentId?: string | null }) => {
+    if (!data?.fileId || !data?.targetFolderId) throw new Error("A file and a destination are required.");
+    return data;
+  })
+  .handler(async ({ data }) => {
+    const current = await driveJson<{ parents?: string[] }>(
+      `${GATEWAY}/drive/v3/files/${data.fileId}?fields=parents&supportsAllDrives=true`,
+    );
+    const removeParents = (current.parents ?? []).join(",");
+    const params = new URLSearchParams({
+      fields: "id,name,parents",
+      addParents: data.targetFolderId,
+      supportsAllDrives: "true",
+    });
+    if (removeParents) params.set("removeParents", removeParents);
+    const moved = await driveJson<{ id: string; name: string; parents?: string[] }>(
+      `${GATEWAY}/drive/v3/files/${data.fileId}?${params.toString()}`,
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" },
+    );
+    return moved;
+  });
+
 /** Create a folder anywhere in the mirrored tree. */
 export const createDriveFolder = createServerFn({ method: "POST" })
   .inputValidator((data: { path: string }) => {
@@ -439,6 +481,27 @@ export const generateCloneDocument = createServerFn({ method: "POST" })
       originalNote = `The original could not be embedded (${error instanceof Error ? error.message : "unknown error"}); it stays in Drive unchanged.`;
     }
 
+    // Page references so the cover sheet can be cited in the packet index.
+    const totalPages = originalPages + 1;
+    const pageReference = originalPages
+      ? `Cover sheet: page 1 of ${totalPages} · Original document: pages 2–${totalPages} (${originalPages} page${originalPages > 1 ? "s" : ""})`
+      : `Cover sheet: page 1 of ${totalPages} · Original document held separately in Drive`;
+
+    page.drawText("PAGE REFERENCES", {
+      x: left,
+      y: 76,
+      size: 7.5,
+      font: bold,
+      color: rgb(0.42, 0.45, 0.52),
+    });
+    page.drawText(pageReference, {
+      x: left,
+      y: 62,
+      size: 9,
+      font: body,
+      color: rgb(0.1, 0.1, 0.14),
+    });
+
     if (originalNote) {
       page.drawText(originalNote, {
         x: left,
@@ -448,6 +511,19 @@ export const generateCloneDocument = createServerFn({ method: "POST" })
         color: rgb(0.55, 0.15, 0.15),
       });
     }
+
+    // Footer stamp on every page: exhibit number and page x of y.
+    const all = doc.getPages();
+    all.forEach((p, index) => {
+      p.drawText(`${meta.exhibitId} · page ${index + 1} of ${all.length}`, {
+        x: 40,
+        y: 20,
+        size: 7.5,
+        font: body,
+        color: rgb(0.45, 0.47, 0.53),
+      });
+    });
+
 
     doc.setTitle(`${meta.exhibitId} — ${meta.title || data.fileName}`);
     doc.setSubject(meta.summary || meta.title);

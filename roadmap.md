@@ -21,8 +21,10 @@
 - [x] Add main-page manual sync with folder, rename, move, upload, and removal matching
 - [x] Keep review attention limited to missing support or important missing details
 - [x] Save app uploads as Drive originals and generate matching enriched PDF clones
+- [x] Rename and move existing Drive files and folders from the app (full Drive access granted)
+- [x] Refresh the board every 20 seconds, on focus and on reopen so Drive changes appear quickly
+- [x] Build clone PDFs with an exhibit cover sheet, page references and per-page exhibit stamps
 
 ## External limitation
-- Real Drive upload of originals depends on Drive write access; originals remain unchanged.
-- Renaming or moving existing Drive folders from the app needs full Drive access (permission upgrade declined for now).
+- Original files are never altered; clones are always separate PDFs.
 

@@ -8,11 +8,13 @@ import {
   FilePlus2,
   FileText,
   Folder,
+  FolderInput,
   FolderPlus,
   GripVertical,
   Loader2,
   MoveLeft,
   MoveRight,
+  Pencil,
   RefreshCw,
   Sparkles,
   Star,
@@ -26,11 +28,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useEvidence } from "@/lib/evidence/store";
 import {
   createDriveFolder,
   generateCloneDocument,
+  moveDriveNode,
+  renameDriveNode,
   uploadEvidenceToFolder,
   type DriveFileNode,
   type DriveFolderNode,
@@ -129,6 +141,10 @@ export function FileBoardView() {
   const [newFolder, setNewFolder] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [renameFor, setRenameFor] = useState<{ id: string; name: string } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [moveFor, setMoveFor] = useState<{ id: string; name: string } | null>(null);
+  const [moveQuery, setMoveQuery] = useState("");
   const uploadRef = useRef<HTMLInputElement>(null);
   const sentinel = useRef<HTMLDivElement | null>(null);
 
@@ -180,7 +196,7 @@ export function FileBoardView() {
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
-    const timer = window.setInterval(() => void sync("auto"), 120_000);
+    const timer = window.setInterval(() => void sync("auto"), 20_000);
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
@@ -404,6 +420,56 @@ export function FileBoardView() {
     }
   }
 
+  function startRename(node: { id: string; name: string }) {
+    setRenameFor(node);
+    setRenameValue(node.name);
+  }
+
+  async function saveRename() {
+    if (!renameFor) return;
+    const name = renameValue.trim();
+    if (!name || name === renameFor.name) {
+      setRenameFor(null);
+      return;
+    }
+    setBusy(renameFor.id);
+    try {
+      await renameDriveNode({ data: { fileId: renameFor.id, name } });
+      toast.success(`Renamed in Drive: ${name}`);
+      setRenameFor(null);
+      await sync("auto");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The rename could not be saved to Drive.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveMove(targetFolderId: string, targetName: string) {
+    if (!moveFor) return;
+    setBusy(moveFor.id);
+    try {
+      await moveDriveNode({ data: { fileId: moveFor.id, targetFolderId } });
+      toast.success(`Moved in Drive to ${targetName}`);
+      setMoveFor(null);
+      setMoveQuery("");
+      await sync("auto");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The move could not be saved to Drive.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const moveChoices = useMemo(() => {
+    const all = tree?.folders ?? [];
+    const query = moveQuery.trim().toLowerCase();
+    return all
+      .filter((f) => f.id !== moveFor?.id)
+      .filter((f) => !query || f.name.toLowerCase().includes(query) || f.path.toLowerCase().includes(query))
+      .slice(0, 40);
+  }, [tree, moveQuery, moveFor]);
+
   const favouriteFolders = favourites
     .map((id) => folderById.get(id))
     .filter((f): f is DriveFolderNode => Boolean(f));
@@ -557,6 +623,8 @@ export function FileBoardView() {
               onFavourite={() => toggleFavourite(f.id)}
               onMoveBack={() => reorder(f.id, -1)}
               onMoveForward={() => reorder(f.id, 1)}
+              onRename={() => startRename(f)}
+              onMoveTo={() => setMoveFor({ id: f.id, name: f.name })}
             />
           ))}
           {childFiles.slice(0, Math.max(0, visible - orderedFolders.length)).map((file) => (
@@ -566,6 +634,8 @@ export function FileBoardView() {
               exhibit={byDriveId.get(file.id)?.exhibitId ?? exhibitFor(file.id)}
               busy={busy === file.id}
               onClone={() => void makeClone(file)}
+              onRename={() => startRename(file)}
+              onMoveTo={() => setMoveFor({ id: file.id, name: file.name })}
             />
           ))}
         </CardGrid>
@@ -576,6 +646,81 @@ export function FileBoardView() {
           </p>
         )}
       </Section>
+
+      <Dialog open={Boolean(renameFor)} onOpenChange={(v) => !v && setRenameFor(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Rename in Drive</DialogTitle>
+            <DialogDescription className="text-xs">
+              The new name is saved straight to your Google Drive. The contents stay untouched.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void saveRename()}
+            className="h-11 text-sm"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setRenameFor(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => void saveRename()} disabled={busy === renameFor?.id}>
+              {busy === renameFor?.id ? <Loader2 className="size-4 animate-spin" /> : null}
+              Save name
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(moveFor)}
+        onOpenChange={(v) => {
+          if (!v) {
+            setMoveFor(null);
+            setMoveQuery("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="truncate text-base">Move “{moveFor?.name}”</DialogTitle>
+            <DialogDescription className="text-xs">
+              Pick where it should live. The move happens in your Google Drive too.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={moveQuery}
+            onChange={(e) => setMoveQuery(e.target.value)}
+            placeholder="Search folders"
+            className="h-11 text-sm"
+          />
+          <div className="max-h-72 space-y-1 overflow-y-auto">
+            <button
+              onClick={() => void saveMove("root", "My Drive")}
+              className="flex min-h-11 w-full items-center gap-2 rounded-md border border-border px-3 text-left text-sm font-bold hover:bg-accent/40"
+            >
+              <Folder className="size-4 text-primary" /> My Drive
+            </button>
+            {moveChoices.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => void saveMove(f.id, f.name)}
+                className="flex min-h-11 w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-left hover:bg-accent/40"
+              >
+                <Folder className="size-4 shrink-0 text-primary" />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold text-foreground">{f.name}</span>
+                  <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    {f.path || "My Drive"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -631,6 +776,8 @@ function FolderCard({
   onMoveForward,
   onDragStart,
   onDrop,
+  onRename,
+  onMoveTo,
 }: {
   folder: DriveFolderNode;
   favourite: boolean;
@@ -642,6 +789,8 @@ function FolderCard({
   onMoveForward?: () => void;
   onDragStart?: () => void;
   onDrop?: () => void;
+  onRename?: () => void;
+  onMoveTo?: () => void;
 }) {
   return (
     <div
@@ -676,6 +825,12 @@ function FolderCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem className="text-xs" onSelect={() => onRename?.()}>
+                  <Pencil className="size-3.5" /> Rename in Drive
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-xs" onSelect={() => onMoveTo?.()}>
+                  <FolderInput className="size-3.5" /> Move to another folder
+                </DropdownMenuItem>
                 <DropdownMenuItem className="text-xs" onSelect={() => onMoveBack?.()}>
                   <MoveLeft className="size-3.5" /> Move earlier
                 </DropdownMenuItem>
@@ -695,11 +850,15 @@ function FileCard({
   exhibit,
   busy,
   onClone,
+  onRename,
+  onMoveTo,
 }: {
   file: DriveFileNode;
   exhibit: string;
   busy: boolean;
   onClone: () => void;
+  onRename: () => void;
+  onMoveTo: () => void;
 }) {
   return (
     <div className="grid min-h-[72px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:border-ring hover:bg-accent/40">
@@ -728,6 +887,21 @@ function FileCard({
               <ExternalLink className="size-3.5" />
             </Button>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8" aria-label="More actions">
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="text-xs" onSelect={() => onRename()}>
+                <Pencil className="size-3.5" /> Rename in Drive
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-xs" onSelect={() => onMoveTo()}>
+                <FolderInput className="size-3.5" /> Move to another folder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
       </div>
     </div>
   );
