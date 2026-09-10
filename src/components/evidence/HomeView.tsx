@@ -11,8 +11,12 @@ import {
   Upload,
 } from "lucide-react";
 
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { getBackgroundStatus } from "@/lib/jobs/background.functions";
 import { formatDate } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { isOpenTask } from "@/lib/task-reminders";
