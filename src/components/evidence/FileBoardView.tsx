@@ -14,6 +14,7 @@ import {
   Loader2,
   MoveLeft,
   MoveRight,
+  Pencil,
   RefreshCw,
   Sparkles,
   Star,
