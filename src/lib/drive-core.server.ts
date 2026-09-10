@@ -608,7 +608,10 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
     | null = null;
   try {
     let source: { bytes: Uint8Array; kind: "pdf" | "png" | "jpg" } | null = null;
-    if (data.base64) {
+    if (!embedOriginal) {
+      originalNote =
+        "The original pages could not be copied by the reader; the untouched original stays in Drive.";
+    } else if (data.base64) {
       const bytes = Uint8Array.from(atob(data.base64), (c) => c.charCodeAt(0));
       const mime = data.mimeType ?? "";
       const name = data.fileName.toLowerCase();
