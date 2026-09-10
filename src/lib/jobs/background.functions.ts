@@ -25,3 +25,30 @@ export const resumeBackgroundSync = createServerFn({ method: "POST" }).handler(a
     .eq("id", true);
   return { ok: true };
 });
+
+/** Existing clones already on record, so Synch now can verify instead of rebuild. */
+export const listCloneLedger = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const rows: {
+    drive_file_id: string;
+    clone_file_id: string | null;
+    clone_name: string | null;
+    clone_link: string | null;
+    status: string;
+    duplicate_of: string | null;
+    updated_at: string | null;
+  }[] = [];
+  const page = 1000;
+  for (let from = 0; from < 5000; from += page) {
+    const { data, error } = await supabaseAdmin
+      .from("gc_clone_jobs")
+      .select("drive_file_id,clone_file_id,clone_name,clone_link,status,duplicate_of,updated_at")
+      .in("status", ["done", "duplicate"])
+      .range(from, from + page - 1);
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+    rows.push(...(data as typeof rows));
+    if (data.length < page) break;
+  }
+  return { clones: rows };
+});
