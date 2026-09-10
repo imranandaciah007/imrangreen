@@ -9,16 +9,44 @@ import { aciahImpactState, type CaseGap } from "@/lib/evidence/review";
 import { useEvidence } from "@/lib/evidence/store";
 import { taskStatus } from "@/lib/evidence/types";
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  attention,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  attention?: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-border bg-card p-3 shadow-panel">
-      <div className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+    <div
+      className={`rounded-xl border p-3 shadow-panel ${
+        attention ? "border-destructive/60 bg-destructive/10" : "border-border bg-card"
+      }`}
+    >
+      <div
+        className={`text-[10px] font-semibold tracking-wider uppercase ${
+          attention ? "text-destructive" : "text-muted-foreground"
+        }`}
+      >
         {label}
       </div>
-      <div className="mt-1 font-mono text-xl leading-none font-semibold text-foreground">
+      <div
+        className={`mt-1 font-mono text-xl leading-none font-semibold ${
+          attention ? "text-destructive" : "text-foreground"
+        }`}
+      >
         {value}
       </div>
-      {hint && <div className="mt-1 text-[10px] text-muted-foreground">{hint}</div>}
+      {hint && (
+        <div
+          className={`mt-1 text-[10px] ${attention ? "text-destructive/80" : "text-muted-foreground"}`}
+        >
+          {hint}
+        </div>
+      )}
     </div>
   );
 }
@@ -99,18 +127,13 @@ export function CaseReviewView({
 
   return (
     <div className="space-y-4">
-      <Button className="h-11 w-full" onClick={onBuildPacket}>
-        Build case packet
-      </Button>
-      <Button variant="outline" className="h-11 w-full" onClick={markAllReady}>
-        Mark every document as Ready
-      </Button>
-      <div>
-        <h2 className="text-sm font-semibold text-foreground">Case review</h2>
-        <p className="text-[11px] text-muted-foreground">
-          How complete and well organised the evidence is. These are organisation measures only —
-          they say nothing about how the application will be decided.
-        </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button className="h-10 flex-1 text-xs" onClick={onBuildPacket}>
+          Build case packet
+        </Button>
+        <Button variant="outline" className="h-10 flex-1 text-xs" onClick={markAllReady}>
+          Mark all as Ready
+        </Button>
       </div>
 
       <Tabs defaultValue="overview">
@@ -118,11 +141,17 @@ export function CaseReviewView({
           <TabsTrigger value="overview" className="text-xs">
             Overview
           </TabsTrigger>
-          <TabsTrigger value="gaps" className="text-xs">
+          <TabsTrigger
+            value="gaps"
+            className={`text-xs ${gaps.length ? "text-destructive data-[state=active]:text-destructive" : ""}`}
+          >
             Gaps ({gaps.length})
           </TabsTrigger>
-          <TabsTrigger value="aciah" className="text-xs">
-            Aciah impact
+          <TabsTrigger
+            value="aciah"
+            className={`text-xs ${needsExplanation.length ? "text-destructive data-[state=active]:text-destructive" : ""}`}
+          >
+            Aciah impact{needsExplanation.length ? ` (${needsExplanation.length})` : ""}
           </TabsTrigger>
           <TabsTrigger value="tasks" className="text-xs">
             Tasks ({tasks.filter((t) => taskStatus(t) !== "Complete").length})
@@ -130,18 +159,39 @@ export function CaseReviewView({
         </TabsList>
 
         <TabsContent value="overview" className="mt-3 space-y-4">
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
+          {(() => {
+            const attention: { label: string; value: number; hint?: string }[] = [
+              { label: "Important details missing", value: stats.needsConfirmation },
+              { label: "Missing supporting evidence", value: stats.gaps },
+              { label: "Events without evidence", value: eventsNoEvidence },
+              { label: "Expenses without proof", value: financeNoProof },
+              { label: "Unresolved gaps", value: gaps.length },
+              { label: "Translation needed", value: stats.missingTranslation },
+              { label: "Duplicate suspects", value: duplicates },
+              { label: "Uncategorised", value: uncategorised },
+            ].filter((s) => s.value > 0);
+            return attention.length ? (
+              <section className="rounded-xl border border-destructive/50 bg-destructive/5 p-3">
+                <h3 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-destructive uppercase">
+                  <AlertTriangle className="size-3.5" /> Needs your attention
+                </h3>
+                <div className="mt-2.5 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
+                  {attention.map((s) => (
+                    <Stat key={s.label} label={s.label} value={String(s.value)} attention />
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <p className="rounded-xl border border-success/50 bg-success/10 p-3 text-xs font-medium text-foreground">
+                Nothing needs your attention right now.
+              </p>
+            );
+          })()}
+
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <Stat label="Exhibits" value={String(stats.total)} hint={`${stats.totalPages} pages`} />
             <Stat label="Reviewed & ready" value={String(stats.ready)} />
-            <Stat label="Important details missing" value={String(stats.needsConfirmation)} />
-            <Stat label="Missing supporting evidence" value={String(stats.gaps)} />
-            <Stat label="Duplicate suspects" value={String(duplicates)} />
-            <Stat label="Translation needed" value={String(stats.missingTranslation)} />
-            <Stat label="Uncategorised" value={String(uncategorised)} />
-            <Stat label="Events without evidence" value={String(eventsNoEvidence)} />
-            <Stat label="Expenses without proof" value={String(financeNoProof)} />
             <Stat label="Open tasks" value={String(stats.openTasks)} />
-            <Stat label="Unresolved gaps" value={String(gaps.length)} />
             <Stat
               label="Last edited"
               value={stats.lastEditedAt ? formatDate(stats.lastEditedAt) : "—"}
@@ -235,7 +285,11 @@ export function CaseReviewView({
               {gaps.map((gap) => (
                 <li
                   key={gap.id}
-                  className="rounded-xl border border-border bg-card p-3 shadow-panel"
+                  className={`rounded-xl border p-3 shadow-panel ${
+                    gap.severity === "high"
+                      ? "border-destructive/60 bg-destructive/10"
+                      : "border-border bg-card"
+                  }`}
                 >
                   <div className="flex items-start gap-2">
                     <AlertTriangle
@@ -299,9 +353,12 @@ export function CaseReviewView({
           ) : (
             <ul className="space-y-2">
               {needsExplanation.map((c) => (
-                <li key={c.id} className="rounded-xl border border-border bg-card p-3">
+                <li
+                  key={c.id}
+                  className="rounded-xl border border-destructive/60 bg-destructive/10 p-3"
+                >
                   <p className="text-xs font-medium text-foreground">{c.title}</p>
-                  <p className="font-mono text-[10px] text-muted-foreground">
+                  <p className="font-mono text-[10px] text-destructive">
                     {c.kind} · {c.date ? formatDate(c.date) : "no date"} · Needs explanation
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
