@@ -1811,6 +1811,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     updateTask,
     gaps,
     coverage,
+    ignoredGaps,
+    ignoreGap,
+    restoreGap,
+
 
     deleteTask,
     runExtraction,
