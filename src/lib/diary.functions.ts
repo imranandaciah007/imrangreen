@@ -11,8 +11,6 @@ import { runJsonModel } from "./ai-json.server";
  * amounts, dates and people that are not written in the diary stay empty.
  */
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
-const MODEL = "openai/gpt-6-astra";
 
 export interface DiaryEventDraft {
   date: string;
