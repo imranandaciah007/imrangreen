@@ -112,6 +112,10 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
 
   // While paused, do at most one probe item per run to detect recovery.
   const batch = paused ? 1 : limit;
+  // Reading each original with AI takes time; stop the run before the request
+  // budget runs out and let the next tick pick up where this one stopped.
+  const startedAt = Date.now();
+  const TIME_BUDGET_MS = 110_000;
   let scanned = 0;
   let queued = 0;
   let cloned = 0;
