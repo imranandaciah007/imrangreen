@@ -79,8 +79,23 @@ function BackgroundBuildPanel() {
         </span>
       </div>
       <Progress value={percent} className="h-1.5" />
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Cloned", value: done },
+          { label: "Pending", value: data.waiting },
+          { label: "New this run", value: data.lastRunCloned + data.lastRunQueued },
+        ].map((box) => (
+          <div key={box.label} className="rounded-md border border-border bg-secondary/40 px-2 py-1.5">
+            <p className="text-base leading-none font-bold text-foreground">{box.value}</p>
+            <p className="mt-1 text-[10px] tracking-wide text-muted-foreground uppercase">
+              {box.label}
+            </p>
+          </div>
+        ))}
+      </div>
       <p className="text-muted-foreground">
         {done} of {total} exhibit clone{total === 1 ? "" : "s"} built ({percent}%)
+        {data.duplicates ? ` · ${data.duplicates} duplicate copy(ies) merged` : ""}
         {data.failed ? ` · ${data.failed} could not be read` : ""}
         {data.status === "paused" && data.pausedReason ? ` · ${data.pausedReason.slice(0, 120)}` : ""}
       </p>
