@@ -194,7 +194,12 @@ export function HomeView({
             {stats.byCategory.slice(0, 6).map((row, index) => {
               const percent = row.total ? row.percent : 0;
               return (
-                <div className="case-coverage-row" key={row.category}>
+                <button
+                  type="button"
+                  className="case-coverage-row w-full text-left"
+                  key={row.category}
+                  onClick={() => onOpenCategory(row.category)}
+                >
                   <div className={`case-coverage-icon case-tone-${index % 4}`}><FileText /></div>
                   <div className="min-w-0 flex-1">
                     <div className="flex justify-between gap-3 text-xs font-extrabold text-navy">
@@ -203,10 +208,12 @@ export function HomeView({
                     </div>
                     <Progress value={percent} className="mt-2 h-2.5 bg-slate-100" />
                   </div>
-                </div>
+                  <ChevronRight className="size-4 shrink-0 text-navy/40" />
+                </button>
               );
             })}
           </div>
+
         </section>
 
         <section className="case-panel">
