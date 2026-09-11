@@ -88,6 +88,22 @@ export const generateCloneDocument = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }) => {
-    const { buildClone } = await import("./drive-core.server");
+    const { buildClone, findExistingClone } = await import("./drive-core.server");
+    // Scan Drive first: adopt a clone that already exists for this original
+    // instead of spending time and AI credit building a duplicate.
+    if (data.driveFileId) {
+      const existing = await findExistingClone(data.driveFileId, data.meta.exhibitId);
+      if (existing) {
+        return {
+          id: existing.id,
+          name: existing.name,
+          webViewLink: existing.webViewLink,
+          folderPath: "",
+          originalPages: 0,
+          totalPages: 0,
+          note: "Existing clone adopted — no rebuild needed",
+        };
+      }
+    }
     return buildClone(data);
   });

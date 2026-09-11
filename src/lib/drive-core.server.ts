@@ -212,6 +212,36 @@ export async function moveNode(fileId: string, targetFolderId: string) {
   );
 }
 
+/**
+ * Scan Drive for a clone that already exists for this original file.
+ * Clones carry the original's Drive ID in their file properties, so a
+ * metadata query finds them without downloading anything. Falls back to a
+ * name-prefix match on the exhibit ID for clones written before properties
+ * were recorded. Returns null when no clone exists.
+ */
+export async function findExistingClone(
+  originalDriveId: string,
+  exhibitId: string,
+): Promise<{ id: string; name: string; webViewLink: string } | null> {
+  const fields = "files(id,name,webViewLink)";
+  const byProperty = await driveJson<{ files?: { id: string; name: string; webViewLink?: string }[] }>(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+      `properties has { key='originalDriveId' and value='${originalDriveId}' } and trashed=false`,
+    )}&fields=${encodeURIComponent(fields)}&pageSize=5`,
+  );
+  const hit = byProperty.files?.[0];
+  if (hit) return { id: hit.id, name: hit.name, webViewLink: hit.webViewLink ?? "" };
+
+  const byName = await driveJson<{ files?: { id: string; name: string; webViewLink?: string }[] }>(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+      `name contains '${exhibitId}_' and trashed=false`,
+    )}&fields=${encodeURIComponent(fields)}&pageSize=5`,
+  );
+  const named = byName.files?.find((f) => f.name.startsWith(`${exhibitId}_`));
+  if (named) return { id: named.id, name: named.name, webViewLink: named.webViewLink ?? "" };
+  return null;
+}
+
 export async function uploadMultipart(input: {
   name: string;
   mimeType: string;

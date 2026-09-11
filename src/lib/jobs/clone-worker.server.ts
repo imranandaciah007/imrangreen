@@ -23,6 +23,7 @@ export interface TickResult {
   scanned?: number;
   queued?: number;
   cloned?: number;
+  verified?: number;
   failed?: number;
   pending?: number;
   folders?: number;
@@ -124,6 +125,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
   let scanned = 0;
   let queued = 0;
   let cloned = 0;
+  let verified = 0;
   let failed = 0;
   let folders = state?.folders ?? 0;
   let files = state?.files ?? 0;
@@ -318,6 +320,25 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
           }
         }
 
+        // Scan Drive first: if a clone of this original already exists,
+        // adopt it into the ledger instead of paying to build it again.
+        const existingClone = await drive.findExistingClone(job.drive_file_id, job.exhibit_id);
+        if (existingClone) {
+          await supabaseAdmin
+            .from("gc_clone_jobs")
+            .update({
+              status: "done",
+              clone_file_id: existingClone.id,
+              clone_name: existingClone.name,
+              clone_link: existingClone.webViewLink,
+              error: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("drive_file_id", job.drive_file_id);
+          verified += 1;
+          return;
+        }
+
         const classification = classifyDriveFile({
           id: job.drive_file_id,
           name: job.file_name,
@@ -445,7 +466,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         files,
         last_run_cloned: cloned,
         last_run_queued: queued,
-        note: `${cloned} clone(s) built, ${pendingAfter ?? 0} waiting`,
+        note: `${cloned} clone(s) built, ${verified} already existed, ${pendingAfter ?? 0} waiting`,
         updated_at: new Date().toISOString(),
       })
       .eq("id", true);
@@ -456,6 +477,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
       scanned,
       queued,
       cloned,
+      verified,
       failed,
       pending: pendingAfter ?? 0,
       folders,
