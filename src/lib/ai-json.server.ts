@@ -106,12 +106,13 @@ function geminiSchema(node: unknown): unknown {
   return out;
 }
 
-async function runGemini(req: JsonModelRequest, key: string) {
+async function runGemini(req: JsonModelRequest, key: string, modelOverride?: string) {
   const parts: Record<string, unknown>[] = [{ text: req.prompt }];
   if (req.file?.base64) {
     parts.push({ inlineData: { mimeType: req.file.mimeType, data: req.file.base64 } });
   }
-  const model = req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
+  const model = modelOverride ?? (req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL);
+
   const res = await fetch(geminiUrl(model), {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
