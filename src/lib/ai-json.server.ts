@@ -270,7 +270,7 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
           ok: true,
           tokens: out.tokens,
         });
-        return await topUp(req, out.value, lovableKey, allowFallback);
+        return await topUp(req, out.value, geminiKey);
       } catch (err) {
         lastErr = err;
         await logUsage({
