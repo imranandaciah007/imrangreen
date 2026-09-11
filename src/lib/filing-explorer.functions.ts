@@ -160,6 +160,7 @@ export const draftExplorerFiling = createServerFn({ method: "POST" })
         totalPages: 0,
         model: jsonModelName("standard"),
         generatedAt: new Date().toISOString(),
+        languageSource: "records",
       };
     }
 
