@@ -97,34 +97,53 @@ function FolderRow({
   node,
   index,
   onOpen,
+  selected,
+  onToggle,
 }: {
   node: FolderNode;
   index: number;
   onOpen: (node: FolderNode) => void;
+  /** When provided, the row shows an include/exclude tick for the filing. */
+  selected?: boolean;
+  onToggle?: (next: boolean) => void;
 }) {
   const percent = node.total ? Math.round((node.built / node.total) * 100) : 0;
   return (
-    <button type="button" className="case-coverage-row w-full text-left" onClick={() => onOpen(node)}>
-      <div className={`case-coverage-icon case-tone-${index % 4}`}>
-        <Folder />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex justify-between gap-3 text-xs font-extrabold text-navy">
-          <span className="truncate">{node.name}</span>
-          <span className="shrink-0">
-            {node.built} / {node.total}
-          </span>
+    <div className={`flex items-center gap-2 ${onToggle && !selected ? "opacity-55" : ""}`}>
+      {onToggle ? (
+        <Checkbox
+          checked={selected ?? true}
+          onCheckedChange={(value) => onToggle(value === true)}
+          aria-label={`Include ${node.name} in the filing`}
+          className="size-5 shrink-0"
+        />
+      ) : null}
+      <button
+        type="button"
+        className="case-coverage-row w-full min-w-0 flex-1 text-left"
+        onClick={() => onOpen(node)}
+      >
+        <div className={`case-coverage-icon case-tone-${index % 4}`}>
+          <Folder />
         </div>
-        <Progress value={percent} className="mt-2 h-2.5 bg-slate-100" />
-        <p className="mt-1 truncate text-[10px] font-semibold text-navy/50">
-          {node.children.length
-            ? `${node.children.length} subfolder${node.children.length === 1 ? "" : "s"}`
-            : "No subfolders"}
-          {node.total - node.built ? ` · ${node.total - node.built} still to prepare` : " · complete"}
-        </p>
-      </div>
-      <ChevronRight className="size-4 shrink-0 text-navy/40" />
-    </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex justify-between gap-3 text-xs font-extrabold text-navy">
+            <span className="truncate">{node.name}</span>
+            <span className="shrink-0">
+              {node.built} / {node.total}
+            </span>
+          </div>
+          <Progress value={percent} className="mt-2 h-2.5 bg-slate-100" />
+          <p className="mt-1 truncate text-[10px] font-semibold text-navy/50">
+            {node.children.length
+              ? `${node.children.length} subfolder${node.children.length === 1 ? "" : "s"}`
+              : "No subfolders"}
+            {node.total - node.built ? ` · ${node.total - node.built} still to prepare` : " · complete"}
+          </p>
+        </div>
+        <ChevronRight className="size-4 shrink-0 text-navy/40" />
+      </button>
+    </div>
   );
 }
 
