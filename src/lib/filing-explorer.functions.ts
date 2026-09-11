@@ -32,6 +32,10 @@ export interface ExplorerFiling {
   totalPages: number;
   model: string;
   generatedAt: string;
+  /** Where the wording came from: the reading engine, or the stored records alone. */
+  languageSource: "ai" | "records";
+  /** Shown to the user when the wording had to fall back to the stored records. */
+  notice?: string;
 }
 
 const SCHEMA = {
@@ -156,6 +160,7 @@ export const draftExplorerFiling = createServerFn({ method: "POST" })
         totalPages: 0,
         model: jsonModelName("standard"),
         generatedAt: new Date().toISOString(),
+        languageSource: "records",
       };
     }
 
@@ -184,29 +189,60 @@ Produce:
 
 Absolute rules: state only what the listed records show; never invent a document, date, figure, person or event; never argue the legal standard, never assert hardship is "extreme", never predict or imply any outcome or likelihood of approval; do not claim a document is certified, translated or notarised unless the detail says so. If a document's purpose is unclear, describe it neutrally by its title and source.`;
 
-    const value = await runJsonModel({
-      prompt,
-      schema: SCHEMA,
-      name: "explorer_filing",
-      tier: "standard",
-      requiredFields: ["coverLetter", "exhibitNotes"],
-      allowGapFill: false,
-    });
+    /** Plain factual wording assembled from the stored records only. */
+    const fromRecordsOnly = (): string[] => {
+      const folders = [...new Set(exhibits.map((e) => e.folderPath || "root"))];
+      const dated = exhibits.map((e) => e.date).filter(Boolean).sort();
+      return [
+        `This packet contains supporting evidence submitted with Form I-601 for the applicant, ${data.applicant}. The qualifying relative is ${data.qualifyingRelative}, the applicant's spouse and a United States citizen. The couple's child is ${data.child}.`,
+        `The packet holds ${exhibits.length} exhibit${exhibits.length === 1 ? "" : "s"} totalling ${totalPages} page${totalPages === 1 ? "" : "s"} of records. Exhibits are numbered sequentially from ${exhibits[0]?.number ?? "EX-001"} to ${exhibits[exhibits.length - 1]?.number ?? "EX-001"} and are listed in the exhibit index that follows this letter.`,
+        `The records are drawn from ${folders.length} folder${folders.length === 1 ? "" : "s"}: ${folders.slice(0, 12).join("; ")}${folders.length > 12 ? "; and others" : ""}.`,
+        dated.length
+          ? `The dated records in this packet span ${dated[0]} to ${dated[dated.length - 1]}.`
+          : `Dates are stated on the individual exhibits where they appear on the records.`,
+        `Family separation begins on ${data.separationStartDate}.`,
+        `Each exhibit is preceded by a cover sheet stating its exhibit number, title, date, source and page count. Original documents are reproduced without alteration.`,
+      ];
+    };
 
-    const coverLetter = Array.isArray(value["coverLetter"])
-      ? (value["coverLetter"] as unknown[]).map((p) => String(p)).filter((p) => p.trim())
-      : [];
-    const notes = new Map<string, string>();
-    if (Array.isArray(value["exhibitNotes"])) {
-      for (const raw of value["exhibitNotes"] as unknown[]) {
-        const r = (raw ?? {}) as { number?: unknown; description?: unknown };
-        const number = String(r.number ?? "").trim();
-        const description = String(r.description ?? "").trim();
-        if (number && description) notes.set(number, description);
+    let coverLetter: string[] = [];
+    let languageSource: "ai" | "records" = "ai";
+    let notice: string | undefined;
+
+    try {
+      const value = await runJsonModel({
+        prompt,
+        schema: SCHEMA,
+        name: "explorer_filing",
+        tier: "standard",
+        requiredFields: ["coverLetter", "exhibitNotes"],
+        allowGapFill: false,
+      });
+
+      coverLetter = Array.isArray(value["coverLetter"])
+        ? (value["coverLetter"] as unknown[]).map((p) => String(p)).filter((p) => p.trim())
+        : [];
+      const notes = new Map<string, string>();
+      if (Array.isArray(value["exhibitNotes"])) {
+        for (const raw of value["exhibitNotes"] as unknown[]) {
+          const r = (raw ?? {}) as { number?: unknown; description?: unknown };
+          const number = String(r.number ?? "").trim();
+          const description = String(r.description ?? "").trim();
+          if (number && description) notes.set(number, description);
+        }
       }
-    }
-    for (const exhibit of exhibits) {
-      exhibit.description = notes.get(exhibit.number) ?? exhibit.summary;
+      for (const exhibit of exhibits) {
+        exhibit.description = notes.get(exhibit.number) ?? exhibit.summary;
+      }
+      if (!coverLetter.length) throw new Error("No cover letter returned.");
+    } catch (error) {
+      languageSource = "records";
+      coverLetter = fromRecordsOnly();
+      for (const exhibit of exhibits) exhibit.description = exhibit.summary;
+      notice =
+        error instanceof Error && /quota|429/i.test(error.message)
+          ? "Automatic reading is out of allowance today, so the wording was built from your stored exhibit details."
+          : "Automatic reading was unavailable, so the wording was built from your stored exhibit details.";
     }
 
     return {
@@ -216,5 +252,7 @@ Absolute rules: state only what the listed records show; never invent a document
       totalPages,
       model: jsonModelName("standard"),
       generatedAt: new Date().toISOString(),
+      languageSource,
+      ...(notice ? { notice } : {}),
     };
   });

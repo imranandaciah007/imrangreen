@@ -148,7 +148,15 @@ function FolderRow({
 }
 
 /** Every exhibit filed in one folder: the original PDF, plus its enriched clone. */
-function FolderFiles({ path }: { path: string }) {
+function FolderFiles({
+  path,
+  excludedFiles,
+  onToggleFile,
+}: {
+  path: string;
+  excludedFiles: Set<string>;
+  onToggleFile: (id: string, include: boolean) => void;
+}) {
   const fetchFiles = useServerFn(listCloneFiles);
   const { data, isLoading } = useQuery({
     queryKey: ["gc-clone-files", path],
@@ -171,48 +179,60 @@ function FolderFiles({ path }: { path: string }) {
   }
   return (
     <div className="space-y-1.5">
-      {data.files.map((file) => (
-        <div key={file.driveFileId} className="rounded-lg border border-border bg-card p-2.5">
-          <div className="flex items-start gap-2">
-            <FileText className="mt-0.5 size-3.5 shrink-0 text-navy/50" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-bold text-navy">{file.exhibitTitle}</p>
-              <p className="truncate font-mono text-[10px] text-navy/50">
-                {file.fileName}
-                {file.documentDate ? ` · ${file.documentDate}` : ""}
-                {file.pageCount ? ` · ${file.pageCount} page(s)` : ""}
-              </p>
-              {file.summary ? (
-                <p className="mt-1 line-clamp-2 text-[10px] text-navy/60">{file.summary}</p>
-              ) : null}
+      {data.files.map((file) => {
+        const included = !excludedFiles.has(file.driveFileId);
+        return (
+          <div
+            key={file.driveFileId}
+            className={`rounded-lg border border-border bg-card p-2.5 ${included ? "" : "opacity-55"}`}
+          >
+            <div className="flex items-start gap-2">
+              <Checkbox
+                checked={included}
+                onCheckedChange={(value) => onToggleFile(file.driveFileId, value === true)}
+                aria-label={`Include ${file.exhibitTitle} in the filing`}
+                className="mt-0.5 size-5 shrink-0"
+              />
+              <FileText className="mt-0.5 size-3.5 shrink-0 text-navy/50" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] font-bold text-navy">{file.exhibitTitle}</p>
+                <p className="truncate font-mono text-[10px] text-navy/50">
+                  {file.fileName}
+                  {file.documentDate ? ` · ${file.documentDate}` : ""}
+                  {file.pageCount ? ` · ${file.pageCount} page(s)` : ""}
+                </p>
+                {file.summary ? (
+                  <p className="mt-1 line-clamp-2 text-[10px] text-navy/60">{file.summary}</p>
+                ) : null}
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <a
-              className="case-view-link inline-flex items-center gap-1 text-[10px]"
-              href={file.originalLink}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <ExternalLink className="size-3" /> Original PDF
-            </a>
-            {file.cloneLink ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
               <a
                 className="case-view-link inline-flex items-center gap-1 text-[10px]"
-                href={file.cloneLink}
+                href={file.originalLink}
                 target="_blank"
                 rel="noreferrer"
               >
-                <ExternalLink className="size-3" /> Exhibit clone
+                <ExternalLink className="size-3" /> Original PDF
               </a>
-            ) : (
-              <span className="text-[10px] font-semibold text-navy/45">
-                {file.status === "error" ? "Could not be read" : "Clone still to build"}
-              </span>
-            )}
+              {file.cloneLink ? (
+                <a
+                  className="case-view-link inline-flex items-center gap-1 text-[10px]"
+                  href={file.cloneLink}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink className="size-3" /> Exhibit clone
+                </a>
+              ) : (
+                <span className="text-[10px] font-semibold text-navy/45">
+                  {file.status === "error" ? "Could not be read" : "Clone still to build"}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -238,6 +258,78 @@ export function CaseProgressPanel({
   });
 
   const [path, setPath] = useState<string[]>([]);
+  const [excludedFolders, setExcludedFolders] = useState<Set<string>>(new Set());
+  const [excludedFiles, setExcludedFiles] = useState<Set<string>>(new Set());
+  const [filing, setFiling] = useState<ExplorerFiling | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  const draftFiling = useServerFn(draftExplorerFiling);
+
+  const toggleSet = (
+    setter: (fn: (prev: Set<string>) => Set<string>) => void,
+    key: string,
+    include: boolean,
+  ) =>
+    setter((prev) => {
+      const next = new Set(prev);
+      if (include) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setFiling(null);
+    try {
+      const result = await draftFiling({
+        data: {
+          rootPath: path.join("/"),
+          excludedFolders: [...excludedFolders],
+          excludedFileIds: [...excludedFiles],
+        },
+      });
+      if (!result.exhibits.length) {
+        toast.error("Nothing selected", {
+          description: "Every folder or file in this view is unticked.",
+        });
+        return;
+      }
+      setFiling(result);
+      toast.success("Cover letter and index ready", {
+        description: `${result.exhibits.length} exhibit${result.exhibits.length === 1 ? "" : "s"} · ${result.totalPages} page(s)`,
+      });
+    } catch (error) {
+      toast.error("Could not write the cover letter", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const printFiling = () => {
+    if (!filing) return;
+    const win = window.open("", "_blank");
+    if (!win) {
+      toast.error("Your browser blocked the print window.");
+      return;
+    }
+    win.document.write(explorerFilingHtml(filing));
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
+  };
+
+  const downloadFiling = () => {
+    if (!filing) return;
+    const blob = new Blob([explorerFilingHtml(filing)], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Cover-letter-and-index-${(filing.folderLabel || "all").replace(/[^\w-]+/g, "-")}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const tree = useMemo(() => buildTree(data?.folders ?? []), [data]);
   const rootRow = (data?.folders ?? []).find((row) => !row.path) ?? empty("");
@@ -373,6 +465,8 @@ export function CaseProgressPanel({
                       node={node}
                       index={index}
                       onOpen={() => setPath([...path, node.name])}
+                      selected={!excludedFolders.has(node.path)}
+                      onToggle={(next) => toggleSet(setExcludedFolders, node.path, next)}
                     />
                   ))}
                 </div>
@@ -381,9 +475,43 @@ export function CaseProgressPanel({
                   <FolderOpen /> No subfolders here.
                 </div>
               )}
-              <FolderFiles path={path.join("/")} />
+              <FolderFiles
+                path={path.join("/")}
+                excludedFiles={excludedFiles}
+                onToggleFile={(id, include) => toggleSet(setExcludedFiles, id, include)}
+              />
             </>
           )}
+
+          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+            <p className="text-[11px] font-bold text-navy">Submission paperwork</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-navy/60">
+              Untick anything you do not want included, then build the cover letter and exhibit
+              index for {path.length ? path[path.length - 1] : data?.root ?? "everything"}.
+            </p>
+            <Button className="mt-2 w-full" onClick={handleGenerate} disabled={generating}>
+              {generating ? <Loader2 className="animate-spin" /> : <FileSignature />}
+              {generating ? "Writing the paperwork…" : "Generate cover letter + index"}
+            </Button>
+            {filing ? (
+              <>
+                <p className="mt-2 text-[10px] font-semibold text-navy/60">
+                  {filing.exhibits.length} exhibit
+                  {filing.exhibits.length === 1 ? "" : "s"} · {filing.totalPages} page(s) ·{" "}
+                  {filing.coverLetter.length} paragraph
+                  {filing.coverLetter.length === 1 ? "" : "s"}
+                </p>
+                <div className="mt-2 flex gap-1.5">
+                  <Button variant="outline" className="flex-1" onClick={printFiling}>
+                    <Printer /> Print
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={downloadFiling}>
+                    <Download /> Save
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </div>
 
           <Button variant="outline" className="w-full" onClick={onOpenBoard}>
             <FolderOpen /> Open the full file board
