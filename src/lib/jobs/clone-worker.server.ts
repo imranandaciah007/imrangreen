@@ -23,6 +23,7 @@ export interface TickResult {
   scanned?: number;
   queued?: number;
   cloned?: number;
+  verified?: number;
   failed?: number;
   pending?: number;
   folders?: number;
@@ -124,6 +125,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
   let scanned = 0;
   let queued = 0;
   let cloned = 0;
+  let verified = 0;
   let failed = 0;
   let folders = state?.folders ?? 0;
   let files = state?.files ?? 0;
