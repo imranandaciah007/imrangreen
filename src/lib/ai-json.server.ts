@@ -206,42 +206,43 @@ function retryable(err: unknown) {
 }
 
 /**
- * Free reader first, paid reader only for the holes it left. Gemini's own answers
- * are never overwritten, and nothing is sent to any third party beyond Google
- * (the case owner's own API key) and the built-in reader.
+ * Blanks left by the first Gemini read are retried once with a stronger Gemini
+ * model. Nothing is ever sent to the paid built-in reader for gap-filling, so
+ * exhibits build on the free key only. Anything still blank stays blank and shows
+ * up in "Needs your attention" for a human to fill.
  */
 async function topUp(
   req: JsonModelRequest,
   value: Record<string, unknown>,
-  lovableKey: string | undefined,
-  allowFallback: boolean,
+  geminiKey: string,
 ): Promise<Record<string, unknown>> {
   const wanted = req.requiredFields ?? [];
-  if (!wanted.length || !lovableKey) return value;
-  if (!allowFallback && req.allowGapFill !== true) return value;
+  if (!wanted.length) return value;
   const missing = wanted.filter((field) => blank(value[field]));
   if (!missing.length) return value;
   try {
-    const extra = await runGateway(
+    const retry = await runGemini(
       {
         ...req,
         prompt: `${req.prompt}\n\nA first reading of this material could not establish: ${missing.join(", ")}. Establish only those, strictly from the material itself. Leave anything the material does not show empty rather than guessing.`,
       },
-      lovableKey,
+      geminiKey,
+      GEMINI_GAPFILL_MODEL,
     );
     const merged = { ...value };
-    for (const field of missing) if (!blank(extra[field])) merged[field] = extra[field];
+    for (const field of missing) if (!blank(retry.value[field])) merged[field] = retry.value[field];
     await logUsage({
-      provider: "lovable",
-      model: GATEWAY_MODEL,
+      provider: "gemini",
+      model: retry.model,
       purpose: `${req.name}:fill-gaps`,
       ok: true,
+      tokens: retry.tokens,
     });
     return merged;
   } catch (err) {
     await logUsage({
-      provider: "lovable",
-      model: GATEWAY_MODEL,
+      provider: "gemini",
+      model: GEMINI_GAPFILL_MODEL,
       purpose: `${req.name}:fill-gaps`,
       ok: false,
       statusCode: statusFrom(err),
@@ -250,6 +251,7 @@ async function topUp(
     return value;
   }
 }
+
 
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const geminiKey = process.env["GEMINI_API_KEY"];
