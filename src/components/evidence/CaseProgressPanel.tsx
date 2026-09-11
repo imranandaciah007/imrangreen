@@ -1,9 +1,21 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, ExternalLink, FileText, Folder, FolderOpen, Loader2 } from "lucide-react";
+import {
+  ChevronRight,
+  Download,
+  ExternalLink,
+  FileSignature,
+  FileText,
+  Folder,
+  FolderOpen,
+  Loader2,
+  Printer,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -11,6 +23,8 @@ import {
   listCloneFolders,
   type CloneFolderRow,
 } from "@/lib/jobs/background.functions";
+import { draftExplorerFiling, type ExplorerFiling } from "@/lib/filing-explorer.functions";
+import { explorerFilingHtml } from "@/lib/evidence/explorer-filing-html";
 import { useEvidence } from "@/lib/evidence/store";
 
 interface FolderNode {
