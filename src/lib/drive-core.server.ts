@@ -225,7 +225,7 @@ export async function findExistingClone(
 ): Promise<{ id: string; name: string; webViewLink: string } | null> {
   const fields = "files(id,name,webViewLink)";
   const byProperty = await driveJson<{ files?: { id: string; name: string; webViewLink?: string }[] }>(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+    `${GATEWAY}/drive/v3/files?q=${encodeURIComponent(
       `properties has { key='originalDriveId' and value='${originalDriveId}' } and trashed=false`,
     )}&fields=${encodeURIComponent(fields)}&pageSize=5`,
   );
@@ -233,7 +233,7 @@ export async function findExistingClone(
   if (hit) return { id: hit.id, name: hit.name, webViewLink: hit.webViewLink ?? "" };
 
   const byName = await driveJson<{ files?: { id: string; name: string; webViewLink?: string }[] }>(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+    `${GATEWAY}/drive/v3/files?q=${encodeURIComponent(
       `name contains '${exhibitId}_' and trashed=false`,
     )}&fields=${encodeURIComponent(fields)}&pageSize=5`,
   );
