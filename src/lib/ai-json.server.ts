@@ -12,6 +12,9 @@ const GATEWAY_MODEL = "openai/gpt-6-astra";
 const GEMINI_MODEL = "gemini-3.6-flash";
 /** Bulk background reading of hundreds of Drive files — cheapest capable model. */
 const GEMINI_BULK_MODEL = "gemini-3.1-flash-lite";
+/** Second attempt for anything the cheap read left blank — stronger, still free. */
+const GEMINI_GAPFILL_MODEL = "gemini-3.8-flash";
+
 const geminiUrl = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
