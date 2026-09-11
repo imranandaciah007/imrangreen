@@ -217,6 +217,9 @@ Absolute rules: state only what the listed records show; never invent a document
         tier: "standard",
         requiredFields: ["coverLetter", "exhibitNotes"],
         allowGapFill: false,
+        // Gemini only: never spend paid credits on the wording. If Gemini is
+        // out of allowance we fall back to wording built from stored records.
+        allowFallback: false,
       });
 
       coverLetter = Array.isArray(value["coverLetter"])
