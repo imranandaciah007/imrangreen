@@ -465,6 +465,8 @@ export function CaseProgressPanel({
                       node={node}
                       index={index}
                       onOpen={() => setPath([...path, node.name])}
+                      selected={!excludedFolders.has(node.path)}
+                      onToggle={(next) => toggleSet(setExcludedFolders, node.path, next)}
                     />
                   ))}
                 </div>
@@ -473,9 +475,43 @@ export function CaseProgressPanel({
                   <FolderOpen /> No subfolders here.
                 </div>
               )}
-              <FolderFiles path={path.join("/")} />
+              <FolderFiles
+                path={path.join("/")}
+                excludedFiles={excludedFiles}
+                onToggleFile={(id, include) => toggleSet(setExcludedFiles, id, include)}
+              />
             </>
           )}
+
+          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+            <p className="text-[11px] font-bold text-navy">Submission paperwork</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-navy/60">
+              Untick anything you do not want included, then build the cover letter and exhibit
+              index for {path.length ? path[path.length - 1] : data?.root ?? "everything"}.
+            </p>
+            <Button className="mt-2 w-full" onClick={handleGenerate} disabled={generating}>
+              {generating ? <Loader2 className="animate-spin" /> : <FileSignature />}
+              {generating ? "Writing the paperwork…" : "Generate cover letter + index"}
+            </Button>
+            {filing ? (
+              <>
+                <p className="mt-2 text-[10px] font-semibold text-navy/60">
+                  {filing.exhibits.length} exhibit
+                  {filing.exhibits.length === 1 ? "" : "s"} · {filing.totalPages} page(s) ·{" "}
+                  {filing.coverLetter.length} paragraph
+                  {filing.coverLetter.length === 1 ? "" : "s"}
+                </p>
+                <div className="mt-2 flex gap-1.5">
+                  <Button variant="outline" className="flex-1" onClick={printFiling}>
+                    <Printer /> Print
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={downloadFiling}>
+                    <Download /> Save
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </div>
 
           <Button variant="outline" className="w-full" onClick={onOpenBoard}>
             <FolderOpen /> Open the full file board
