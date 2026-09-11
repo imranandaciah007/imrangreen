@@ -374,7 +374,12 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
             clone_link: result.webViewLink,
             original_pages: result.originalPages,
             total_pages: result.totalPages,
-            error: result.note || null,
+            error:
+              result.note ||
+              (!read?.title || !read?.summary
+                ? "Details incomplete after automatic reading — needs your attention"
+                : null),
+
             attempts: job.attempts + 1,
             ai_title: read?.title || null,
             ai_date: read?.documentDate || null,

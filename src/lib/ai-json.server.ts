@@ -12,6 +12,9 @@ const GATEWAY_MODEL = "openai/gpt-6-astra";
 const GEMINI_MODEL = "gemini-3.6-flash";
 /** Bulk background reading of hundreds of Drive files — cheapest capable model. */
 const GEMINI_BULK_MODEL = "gemini-3.1-flash-lite";
+/** Second attempt for anything the cheap read left blank — stronger, still free. */
+const GEMINI_GAPFILL_MODEL = "gemini-3.8-flash";
+
 const geminiUrl = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
@@ -106,12 +109,13 @@ function geminiSchema(node: unknown): unknown {
   return out;
 }
 
-async function runGemini(req: JsonModelRequest, key: string) {
+async function runGemini(req: JsonModelRequest, key: string, modelOverride?: string) {
   const parts: Record<string, unknown>[] = [{ text: req.prompt }];
   if (req.file?.base64) {
     parts.push({ inlineData: { mimeType: req.file.mimeType, data: req.file.base64 } });
   }
-  const model = req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
+  const model = modelOverride ?? (req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL);
+
   const res = await fetch(geminiUrl(model), {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -205,42 +209,43 @@ function retryable(err: unknown) {
 }
 
 /**
- * Free reader first, paid reader only for the holes it left. Gemini's own answers
- * are never overwritten, and nothing is sent to any third party beyond Google
- * (the case owner's own API key) and the built-in reader.
+ * Blanks left by the first Gemini read are retried once with a stronger Gemini
+ * model. Nothing is ever sent to the paid built-in reader for gap-filling, so
+ * exhibits build on the free key only. Anything still blank stays blank and shows
+ * up in "Needs your attention" for a human to fill.
  */
 async function topUp(
   req: JsonModelRequest,
   value: Record<string, unknown>,
-  lovableKey: string | undefined,
-  allowFallback: boolean,
+  geminiKey: string,
 ): Promise<Record<string, unknown>> {
   const wanted = req.requiredFields ?? [];
-  if (!wanted.length || !lovableKey) return value;
-  if (!allowFallback && req.allowGapFill !== true) return value;
+  if (!wanted.length) return value;
   const missing = wanted.filter((field) => blank(value[field]));
   if (!missing.length) return value;
   try {
-    const extra = await runGateway(
+    const retry = await runGemini(
       {
         ...req,
         prompt: `${req.prompt}\n\nA first reading of this material could not establish: ${missing.join(", ")}. Establish only those, strictly from the material itself. Leave anything the material does not show empty rather than guessing.`,
       },
-      lovableKey,
+      geminiKey,
+      GEMINI_GAPFILL_MODEL,
     );
     const merged = { ...value };
-    for (const field of missing) if (!blank(extra[field])) merged[field] = extra[field];
+    for (const field of missing) if (!blank(retry.value[field])) merged[field] = retry.value[field];
     await logUsage({
-      provider: "lovable",
-      model: GATEWAY_MODEL,
+      provider: "gemini",
+      model: retry.model,
       purpose: `${req.name}:fill-gaps`,
       ok: true,
+      tokens: retry.tokens,
     });
     return merged;
   } catch (err) {
     await logUsage({
-      provider: "lovable",
-      model: GATEWAY_MODEL,
+      provider: "gemini",
+      model: GEMINI_GAPFILL_MODEL,
       purpose: `${req.name}:fill-gaps`,
       ok: false,
       statusCode: statusFrom(err),
@@ -249,6 +254,7 @@ async function topUp(
     return value;
   }
 }
+
 
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const geminiKey = process.env["GEMINI_API_KEY"];
@@ -267,7 +273,7 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
           ok: true,
           tokens: out.tokens,
         });
-        return await topUp(req, out.value, lovableKey, allowFallback);
+        return await topUp(req, out.value, geminiKey);
       } catch (err) {
         lastErr = err;
         await logUsage({
