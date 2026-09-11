@@ -148,7 +148,15 @@ function FolderRow({
 }
 
 /** Every exhibit filed in one folder: the original PDF, plus its enriched clone. */
-function FolderFiles({ path }: { path: string }) {
+function FolderFiles({
+  path,
+  excludedFiles,
+  onToggleFile,
+}: {
+  path: string;
+  excludedFiles: Set<string>;
+  onToggleFile: (id: string, include: boolean) => void;
+}) {
   const fetchFiles = useServerFn(listCloneFiles);
   const { data, isLoading } = useQuery({
     queryKey: ["gc-clone-files", path],
@@ -171,48 +179,60 @@ function FolderFiles({ path }: { path: string }) {
   }
   return (
     <div className="space-y-1.5">
-      {data.files.map((file) => (
-        <div key={file.driveFileId} className="rounded-lg border border-border bg-card p-2.5">
-          <div className="flex items-start gap-2">
-            <FileText className="mt-0.5 size-3.5 shrink-0 text-navy/50" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-bold text-navy">{file.exhibitTitle}</p>
-              <p className="truncate font-mono text-[10px] text-navy/50">
-                {file.fileName}
-                {file.documentDate ? ` · ${file.documentDate}` : ""}
-                {file.pageCount ? ` · ${file.pageCount} page(s)` : ""}
-              </p>
-              {file.summary ? (
-                <p className="mt-1 line-clamp-2 text-[10px] text-navy/60">{file.summary}</p>
-              ) : null}
+      {data.files.map((file) => {
+        const included = !excludedFiles.has(file.driveFileId);
+        return (
+          <div
+            key={file.driveFileId}
+            className={`rounded-lg border border-border bg-card p-2.5 ${included ? "" : "opacity-55"}`}
+          >
+            <div className="flex items-start gap-2">
+              <Checkbox
+                checked={included}
+                onCheckedChange={(value) => onToggleFile(file.driveFileId, value === true)}
+                aria-label={`Include ${file.exhibitTitle} in the filing`}
+                className="mt-0.5 size-5 shrink-0"
+              />
+              <FileText className="mt-0.5 size-3.5 shrink-0 text-navy/50" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] font-bold text-navy">{file.exhibitTitle}</p>
+                <p className="truncate font-mono text-[10px] text-navy/50">
+                  {file.fileName}
+                  {file.documentDate ? ` · ${file.documentDate}` : ""}
+                  {file.pageCount ? ` · ${file.pageCount} page(s)` : ""}
+                </p>
+                {file.summary ? (
+                  <p className="mt-1 line-clamp-2 text-[10px] text-navy/60">{file.summary}</p>
+                ) : null}
+              </div>
             </div>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <a
-              className="case-view-link inline-flex items-center gap-1 text-[10px]"
-              href={file.originalLink}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <ExternalLink className="size-3" /> Original PDF
-            </a>
-            {file.cloneLink ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
               <a
                 className="case-view-link inline-flex items-center gap-1 text-[10px]"
-                href={file.cloneLink}
+                href={file.originalLink}
                 target="_blank"
                 rel="noreferrer"
               >
-                <ExternalLink className="size-3" /> Exhibit clone
+                <ExternalLink className="size-3" /> Original PDF
               </a>
-            ) : (
-              <span className="text-[10px] font-semibold text-navy/45">
-                {file.status === "error" ? "Could not be read" : "Clone still to build"}
-              </span>
-            )}
+              {file.cloneLink ? (
+                <a
+                  className="case-view-link inline-flex items-center gap-1 text-[10px]"
+                  href={file.cloneLink}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink className="size-3" /> Exhibit clone
+                </a>
+              ) : (
+                <span className="text-[10px] font-semibold text-navy/45">
+                  {file.status === "error" ? "Could not be read" : "Clone still to build"}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
