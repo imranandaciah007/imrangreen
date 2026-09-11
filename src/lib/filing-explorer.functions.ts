@@ -32,6 +32,10 @@ export interface ExplorerFiling {
   totalPages: number;
   model: string;
   generatedAt: string;
+  /** Where the wording came from: the reading engine, or the stored records alone. */
+  languageSource: "ai" | "records";
+  /** Shown to the user when the wording had to fall back to the stored records. */
+  notice?: string;
 }
 
 const SCHEMA = {
