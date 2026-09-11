@@ -258,6 +258,78 @@ export function CaseProgressPanel({
   });
 
   const [path, setPath] = useState<string[]>([]);
+  const [excludedFolders, setExcludedFolders] = useState<Set<string>>(new Set());
+  const [excludedFiles, setExcludedFiles] = useState<Set<string>>(new Set());
+  const [filing, setFiling] = useState<ExplorerFiling | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  const draftFiling = useServerFn(draftExplorerFiling);
+
+  const toggleSet = (
+    setter: (fn: (prev: Set<string>) => Set<string>) => void,
+    key: string,
+    include: boolean,
+  ) =>
+    setter((prev) => {
+      const next = new Set(prev);
+      if (include) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setFiling(null);
+    try {
+      const result = await draftFiling({
+        data: {
+          rootPath: path.join("/"),
+          excludedFolders: [...excludedFolders],
+          excludedFileIds: [...excludedFiles],
+        },
+      });
+      if (!result.exhibits.length) {
+        toast.error("Nothing selected", {
+          description: "Every folder or file in this view is unticked.",
+        });
+        return;
+      }
+      setFiling(result);
+      toast.success("Cover letter and index ready", {
+        description: `${result.exhibits.length} exhibit${result.exhibits.length === 1 ? "" : "s"} · ${result.totalPages} page(s)`,
+      });
+    } catch (error) {
+      toast.error("Could not write the cover letter", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const printFiling = () => {
+    if (!filing) return;
+    const win = window.open("", "_blank");
+    if (!win) {
+      toast.error("Your browser blocked the print window.");
+      return;
+    }
+    win.document.write(explorerFilingHtml(filing));
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
+  };
+
+  const downloadFiling = () => {
+    if (!filing) return;
+    const blob = new Blob([explorerFilingHtml(filing)], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Cover-letter-and-index-${(filing.folderLabel || "all").replace(/[^\w-]+/g, "-")}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const tree = useMemo(() => buildTree(data?.folders ?? []), [data]);
   const rootRow = (data?.folders ?? []).find((row) => !row.path) ?? empty("");
