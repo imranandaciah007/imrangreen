@@ -466,7 +466,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         files,
         last_run_cloned: cloned,
         last_run_queued: queued,
-        note: `${cloned} clone(s) built, ${pendingAfter ?? 0} waiting`,
+        note: `${cloned} clone(s) built, ${verified} already existed, ${pendingAfter ?? 0} waiting`,
         updated_at: new Date().toISOString(),
       })
       .eq("id", true);
@@ -477,6 +477,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
       scanned,
       queued,
       cloned,
+      verified,
       failed,
       pending: pendingAfter ?? 0,
       folders,
