@@ -318,6 +318,25 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
           }
         }
 
+        // Scan Drive first: if a clone of this original already exists,
+        // adopt it into the ledger instead of paying to build it again.
+        const existingClone = await drive.findExistingClone(job.drive_file_id, job.exhibit_id);
+        if (existingClone) {
+          await supabaseAdmin
+            .from("gc_clone_jobs")
+            .update({
+              status: "done",
+              clone_file_id: existingClone.id,
+              clone_name: existingClone.name,
+              clone_link: existingClone.webViewLink,
+              error: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("drive_file_id", job.drive_file_id);
+          verified += 1;
+          return;
+        }
+
         const classification = classifyDriveFile({
           id: job.drive_file_id,
           name: job.file_name,
