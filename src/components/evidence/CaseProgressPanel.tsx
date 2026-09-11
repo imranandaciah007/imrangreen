@@ -501,6 +501,14 @@ export function CaseProgressPanel({
                   {filing.coverLetter.length} paragraph
                   {filing.coverLetter.length === 1 ? "" : "s"}
                 </p>
+                {filing.notice ? (
+                  <p
+                    data-testid="filing-notice"
+                    className="mt-1.5 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-[10px] font-semibold text-destructive"
+                  >
+                    {filing.notice}
+                  </p>
+                ) : null}
                 <div className="mt-2 flex gap-1.5">
                   <Button variant="outline" className="flex-1" onClick={printFiling}>
                     <Printer /> Print
