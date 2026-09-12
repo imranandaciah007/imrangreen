@@ -649,17 +649,32 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
       });
     }
 
+    // Very large originals (long diaries, big scans) cannot be copied page by
+    // page inside one background run, so they get a cover sheet that points at
+    // the untouched original instead of stalling the queue forever.
+    const HEAVY_BYTES = 8 * 1024 * 1024;
+    const HEAVY_PAGES = 150;
+    if (source?.kind === "pdf" && source.bytes.length > HEAVY_BYTES) {
+      originalNote =
+        "This original is too large to copy into the exhibit; the full untouched original stays in Drive and is linked on this cover sheet.";
+      source = null;
+    }
+
     if (source?.kind === "pdf") {
       const src = await PDFDocument.load(source.bytes, { ignoreEncryption: true });
-      // Some originals only reveal broken compression when their streams are
-      // rewritten. Probe here so a bad original degrades to a cover sheet.
-      await src.save({ useObjectStreams: false });
-      const copied = await doc.copyPages(src, src.getPageIndices());
-      for (const p of copied) doc.addPage(p);
-      originalPages = copied.length;
-      originalNote = "";
       const [firstPage] = await doc.embedPdf(src, [0]);
       if (firstPage) preview = { width: firstPage.width, height: firstPage.height, page: firstPage };
+      if (src.getPageCount() > HEAVY_PAGES) {
+        originalNote = `This original runs to ${src.getPageCount()} pages and is not copied into the exhibit; the full untouched original stays in Drive and is linked on this cover sheet.`;
+      } else {
+        // Some originals only reveal broken compression when their streams are
+        // rewritten. Probe here so a bad original degrades to a cover sheet.
+        await src.save({ useObjectStreams: false });
+        const copied = await doc.copyPages(src, src.getPageIndices());
+        for (const p of copied) doc.addPage(p);
+        originalPages = copied.length;
+        originalNote = "";
+      }
     } else if (source) {
       const image =
         source.kind === "png" ? await doc.embedPng(source.bytes) : await doc.embedJpg(source.bytes);
