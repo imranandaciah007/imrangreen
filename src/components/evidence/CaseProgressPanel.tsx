@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  Check,
   ChevronRight,
   Download,
   ExternalLink,
@@ -201,13 +202,23 @@ function FolderFiles({
             key={file.driveFileId}
             className={`rounded-lg border border-border bg-card p-2.5 ${included ? "" : "opacity-55"}`}
           >
-            <div className="flex items-start gap-2">
-              <Checkbox
-                checked={included}
-                onCheckedChange={(value) => onToggleFile(file.driveFileId, value === true)}
+            <div className="flex items-start gap-1">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={included}
                 aria-label={`Include ${file.exhibitTitle} in the filing`}
-                className="mt-0.5 size-5 shrink-0"
-              />
+                className="grid size-11 shrink-0 cursor-pointer place-content-center"
+                onClick={() => onToggleFile(file.driveFileId, !included)}
+              >
+                <span
+                  className={`grid size-6 place-content-center rounded-md border-2 transition-colors ${
+                    included ? "border-navy bg-navy text-white" : "border-navy/40 bg-card"
+                  }`}
+                >
+                  {included ? <Check className="size-4" /> : null}
+                </span>
+              </button>
               <FileText className="mt-0.5 size-3.5 shrink-0 text-navy/50" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[11px] font-bold text-navy">{file.exhibitTitle}</p>
