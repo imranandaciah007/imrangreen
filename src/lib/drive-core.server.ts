@@ -649,6 +649,27 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
       });
     }
 
+    // Very large originals (long diaries, big scans) cannot be copied page by
+    // page inside one background run, so they get a cover sheet that points at
+    // the untouched original instead of stalling the queue forever.
+    const HEAVY_BYTES = 8 * 1024 * 1024;
+    const HEAVY_PAGES = 150;
+    if (source?.kind === "pdf" && source.bytes.length > HEAVY_BYTES) {
+      originalNote =
+        "This original is too large to copy into the exhibit; the full untouched original stays in Drive and is linked on this cover sheet.";
+      source = null;
+    }
+
+    if (source?.kind === "pdf") {
+      const src = await PDFDocument.load(source.bytes, { ignoreEncryption: true });
+      if (src.getPageCount() > HEAVY_PAGES) {
+        originalNote = `This original runs to ${src.getPageCount()} pages and is not copied into the exhibit; the full untouched original stays in Drive and is linked on this cover sheet.`;
+        const [onlyPage] = await doc.embedPdf(src, [0]);
+        if (onlyPage) preview = { width: onlyPage.width, height: onlyPage.height, page: onlyPage };
+        source = null;
+      }
+    }
+
     if (source?.kind === "pdf") {
       const src = await PDFDocument.load(source.bytes, { ignoreEncryption: true });
       // Some originals only reveal broken compression when their streams are
