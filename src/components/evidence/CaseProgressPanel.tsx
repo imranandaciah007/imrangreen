@@ -371,47 +371,64 @@ export function CaseProgressPanel({
         </Button>
       </div>
 
-      <Tabs defaultValue="folders">
+      <Tabs defaultValue="files">
         <TabsList className="w-full">
-          <TabsTrigger value="folders" className="flex-1 text-[11px]">
-            Folders
+          <TabsTrigger value="files" className="flex-1 text-[11px]">
+            Files
           </TabsTrigger>
           <TabsTrigger value="categories" className="flex-1 text-[11px]">
             Categories
           </TabsTrigger>
-          <TabsTrigger value="explorer" className="flex-1 text-[11px]">
-            File explorer
-          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="folders" className="mt-3">
-          {isLoading ? (
-            <div className="case-empty">
-              <Loader2 className="animate-spin" /> Checking the clones folder…
+        <TabsContent value="files" className="mt-3 space-y-2">
+          {!isLoading && tree.length ? (
+            <div className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[11px] font-semibold text-navy/70">
+              {totals.built} of {totals.total} exhibits prepared across {tree.length} folder
+              {tree.length === 1 ? "" : "s"} ({overall}%) ·{" "}
+              {selectedFolders.size + selectedFiles.size} ticked for the paperwork
             </div>
-          ) : tree.length ? (
-            <>
-              <div className="mb-3 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[11px] font-semibold text-navy/70">
-                {totals.built} of {totals.total} exhibits prepared across {tree.length} folder
-                {tree.length === 1 ? "" : "s"} ({overall}%)
-              </div>
-              <div className="case-coverage-list">
-                {tree.slice(0, 8).map((node, index) => (
-                  <FolderRow
-                    key={node.path}
-                    node={node}
-                    index={index}
-                    onOpen={() => setPath([node.name])}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="case-empty">
-              <Folder /> No folders yet — press Synch now to mirror your Drive.
-            </div>
-          )}
-        </TabsContent>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-1 text-[11px] font-bold text-navy/70">
+            <button type="button" className="case-view-link" onClick={() => setPath([])}>
+              {data?.root ?? "I601 Evidence Clones"}
+            </button>
+            {path.map((part, index) => (
+              <span key={part + index} className="flex items-center gap-1">
+                <ChevronRight className="size-3 text-navy/40" />
+                <button
+                  type="button"
+                  className="case-view-link"
+                  onClick={() => setPath(path.slice(0, index + 1))}
+                >
+                  {part}
+                </button>
+              </span>
+            ))}
+            <span className="ml-auto flex gap-2">
+              <button
+                type="button"
+                className="case-view-link"
+                onClick={() => {
+                  setSelectedFolders(new Set(current.list.map((node) => node.path)));
+                  toast.success("All folders in this view ticked");
+                }}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                className="case-view-link"
+                onClick={() => {
+                  setSelectedFolders(new Set());
+                  setSelectedFiles(new Set());
+                }}
+              >
+                Clear
+              </button>
+            </span>
+          </div>
 
         <TabsContent value="categories" className="mt-3">
           <div className="case-coverage-list">
