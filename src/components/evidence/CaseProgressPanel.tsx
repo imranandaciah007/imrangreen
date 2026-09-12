@@ -150,11 +150,11 @@ function FolderRow({
 /** Every exhibit filed in one folder: the original PDF, plus its enriched clone. */
 function FolderFiles({
   path,
-  excludedFiles,
+  selectedFiles,
   onToggleFile,
 }: {
   path: string;
-  excludedFiles: Set<string>;
+  selectedFiles: Set<string>;
   onToggleFile: (id: string, include: boolean) => void;
 }) {
   const fetchFiles = useServerFn(listCloneFiles);
@@ -180,7 +180,7 @@ function FolderFiles({
   return (
     <div className="space-y-1.5">
       {data.files.map((file) => {
-        const included = !excludedFiles.has(file.driveFileId);
+        const included = selectedFiles.has(file.driveFileId);
         return (
           <div
             key={file.driveFileId}
@@ -238,8 +238,9 @@ function FolderFiles({
 }
 
 /**
- * Case progress, shown two ways: the folders that exist inside the clones root
- * in Drive, and the hardship categories. A third tab browses the mirror itself.
+ * Case progress: one merged file explorer mirroring the clones root in Drive
+ * (tick folders or individual documents to include them in the paperwork), and
+ * a hardship-category view.
  */
 export function CaseProgressPanel({
   onOpenCategory,
@@ -258,8 +259,9 @@ export function CaseProgressPanel({
   });
 
   const [path, setPath] = useState<string[]>([]);
-  const [excludedFolders, setExcludedFolders] = useState<Set<string>>(new Set());
-  const [excludedFiles, setExcludedFiles] = useState<Set<string>>(new Set());
+  // Nothing is included until it is ticked.
+  const [selectedFolders, setSelectedFolders] = useState<Set<string>>(new Set());
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [filing, setFiling] = useState<ExplorerFiling | null>(null);
   const [generating, setGenerating] = useState(false);
 
