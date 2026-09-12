@@ -662,25 +662,19 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
 
     if (source?.kind === "pdf") {
       const src = await PDFDocument.load(source.bytes, { ignoreEncryption: true });
-      if (src.getPageCount() > HEAVY_PAGES) {
-        originalNote = `This original runs to ${src.getPageCount()} pages and is not copied into the exhibit; the full untouched original stays in Drive and is linked on this cover sheet.`;
-        const [onlyPage] = await doc.embedPdf(src, [0]);
-        if (onlyPage) preview = { width: onlyPage.width, height: onlyPage.height, page: onlyPage };
-        source = null;
-      }
-    }
-
-    if (source?.kind === "pdf") {
-      const src = await PDFDocument.load(source.bytes, { ignoreEncryption: true });
-      // Some originals only reveal broken compression when their streams are
-      // rewritten. Probe here so a bad original degrades to a cover sheet.
-      await src.save({ useObjectStreams: false });
-      const copied = await doc.copyPages(src, src.getPageIndices());
-      for (const p of copied) doc.addPage(p);
-      originalPages = copied.length;
-      originalNote = "";
       const [firstPage] = await doc.embedPdf(src, [0]);
       if (firstPage) preview = { width: firstPage.width, height: firstPage.height, page: firstPage };
+      if (src.getPageCount() > HEAVY_PAGES) {
+        originalNote = `This original runs to ${src.getPageCount()} pages and is not copied into the exhibit; the full untouched original stays in Drive and is linked on this cover sheet.`;
+      } else {
+        // Some originals only reveal broken compression when their streams are
+        // rewritten. Probe here so a bad original degrades to a cover sheet.
+        await src.save({ useObjectStreams: false });
+        const copied = await doc.copyPages(src, src.getPageIndices());
+        for (const p of copied) doc.addPage(p);
+        originalPages = copied.length;
+        originalNote = "";
+      }
     } else if (source) {
       const image =
         source.kind === "png" ? await doc.embedPng(source.bytes) : await doc.embedJpg(source.bytes);
