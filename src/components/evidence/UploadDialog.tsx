@@ -215,6 +215,7 @@ export function UploadDialog({
         setSourceType(a.sourceType as SourceType);
       if (a.pageCount) setPageCount(String(a.pageCount));
       if (result.summary) setNotes((prev) => prev || result.summary);
+      if (result.aciahImpact) setAffectsAciah((prev) => prev || result.aciahImpact);
       setStatus(result.uncertain.length ? "Needs confirmation" : "Reviewed");
       const dup = findDuplicate(next, a.documentDate ?? "");
       setDuplicate(dup);
