@@ -280,19 +280,25 @@ export function CaseProgressPanel({
     });
 
   const handleGenerate = async () => {
+    if (!selectedFolders.size && !selectedFiles.size) {
+      toast.error("Nothing selected", {
+        description: "Tick a folder or a document first, or press Select all.",
+      });
+      return;
+    }
     setGenerating(true);
     setFiling(null);
     try {
       const result = await draftFiling({
         data: {
           rootPath: path.join("/"),
-          excludedFolders: [...excludedFolders],
-          excludedFileIds: [...excludedFiles],
+          includedFolders: [...selectedFolders],
+          includedFileIds: [...selectedFiles],
         },
       });
       if (!result.exhibits.length) {
         toast.error("Nothing selected", {
-          description: "Every folder or file in this view is unticked.",
+          description: "None of the ticked items have an exhibit yet.",
         });
         return;
       }
