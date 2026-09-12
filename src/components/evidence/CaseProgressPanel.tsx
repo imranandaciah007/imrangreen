@@ -430,6 +430,85 @@ export function CaseProgressPanel({
             </span>
           </div>
 
+          {isLoading ? (
+            <div className="case-empty">
+              <Loader2 className="animate-spin" /> Checking the clones folder…
+            </div>
+          ) : tree.length ? (
+            <>
+              {current.list.length ? (
+                <div className="case-coverage-list">
+                  {current.list.map((node, index) => (
+                    <FolderRow
+                      key={node.path}
+                      node={node}
+                      index={index}
+                      onOpen={() => setPath([...path, node.name])}
+                      selected={selectedFolders.has(node.path)}
+                      onToggle={(next) => toggleSet(setSelectedFolders, node.path, next)}
+                    />
+                  ))}
+                </div>
+              ) : path.length ? (
+                <div className="case-empty">
+                  <FolderOpen /> No subfolders here.
+                </div>
+              ) : null}
+              <FolderFiles
+                path={path.join("/")}
+                selectedFiles={selectedFiles}
+                onToggleFile={(id, include) => toggleSet(setSelectedFiles, id, include)}
+              />
+
+              <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                <p className="text-[11px] font-bold text-navy">Submission paperwork</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-navy/60">
+                  Tick the folders or documents to include — nothing is included until you tick
+                  it — then build the cover letter and exhibit index.
+                </p>
+                <Button className="mt-2 w-full" onClick={handleGenerate} disabled={generating}>
+                  {generating ? <Loader2 className="animate-spin" /> : <FileSignature />}
+                  {generating ? "Writing the paperwork…" : "Generate cover letter + index"}
+                </Button>
+                {filing ? (
+                  <>
+                    <p className="mt-2 text-[10px] font-semibold text-navy/60">
+                      {filing.exhibits.length} exhibit
+                      {filing.exhibits.length === 1 ? "" : "s"} · {filing.totalPages} page(s) ·{" "}
+                      {filing.coverLetter.length} paragraph
+                      {filing.coverLetter.length === 1 ? "" : "s"}
+                    </p>
+                    {filing.notice ? (
+                      <p
+                        data-testid="filing-notice"
+                        className="mt-1.5 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-[10px] font-semibold text-destructive"
+                      >
+                        {filing.notice}
+                      </p>
+                    ) : null}
+                    <div className="mt-2 flex gap-1.5">
+                      <Button variant="outline" className="flex-1" onClick={printFiling}>
+                        <Printer /> Print
+                      </Button>
+                      <Button variant="outline" className="flex-1" onClick={downloadFiling}>
+                        <Download /> Save
+                      </Button>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              <Button variant="outline" className="w-full" onClick={onOpenBoard}>
+                <FolderOpen /> Open the full file board
+              </Button>
+            </>
+          ) : (
+            <div className="case-empty">
+              <Folder /> No folders yet — press Synch now to mirror your Drive.
+            </div>
+          )}
+        </TabsContent>
+
         <TabsContent value="categories" className="mt-3">
           <div className="case-coverage-list">
             {stats.byCategory.slice(0, 8).map((row, index) => (
