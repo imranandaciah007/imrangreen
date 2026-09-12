@@ -150,11 +150,11 @@ function FolderRow({
 /** Every exhibit filed in one folder: the original PDF, plus its enriched clone. */
 function FolderFiles({
   path,
-  excludedFiles,
+  selectedFiles,
   onToggleFile,
 }: {
   path: string;
-  excludedFiles: Set<string>;
+  selectedFiles: Set<string>;
   onToggleFile: (id: string, include: boolean) => void;
 }) {
   const fetchFiles = useServerFn(listCloneFiles);
@@ -180,7 +180,7 @@ function FolderFiles({
   return (
     <div className="space-y-1.5">
       {data.files.map((file) => {
-        const included = !excludedFiles.has(file.driveFileId);
+        const included = selectedFiles.has(file.driveFileId);
         return (
           <div
             key={file.driveFileId}
@@ -238,8 +238,9 @@ function FolderFiles({
 }
 
 /**
- * Case progress, shown two ways: the folders that exist inside the clones root
- * in Drive, and the hardship categories. A third tab browses the mirror itself.
+ * Case progress: one merged file explorer mirroring the clones root in Drive
+ * (tick folders or individual documents to include them in the paperwork), and
+ * a hardship-category view.
  */
 export function CaseProgressPanel({
   onOpenCategory,
@@ -258,8 +259,9 @@ export function CaseProgressPanel({
   });
 
   const [path, setPath] = useState<string[]>([]);
-  const [excludedFolders, setExcludedFolders] = useState<Set<string>>(new Set());
-  const [excludedFiles, setExcludedFiles] = useState<Set<string>>(new Set());
+  // Nothing is included until it is ticked.
+  const [selectedFolders, setSelectedFolders] = useState<Set<string>>(new Set());
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [filing, setFiling] = useState<ExplorerFiling | null>(null);
   const [generating, setGenerating] = useState(false);
 
@@ -278,19 +280,25 @@ export function CaseProgressPanel({
     });
 
   const handleGenerate = async () => {
+    if (!selectedFolders.size && !selectedFiles.size) {
+      toast.error("Nothing selected", {
+        description: "Tick a folder or a document first, or press Select all.",
+      });
+      return;
+    }
     setGenerating(true);
     setFiling(null);
     try {
       const result = await draftFiling({
         data: {
           rootPath: path.join("/"),
-          excludedFolders: [...excludedFolders],
-          excludedFileIds: [...excludedFiles],
+          includedFolders: [...selectedFolders],
+          includedFileIds: [...selectedFiles],
         },
       });
       if (!result.exhibits.length) {
         toast.error("Nothing selected", {
-          description: "Every folder or file in this view is unticked.",
+          description: "None of the ticked items have an exhibit yet.",
         });
         return;
       }
@@ -363,40 +371,136 @@ export function CaseProgressPanel({
         </Button>
       </div>
 
-      <Tabs defaultValue="folders">
+      <Tabs defaultValue="files">
         <TabsList className="w-full">
-          <TabsTrigger value="folders" className="flex-1 text-[11px]">
-            Folders
+          <TabsTrigger value="files" className="flex-1 text-[11px]">
+            Files
           </TabsTrigger>
           <TabsTrigger value="categories" className="flex-1 text-[11px]">
             Categories
           </TabsTrigger>
-          <TabsTrigger value="explorer" className="flex-1 text-[11px]">
-            File explorer
-          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="folders" className="mt-3">
+        <TabsContent value="files" className="mt-3 space-y-2">
+          {!isLoading && tree.length ? (
+            <div className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[11px] font-semibold text-navy/70">
+              {totals.built} of {totals.total} exhibits prepared across {tree.length} folder
+              {tree.length === 1 ? "" : "s"} ({overall}%) ·{" "}
+              {selectedFolders.size + selectedFiles.size} ticked for the paperwork
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-1 text-[11px] font-bold text-navy/70">
+            <button type="button" className="case-view-link" onClick={() => setPath([])}>
+              {data?.root ?? "I601 Evidence Clones"}
+            </button>
+            {path.map((part, index) => (
+              <span key={part + index} className="flex items-center gap-1">
+                <ChevronRight className="size-3 text-navy/40" />
+                <button
+                  type="button"
+                  className="case-view-link"
+                  onClick={() => setPath(path.slice(0, index + 1))}
+                >
+                  {part}
+                </button>
+              </span>
+            ))}
+            <span className="ml-auto flex gap-2">
+              <button
+                type="button"
+                className="case-view-link"
+                onClick={() => {
+                  setSelectedFolders(new Set(current.list.map((node) => node.path)));
+                  toast.success("All folders in this view ticked");
+                }}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                className="case-view-link"
+                onClick={() => {
+                  setSelectedFolders(new Set());
+                  setSelectedFiles(new Set());
+                }}
+              >
+                Clear
+              </button>
+            </span>
+          </div>
+
           {isLoading ? (
             <div className="case-empty">
               <Loader2 className="animate-spin" /> Checking the clones folder…
             </div>
           ) : tree.length ? (
             <>
-              <div className="mb-3 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[11px] font-semibold text-navy/70">
-                {totals.built} of {totals.total} exhibits prepared across {tree.length} folder
-                {tree.length === 1 ? "" : "s"} ({overall}%)
+              {current.list.length ? (
+                <div className="case-coverage-list">
+                  {current.list.map((node, index) => (
+                    <FolderRow
+                      key={node.path}
+                      node={node}
+                      index={index}
+                      onOpen={() => setPath([...path, node.name])}
+                      selected={selectedFolders.has(node.path)}
+                      onToggle={(next) => toggleSet(setSelectedFolders, node.path, next)}
+                    />
+                  ))}
+                </div>
+              ) : path.length ? (
+                <div className="case-empty">
+                  <FolderOpen /> No subfolders here.
+                </div>
+              ) : null}
+              <FolderFiles
+                path={path.join("/")}
+                selectedFiles={selectedFiles}
+                onToggleFile={(id, include) => toggleSet(setSelectedFiles, id, include)}
+              />
+
+              <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                <p className="text-[11px] font-bold text-navy">Submission paperwork</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-navy/60">
+                  Tick the folders or documents to include — nothing is included until you tick
+                  it — then build the cover letter and exhibit index.
+                </p>
+                <Button className="mt-2 w-full" onClick={handleGenerate} disabled={generating}>
+                  {generating ? <Loader2 className="animate-spin" /> : <FileSignature />}
+                  {generating ? "Writing the paperwork…" : "Generate cover letter + index"}
+                </Button>
+                {filing ? (
+                  <>
+                    <p className="mt-2 text-[10px] font-semibold text-navy/60">
+                      {filing.exhibits.length} exhibit
+                      {filing.exhibits.length === 1 ? "" : "s"} · {filing.totalPages} page(s) ·{" "}
+                      {filing.coverLetter.length} paragraph
+                      {filing.coverLetter.length === 1 ? "" : "s"}
+                    </p>
+                    {filing.notice ? (
+                      <p
+                        data-testid="filing-notice"
+                        className="mt-1.5 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-[10px] font-semibold text-destructive"
+                      >
+                        {filing.notice}
+                      </p>
+                    ) : null}
+                    <div className="mt-2 flex gap-1.5">
+                      <Button variant="outline" className="flex-1" onClick={printFiling}>
+                        <Printer /> Print
+                      </Button>
+                      <Button variant="outline" className="flex-1" onClick={downloadFiling}>
+                        <Download /> Save
+                      </Button>
+                    </div>
+                  </>
+                ) : null}
               </div>
-              <div className="case-coverage-list">
-                {tree.slice(0, 8).map((node, index) => (
-                  <FolderRow
-                    key={node.path}
-                    node={node}
-                    index={index}
-                    onOpen={() => setPath([node.name])}
-                  />
-                ))}
-              </div>
+
+              <Button variant="outline" className="w-full" onClick={onOpenBoard}>
+                <FolderOpen /> Open the full file board
+              </Button>
             </>
           ) : (
             <div className="case-empty">
@@ -432,99 +536,6 @@ export function CaseProgressPanel({
           </div>
         </TabsContent>
 
-        <TabsContent value="explorer" className="mt-3 space-y-2">
-          <div className="flex flex-wrap items-center gap-1 text-[11px] font-bold text-navy/70">
-            <button type="button" className="case-view-link" onClick={() => setPath([])}>
-              {data?.root ?? "I601 Evidence Clones"}
-            </button>
-            {path.map((part, index) => (
-              <span key={part + index} className="flex items-center gap-1">
-                <ChevronRight className="size-3 text-navy/40" />
-                <button
-                  type="button"
-                  className="case-view-link"
-                  onClick={() => setPath(path.slice(0, index + 1))}
-                >
-                  {part}
-                </button>
-              </span>
-            ))}
-          </div>
-
-          {isLoading ? (
-            <div className="case-empty">
-              <Loader2 className="animate-spin" /> Reading the mirror…
-            </div>
-          ) : (
-            <>
-              {current.list.length ? (
-                <div className="case-coverage-list">
-                  {current.list.map((node, index) => (
-                    <FolderRow
-                      key={node.path}
-                      node={node}
-                      index={index}
-                      onOpen={() => setPath([...path, node.name])}
-                      selected={!excludedFolders.has(node.path)}
-                      onToggle={(next) => toggleSet(setExcludedFolders, node.path, next)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="case-empty">
-                  <FolderOpen /> No subfolders here.
-                </div>
-              )}
-              <FolderFiles
-                path={path.join("/")}
-                excludedFiles={excludedFiles}
-                onToggleFile={(id, include) => toggleSet(setExcludedFiles, id, include)}
-              />
-            </>
-          )}
-
-          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
-            <p className="text-[11px] font-bold text-navy">Submission paperwork</p>
-            <p className="mt-0.5 text-[10px] font-semibold text-navy/60">
-              Untick anything you do not want included, then build the cover letter and exhibit
-              index for {path.length ? path[path.length - 1] : data?.root ?? "everything"}.
-            </p>
-            <Button className="mt-2 w-full" onClick={handleGenerate} disabled={generating}>
-              {generating ? <Loader2 className="animate-spin" /> : <FileSignature />}
-              {generating ? "Writing the paperwork…" : "Generate cover letter + index"}
-            </Button>
-            {filing ? (
-              <>
-                <p className="mt-2 text-[10px] font-semibold text-navy/60">
-                  {filing.exhibits.length} exhibit
-                  {filing.exhibits.length === 1 ? "" : "s"} · {filing.totalPages} page(s) ·{" "}
-                  {filing.coverLetter.length} paragraph
-                  {filing.coverLetter.length === 1 ? "" : "s"}
-                </p>
-                {filing.notice ? (
-                  <p
-                    data-testid="filing-notice"
-                    className="mt-1.5 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-[10px] font-semibold text-destructive"
-                  >
-                    {filing.notice}
-                  </p>
-                ) : null}
-                <div className="mt-2 flex gap-1.5">
-                  <Button variant="outline" className="flex-1" onClick={printFiling}>
-                    <Printer /> Print
-                  </Button>
-                  <Button variant="outline" className="flex-1" onClick={downloadFiling}>
-                    <Download /> Save
-                  </Button>
-                </div>
-              </>
-            ) : null}
-          </div>
-
-          <Button variant="outline" className="w-full" onClick={onOpenBoard}>
-            <FolderOpen /> Open the full file board
-          </Button>
-        </TabsContent>
       </Tabs>
     </section>
   );

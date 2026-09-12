@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -55,7 +55,28 @@ export const Route = createFileRoute("/")({
 
 function CaseApp() {
   const { loading, stats, syncDrive, scanAllDocuments, setFilters } = useEvidence();
-  const [tab, setTab] = useState<MainTab>("home");
+  const [tab, setTabRaw] = useState<MainTab>("home");
+  const tabRef = useRef<MainTab>("home");
+
+  // Give every page switch its own browser history entry, so the phone's back
+  // button returns to the previous page instead of leaving the app.
+  function setTab(next: MainTab) {
+    if (next === tabRef.current) return;
+    tabRef.current = next;
+    setTabRaw(next);
+    window.history.pushState({ gcTab: next }, "");
+  }
+
+  useEffect(() => {
+    window.history.replaceState({ gcTab: "home" }, "");
+    const onPop = (event: PopStateEvent) => {
+      const target = (event.state?.gcTab as MainTab | undefined) ?? "home";
+      tabRef.current = target;
+      setTabRaw(target);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const [connectOpen, setConnectOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
