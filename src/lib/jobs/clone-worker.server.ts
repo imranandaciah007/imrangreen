@@ -257,12 +257,30 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         .eq("id", true);
     }
 
-    // 2. Recover rows a crashed run left mid-flight.
-    await supabaseAdmin
+    // 2. Recover rows a crashed run left mid-flight. Count the lost attempt so a
+    // document that keeps killing the run cannot circle the queue forever.
+    const staleBefore = new Date(now.getTime() - STALE_CLAIM_MINUTES * 60_000).toISOString();
+    const { data: staleRows } = await supabaseAdmin
       .from("gc_clone_jobs")
-      .update({ status: "pending", updated_at: now.toISOString() })
+      .select("drive_file_id,attempts")
       .eq("status", "processing")
-      .lt("updated_at", new Date(now.getTime() - STALE_CLAIM_MINUTES * 60_000).toISOString());
+      .lt("updated_at", staleBefore);
+    for (const row of staleRows ?? []) {
+      const attempts = (row.attempts ?? 0) + 1;
+      await supabaseAdmin
+        .from("gc_clone_jobs")
+        .update({
+          status: attempts >= MAX_ATTEMPTS ? "failed" : "pending",
+          attempts,
+          error:
+            attempts >= MAX_ATTEMPTS
+              ? "This document is too heavy to prepare automatically — needs your attention"
+              : "Interrupted while preparing; will be retried",
+          updated_at: now.toISOString(),
+        })
+        .eq("drive_file_id", row.drive_file_id)
+        .eq("status", "processing");
+    }
 
     // 3. Claim a bounded batch so no other run can pick up the same documents.
     const { data: candidates } = await supabaseAdmin
