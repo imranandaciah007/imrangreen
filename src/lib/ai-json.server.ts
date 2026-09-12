@@ -63,7 +63,7 @@ function blank(value: unknown) {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Records every model call so the app can show honest usage figures. */
-async function logUsage(entry: {
+export async function logAiUsage(entry: {
   provider: string;
   model: string;
   purpose?: string | undefined;
