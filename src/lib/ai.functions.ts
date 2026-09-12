@@ -12,6 +12,7 @@ export interface ExtractionPass {
   sourceType: string;
   pageCount: number;
   summary: string;
+  aciahImpact: string;
   language: string;
 }
 
@@ -21,6 +22,8 @@ export interface ExtractionResult {
   /** Fields the two passes disagreed on, with both candidate values. */
   uncertain: { field: string; options: string[] }[];
   summary: string;
+  /** Factual sentence on the effect on Aciah, when the document shows one. */
+  aciahImpact: string;
   language: string;
   passes: ExtractionPass[];
   ranAt: string;
@@ -38,6 +41,7 @@ const SCHEMA = {
     "sourceType",
     "pageCount",
     "summary",
+    "aciahImpact",
     "language",
   ],
   properties: {
@@ -59,6 +63,11 @@ const SCHEMA = {
     sourceType: { type: "string", description: "One of the provided source types" },
     pageCount: { type: "number", description: "Number of pages, 1 if unknown" },
     summary: { type: "string", description: "Two sentences on why this may matter for the case" },
+    aciahImpact: {
+      type: "string",
+      description:
+        "One factual sentence on how this affects Aciah, or empty string if the document does not show that",
+    },
     language: { type: "string", description: "Main language of the document" },
   },
 } as const;
@@ -105,6 +114,9 @@ async function runPass(input: {
     schema: SCHEMA,
     name: "evidence_extraction",
     file: { fileName: input.fileName, mimeType: input.mimeType, base64: input.base64 },
+    // Anything the first read leaves blank is retried once with a stronger Gemini model.
+    requiredFields: ["title", "documentDate", "people", "categories", "sourceType", "summary"],
+    allowGapFill: true,
   });
   return {
     title: String(parsed["title"] ?? "").trim(),
@@ -114,6 +126,7 @@ async function runPass(input: {
     sourceType: String(parsed["sourceType"] ?? "").trim(),
     pageCount: Math.max(1, Number(parsed["pageCount"]) || 1),
     summary: String(parsed["summary"] ?? "").trim(),
+    aciahImpact: String(parsed["aciahImpact"] ?? "").trim(),
     language: String(parsed["language"] ?? "").trim(),
   } satisfies ExtractionPass;
 }
@@ -211,6 +224,9 @@ async function twoPass(data: {
     if (x && y && x.toLowerCase() === y.toLowerCase()) {
       (agreed as Record<string, unknown>)[field] = x;
     } else if (x || y) {
+      // Still prefill the best available reading so no field is left empty; it is
+      // flagged as uncertain so it can be confirmed or corrected.
+      (agreed as Record<string, unknown>)[field] = x || y;
       uncertain.push({ field, options: [x, y].filter(Boolean) as string[] });
     }
   };
@@ -220,18 +236,22 @@ async function twoPass(data: {
   pushScalar("sourceType", a.sourceType, b.sourceType);
 
   if (samePass(a.people, b.people) && a.people.length) agreed.people = a.people;
-  else if (a.people.length || b.people.length)
+  else if (a.people.length || b.people.length) {
+    agreed.people = a.people.length ? a.people : b.people;
     uncertain.push({
       field: "people",
       options: [a.people.join(", "), b.people.join(", ")].filter(Boolean),
     });
+  }
 
   if (samePass(a.categories, b.categories) && a.categories.length) agreed.categories = a.categories;
-  else if (a.categories.length || b.categories.length)
+  else if (a.categories.length || b.categories.length) {
+    agreed.categories = a.categories.length ? a.categories : b.categories;
     uncertain.push({
       field: "categories",
       options: [a.categories.join(", "), b.categories.join(", ")].filter(Boolean),
     });
+  }
 
   if (a.pageCount === b.pageCount) agreed.pageCount = a.pageCount;
   else uncertain.push({ field: "pageCount", options: [String(a.pageCount), String(b.pageCount)] });
@@ -240,6 +260,7 @@ async function twoPass(data: {
     agreed,
     uncertain,
     summary: a.summary || b.summary,
+    aciahImpact: a.aciahImpact || b.aciahImpact,
     language: a.language || b.language,
     passes: [a, b],
     ranAt: new Date().toISOString(),
