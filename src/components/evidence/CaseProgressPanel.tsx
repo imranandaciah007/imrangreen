@@ -109,14 +109,29 @@ function FolderRow({
 }) {
   const percent = node.total ? Math.round((node.built / node.total) * 100) : 0;
   return (
-    <div className={`flex items-center gap-2 ${onToggle && !selected ? "opacity-60" : ""}`}>
+    <div className={`flex items-center gap-1 ${onToggle && !selected ? "opacity-60" : ""}`}>
       {onToggle ? (
-        <Checkbox
-          checked={selected ?? false}
-          onCheckedChange={(value) => onToggle(value === true)}
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected ?? false}
           aria-label={`Include ${node.name} in the filing`}
-          className="size-5 shrink-0"
-        />
+          className="grid size-11 shrink-0 cursor-pointer place-content-center"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(!selected);
+          }}
+        >
+          <span
+            className={`grid size-6 place-content-center rounded-md border-2 transition-colors ${
+              selected
+                ? "border-navy bg-navy text-white"
+                : "border-navy/40 bg-card"
+            }`}
+          >
+            {selected ? <Check className="size-4" /> : null}
+          </span>
+        </button>
       ) : null}
       <button
         type="button"
