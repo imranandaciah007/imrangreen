@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  Check,
   ChevronRight,
   Download,
   ExternalLink,
@@ -15,7 +16,7 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -109,14 +110,29 @@ function FolderRow({
 }) {
   const percent = node.total ? Math.round((node.built / node.total) * 100) : 0;
   return (
-    <div className={`flex items-center gap-2 ${onToggle && !selected ? "opacity-60" : ""}`}>
+    <div className={`flex items-center gap-1 ${onToggle && !selected ? "opacity-60" : ""}`}>
       {onToggle ? (
-        <Checkbox
-          checked={selected ?? false}
-          onCheckedChange={(value) => onToggle(value === true)}
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected ?? false}
           aria-label={`Include ${node.name} in the filing`}
-          className="size-5 shrink-0"
-        />
+          className="grid size-11 shrink-0 cursor-pointer place-content-center"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(!selected);
+          }}
+        >
+          <span
+            className={`grid size-6 place-content-center rounded-md border-2 transition-colors ${
+              selected
+                ? "border-navy bg-navy text-white"
+                : "border-navy/40 bg-card"
+            }`}
+          >
+            {selected ? <Check className="size-4" /> : null}
+          </span>
+        </button>
       ) : null}
       <button
         type="button"
@@ -186,13 +202,23 @@ function FolderFiles({
             key={file.driveFileId}
             className={`rounded-lg border border-border bg-card p-2.5 ${included ? "" : "opacity-55"}`}
           >
-            <div className="flex items-start gap-2">
-              <Checkbox
-                checked={included}
-                onCheckedChange={(value) => onToggleFile(file.driveFileId, value === true)}
+            <div className="flex items-start gap-1">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={included}
                 aria-label={`Include ${file.exhibitTitle} in the filing`}
-                className="mt-0.5 size-5 shrink-0"
-              />
+                className="grid size-11 shrink-0 cursor-pointer place-content-center"
+                onClick={() => onToggleFile(file.driveFileId, !included)}
+              >
+                <span
+                  className={`grid size-6 place-content-center rounded-md border-2 transition-colors ${
+                    included ? "border-navy bg-navy text-white" : "border-navy/40 bg-card"
+                  }`}
+                >
+                  {included ? <Check className="size-4" /> : null}
+                </span>
+              </button>
               <FileText className="mt-0.5 size-3.5 shrink-0 text-navy/50" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[11px] font-bold text-navy">{file.exhibitTitle}</p>
@@ -274,8 +300,8 @@ export function CaseProgressPanel({
   ) =>
     setter((prev) => {
       const next = new Set(prev);
-      if (include) next.delete(key);
-      else next.add(key);
+      if (include) next.add(key);
+      else next.delete(key);
       return next;
     });
 
