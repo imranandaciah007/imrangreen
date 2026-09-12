@@ -63,7 +63,7 @@ function blank(value: unknown) {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Records every model call so the app can show honest usage figures. */
-async function logUsage(entry: {
+export async function logAiUsage(entry: {
   provider: string;
   model: string;
   purpose?: string | undefined;
@@ -234,7 +234,7 @@ async function topUp(
     );
     const merged = { ...value };
     for (const field of missing) if (!blank(retry.value[field])) merged[field] = retry.value[field];
-    await logUsage({
+    await logAiUsage({
       provider: "gemini",
       model: retry.model,
       purpose: `${req.name}:fill-gaps`,
@@ -243,7 +243,7 @@ async function topUp(
     });
     return merged;
   } catch (err) {
-    await logUsage({
+    await logAiUsage({
       provider: "gemini",
       model: GEMINI_GAPFILL_MODEL,
       purpose: `${req.name}:fill-gaps`,
@@ -266,7 +266,7 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const out = await runGemini(req, geminiKey);
-        await logUsage({
+        await logAiUsage({
           provider: "gemini",
           model: out.model,
           purpose: req.name,
@@ -276,7 +276,7 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
         return await topUp(req, out.value, geminiKey);
       } catch (err) {
         lastErr = err;
-        await logUsage({
+        await logAiUsage({
           provider: "gemini",
           model: geminiModel,
           purpose: req.name,
@@ -294,10 +294,10 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
   if (!lovableKey) throw new Error("AI is not configured for this project.");
   try {
     const value = await runGateway(req, lovableKey);
-    await logUsage({ provider: "lovable", model: GATEWAY_MODEL, purpose: req.name, ok: true });
+    await logAiUsage({ provider: "lovable", model: GATEWAY_MODEL, purpose: req.name, ok: true });
     return value;
   } catch (err) {
-    await logUsage({
+    await logAiUsage({
       provider: "lovable",
       model: GATEWAY_MODEL,
       purpose: req.name,

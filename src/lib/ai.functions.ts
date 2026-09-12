@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { runJsonModel } from "./ai-json.server";
+import { jsonModelName, runJsonModel } from "./ai-json.server";
+import { verifyWithOpenAi, type VerificationReport } from "./ai-verify.server";
 
 const DRIVE_GATEWAY = "https://connector-gateway.lovable.dev/google_drive";
 const MAX_BYTES = 12 * 1024 * 1024;
@@ -28,6 +29,8 @@ export interface ExtractionResult {
   passes: ExtractionPass[];
   ranAt: string;
   contentRead: boolean;
+  /** Independent OpenAI check of what Gemini extracted. */
+  verification: VerificationReport;
 }
 
 const SCHEMA = {
@@ -256,15 +259,54 @@ async function twoPass(data: {
   if (a.pageCount === b.pageCount) agreed.pageCount = a.pageCount;
   else uncertain.push({ field: "pageCount", options: [String(a.pageCount), String(b.pageCount)] });
 
+  const ranAt = new Date().toISOString();
+  const summary = a.summary || b.summary;
+
+  // Independent second opinion. It can flag and question, never fill in blanks,
+  // and an outage is reported honestly instead of counting as a double-check.
+  const claims = Object.entries(agreed)
+    .map(([field, value]) => ({
+      field,
+      value: Array.isArray(value) ? value.join(", ") : String(value ?? ""),
+    }))
+    .filter((c) => c.value.trim() !== "");
+  const verification = await verifyWithOpenAi({
+    claims,
+    summary,
+    fileName: data.fileName,
+    mimeType: data.mimeType,
+    base64,
+    analysisProvider: "gemini",
+    analysisModel: jsonModelName(),
+    analysedAt: ranAt,
+    purpose: "evidence_extraction",
+  });
+
+  for (const field of verification.fields) {
+    if (field.verdict !== "disagrees") continue;
+    const existing = uncertain.find((u) => u.field === field.field);
+    const option = field.documentShows.trim();
+    if (existing) {
+      if (option && !existing.options.includes(option)) existing.options.push(option);
+    } else {
+      const current = claims.find((c) => c.field === field.field)?.value ?? "";
+      uncertain.push({
+        field: field.field,
+        options: [current, option].filter(Boolean),
+      });
+    }
+  }
+
   return {
     agreed,
     uncertain,
-    summary: a.summary || b.summary,
+    summary,
     aciahImpact: a.aciahImpact || b.aciahImpact,
     language: a.language || b.language,
     passes: [a, b],
-    ranAt: new Date().toISOString(),
+    ranAt,
     contentRead: Boolean(base64),
+    verification,
   };
 }
 
