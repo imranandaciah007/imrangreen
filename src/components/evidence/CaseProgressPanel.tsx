@@ -300,8 +300,8 @@ export function CaseProgressPanel({
   ) =>
     setter((prev) => {
       const next = new Set(prev);
-      if (include) next.delete(key);
-      else next.add(key);
+      if (include) next.add(key);
+      else next.delete(key);
       return next;
     });
 
