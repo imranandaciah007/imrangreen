@@ -65,6 +65,10 @@ export const draftExplorerFiling = createServerFn({ method: "POST" })
       rootPath?: string;
       excludedFolders?: string[];
       excludedFileIds?: string[];
+      /** When given, only these folders (and anything beneath them) are kept. */
+      includedFolders?: string[];
+      /** Individual documents ticked on their own, outside the ticked folders. */
+      includedFileIds?: string[];
       qualifyingRelative?: string;
       applicant?: string;
       child?: string;
@@ -73,6 +77,8 @@ export const draftExplorerFiling = createServerFn({ method: "POST" })
       rootPath: (data.rootPath ?? "").replace(/^\/+|\/+$/g, ""),
       excludedFolders: (data.excludedFolders ?? []).map((p) => p.replace(/^\/+|\/+$/g, "")),
       excludedFileIds: data.excludedFileIds ?? [],
+      includedFolders: (data.includedFolders ?? []).map((p) => p.replace(/^\/+|\/+$/g, "")),
+      includedFileIds: data.includedFileIds ?? [],
       qualifyingRelative: data.qualifyingRelative ?? "Aciah",
       applicant: data.applicant ?? "Imran",
       child: data.child ?? "Jibril",
@@ -115,11 +121,19 @@ export const draftExplorerFiling = createServerFn({ method: "POST" })
     }
 
     const excludedIds = new Set(data.excludedFileIds);
+    const includedIds = new Set(data.includedFileIds);
+    // Nothing is selected by default, so an explicit selection wins: a document
+    // is kept when its folder is ticked, or when the document itself is ticked.
+    const selecting = data.includedFolders.length > 0 || includedIds.size > 0;
     const kept = rows.filter((row) => {
       const path = (row.folder_path ?? "").replace(/^\/+|\/+$/g, "");
       if (data.rootPath && path !== data.rootPath && !path.startsWith(`${data.rootPath}/`)) return false;
       if (excluded(path, data.excludedFolders)) return false;
       if (excludedIds.has(row.drive_file_id)) return false;
+      if (selecting) {
+        const inFolder = excluded(path, data.includedFolders);
+        if (!inFolder && !includedIds.has(row.drive_file_id)) return false;
+      }
       return true;
     });
 

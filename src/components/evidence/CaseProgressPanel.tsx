@@ -103,16 +103,16 @@ function FolderRow({
   node: FolderNode;
   index: number;
   onOpen: (node: FolderNode) => void;
-  /** When provided, the row shows an include/exclude tick for the filing. */
+  /** When provided, the row shows an include tick for the filing. */
   selected?: boolean;
   onToggle?: (next: boolean) => void;
 }) {
   const percent = node.total ? Math.round((node.built / node.total) * 100) : 0;
   return (
-    <div className={`flex items-center gap-2 ${onToggle && !selected ? "opacity-55" : ""}`}>
+    <div className={`flex items-center gap-2 ${onToggle && !selected ? "opacity-60" : ""}`}>
       {onToggle ? (
         <Checkbox
-          checked={selected ?? true}
+          checked={selected ?? false}
           onCheckedChange={(value) => onToggle(value === true)}
           aria-label={`Include ${node.name} in the filing`}
           className="size-5 shrink-0"
