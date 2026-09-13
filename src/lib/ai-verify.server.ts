@@ -10,84 +10,21 @@
  */
 
 import { logAiUsage } from "./ai-json.server";
+import {
+  VERIFICATION_SCHEMA,
+  type FieldVerdict,
+  type VerificationReport,
+  type VerificationState,
+  type VerifiedField,
+} from "./evidence/verification";
+
+export type { FieldVerdict, VerificationReport, VerificationState, VerifiedField };
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const DEFAULT_MODEL = "gpt-4o-mini";
 
-export type FieldVerdict = "agrees" | "disagrees" | "cannot_verify";
+const SCHEMA = VERIFICATION_SCHEMA;
 
-export interface VerifiedField {
-  field: string;
-  verdict: FieldVerdict;
-  /** Only set when the verifier disagrees: what the document itself shows. */
-  documentShows: string;
-  note: string;
-}
-
-/** How much independent checking an item has actually had. */
-export type VerificationState =
-  | "primary_only"
-  | "verified"
-  | "disagreement"
-  | "needs_human_review"
-  | "unavailable";
-
-export interface VerificationReport {
-  state: VerificationState;
-  fields: VerifiedField[];
-  /** Factual observations, never new facts to apply. */
-  notes: string[];
-  /** Audit trail. */
-  analysisProvider: string;
-  analysisModel: string;
-  analysedAt: string;
-  verifierProvider: string | null;
-  verifierModel: string | null;
-  verifiedAt: string | null;
-  /** Present when verification could not run (missing key, outage, quota). */
-  error: string | null;
-}
-
-const SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["fields", "notes", "overall"],
-  properties: {
-    fields: {
-      type: "array",
-      description: "One entry per field you were given. Never add fields.",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["field", "verdict", "documentShows", "note"],
-        properties: {
-          field: { type: "string" },
-          verdict: {
-            type: "string",
-            enum: ["agrees", "disagrees", "cannot_verify"],
-            description:
-              "agrees = the material supports the value; disagrees = the material clearly shows something else; cannot_verify = the material does not establish it",
-          },
-          documentShows: {
-            type: "string",
-            description:
-              "Only when verdict is disagrees: what the material itself states. Empty string otherwise. Never guess.",
-          },
-          note: { type: "string", description: "Short factual reason, or empty string" },
-        },
-      },
-    },
-    notes: {
-      type: "array",
-      items: { type: "string" },
-      description: "Factual observations about the material only. No legal argument, no guesses.",
-    },
-    overall: {
-      type: "string",
-      enum: ["consistent", "discrepancies", "insufficient_material"],
-    },
-  },
-} as const;
 
 export function openAiConfigured() {
   return Boolean(process.env["OPENAI_API_KEY"]);
