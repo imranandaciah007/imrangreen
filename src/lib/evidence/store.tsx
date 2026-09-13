@@ -870,6 +870,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         applied,
         uncertain: result.uncertain,
         passes: result.passes as unknown as Record<string, unknown>[] | undefined,
+        verification: result.verification,
       };
       patch.status =
         result.uncertain.length > 0 || conflicts.length > (item.aiConflicts?.length ?? 0)

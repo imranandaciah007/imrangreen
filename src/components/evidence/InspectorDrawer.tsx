@@ -28,6 +28,7 @@ import { TAGS, type EvidenceItem } from "@/lib/evidence/types";
 import { toast } from "sonner";
 import { DocumentPreview, shortSummaryOf } from "./DocumentPreview";
 import { StatusSelect, TagChip } from "./status-ui";
+import { VerificationBadge } from "./VerificationBadge";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -211,6 +212,7 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                     {item.aiExtraction.summary && (
                       <p className="text-xs text-foreground/85">{item.aiExtraction.summary}</p>
                     )}
+                    <VerificationBadge report={item.aiExtraction.verification} showAudit />
                     {item.aiExtraction.applied.length > 0 && (
                       <p className="text-[11px] text-success">
                         Verified by double scan: {item.aiExtraction.applied.join(", ")}

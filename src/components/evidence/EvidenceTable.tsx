@@ -10,6 +10,7 @@ import { useEvidence, type SortKey } from "@/lib/evidence/store";
 import type { EvidenceItem } from "@/lib/evidence/types";
 import { shortSummaryOf } from "./DocumentPreview";
 import { StatusBadge, StatusSelect, TagChip } from "./status-ui";
+import { VerificationChip } from "./VerificationBadge";
 
 const PAGE_SIZE = 25;
 
@@ -117,6 +118,9 @@ export function EvidenceTable({ onEdit }: { onEdit: (item: EvidenceItem) => void
                 </span>
                 <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                   {item.category} · {item.pageCount} pg · {formatBytes(item.fileSizeBytes)}
+                </span>
+                <span className="mt-1 block">
+                  <VerificationChip report={item.aiExtraction?.verification} />
                 </span>
                 <span className="mt-1.5 block">
                   <StatusBadge status={item.status} />
@@ -240,6 +244,9 @@ export function EvidenceTable({ onEdit }: { onEdit: (item: EvidenceItem) => void
                     <span className="block truncate font-medium text-foreground">{item.title}</span>
                     <span className="block truncate text-[11px] text-foreground/70">
                       {shortSummaryOf(item)}
+                    </span>
+                    <span className="mt-0.5 block">
+                      <VerificationChip report={item.aiExtraction?.verification} />
                     </span>
                     <span className="block truncate font-mono text-[10px] text-muted-foreground">
                       {item.fileName} · {item.fileType} · edited {formatDateTime(item.updatedAt)} by{" "}

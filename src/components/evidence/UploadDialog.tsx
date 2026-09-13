@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { extractUploadedFile, type ExtractionResult } from "@/lib/ai.functions";
+import { VerificationBadge } from "./VerificationBadge";
 import { generateCloneDocument, uploadEvidenceToFolder } from "@/lib/drive-tree.functions";
 import { formatBytes } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
@@ -313,6 +314,7 @@ export function UploadDialog({
                 applied: Object.keys(ai.agreed),
                 uncertain,
                 passes: ai.passes as unknown as Record<string, unknown>[],
+                verification: ai.verification,
               },
             }
           : {}),
@@ -508,6 +510,11 @@ export function UploadDialog({
                 </p>
               )}
               {ai?.summary && <p className="mt-1.5 text-xs text-foreground/85">{ai.summary}</p>}
+              {ai?.verification && (
+                <div className="mt-2">
+                  <VerificationBadge report={ai.verification} showAudit />
+                </div>
+              )}
               {uncertain.length > 0 && (
                 <ul className="mt-2 space-y-2">
                   {uncertain.map((u) => (
