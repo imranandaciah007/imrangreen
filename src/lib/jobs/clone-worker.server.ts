@@ -337,8 +337,19 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         return;
       }
       try {
+        // The Drive original was edited since its clone was made: bin the
+        // outdated clone and rebuild from the newest version.
+        const rebuilding = Boolean(job.needs_rebuild);
+        if (rebuilding && job.clone_file_id) {
+          try {
+            await drive.trashNode(job.clone_file_id);
+          } catch (error) {
+            console.error(`Could not remove the outdated clone ${job.clone_file_id}:`, error);
+          }
+        }
+
         // Never build a second clone of a document already filed as an exhibit.
-        if (job.content_key) {
+        if (!rebuilding && job.content_key) {
           const { data: twin } = await supabaseAdmin
             .from("gc_clone_jobs")
             .select("drive_file_id")
