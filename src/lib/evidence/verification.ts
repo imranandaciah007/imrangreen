@@ -62,3 +62,48 @@ export function verificationTone(state: VerificationState | undefined) {
       return "border-border bg-secondary/60 text-muted-foreground";
   }
 }
+
+/**
+ * The single JSON schema the independent checker is constrained to. Kept here so the
+ * server checker and the UI can never drift apart on the shape of a result.
+ */
+export const VERIFICATION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["fields", "notes", "overall"],
+  properties: {
+    fields: {
+      type: "array",
+      description: "One entry per field you were given. Never add fields.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["field", "verdict", "documentShows", "note"],
+        properties: {
+          field: { type: "string" },
+          verdict: {
+            type: "string",
+            enum: ["agrees", "disagrees", "cannot_verify"],
+            description:
+              "agrees = the material supports the value; disagrees = the material clearly shows something else; cannot_verify = the material does not establish it",
+          },
+          documentShows: {
+            type: "string",
+            description:
+              "Only when verdict is disagrees: what the material itself states. Empty string otherwise. Never guess.",
+          },
+          note: { type: "string", description: "Short factual reason, or empty string" },
+        },
+      },
+    },
+    notes: {
+      type: "array",
+      items: { type: "string" },
+      description: "Factual observations about the material only. No legal argument, no guesses.",
+    },
+    overall: {
+      type: "string",
+      enum: ["consistent", "discrepancies", "insufficient_material"],
+    },
+  },
+} as const;
