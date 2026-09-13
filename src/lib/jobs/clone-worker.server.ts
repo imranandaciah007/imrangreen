@@ -445,6 +445,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
           .update({
             status: "done",
             clone_file_id: result.id,
+            needs_rebuild: false,
             clone_name: result.name,
             clone_link: result.webViewLink,
             original_pages: result.originalPages,
