@@ -155,7 +155,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
 
       const { data: known } = await supabaseAdmin
         .from("gc_clone_jobs")
-        .select("drive_file_id,content_key,status,duplicate_of");
+        .select("drive_file_id,content_key,status,duplicate_of,source_modified_at");
       const liveIds = new Set(originals.map((file) => file.id));
 
       // One exhibit per identical document: Drive checksum first, else name + byte size.
