@@ -217,13 +217,23 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
             content_key: key,
             duplicate_of: isCopy ? winner.id : null,
             status: isCopy ? "duplicate" : "pending",
+            source_modified_at: file.modifiedTime || null,
           });
           continue;
         }
 
+        // The original was edited in Drive after its clone was prepared: the
+        // Drive "last edited" stamp moved on, so the exhibit is rebuilt from
+        // the newest version and the outdated clone is replaced.
+        const seenAt = existing.source_modified_at
+          ? new Date(existing.source_modified_at).getTime()
+          : 0;
+        const liveAt = file.modifiedTime ? new Date(file.modifiedTime).getTime() : 0;
+        const edited = Boolean(liveAt) && liveAt > seenAt;
+
         // Only correct what changed, so finished clones are never rebuilt.
         const wasCopy = Boolean(existing.duplicate_of);
-        if (existing.content_key !== key || wasCopy !== isCopy) {
+        if (existing.content_key !== key || wasCopy !== isCopy || edited) {
           await supabaseAdmin
             .from("gc_clone_jobs")
             .update({
@@ -231,10 +241,17 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
               folder_path: file.path,
               content_key: key,
               duplicate_of: isCopy ? winner.id : null,
-              status: isCopy ? "duplicate" : existing.status === "duplicate" ? "pending" : existing.status,
+              status: isCopy
+                ? "duplicate"
+                : edited || existing.status === "duplicate"
+                  ? "pending"
+                  : existing.status,
+              ...(edited && !isCopy ? { needs_rebuild: true, attempts: 0, error: null } : {}),
+              source_modified_at: file.modifiedTime || existing.source_modified_at,
               updated_at: now.toISOString(),
             })
             .eq("drive_file_id", file.id);
+          if (edited && !isCopy) queued += 1;
         }
       }
 
