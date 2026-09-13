@@ -32,11 +32,15 @@ export function AppHeader({
   onSearch,
   onOpenTasks,
   onAddTask,
+  onHome,
+  onBack,
 }: {
   tab: MainTab;
   onSearch: () => void;
   onOpenTasks: () => void;
   onAddTask: () => void;
+  onHome: () => void;
+  onBack: () => void;
 }) {
   const { tasks } = useEvidence();
   const [usage, setUsage] = useState<AiUsageSummary | null>(null);
