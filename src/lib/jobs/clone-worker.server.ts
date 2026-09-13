@@ -225,11 +225,13 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         // The original was edited in Drive after its clone was prepared: the
         // Drive "last edited" stamp moved on, so the exhibit is rebuilt from
         // the newest version and the outdated clone is replaced.
+        // Rows that predate edit tracking have no stamp yet: stamp them on
+        // this pass instead of treating them all as "edited" and rebuilding.
         const seenAt = existing.source_modified_at
           ? new Date(existing.source_modified_at).getTime()
-          : 0;
+          : null;
         const liveAt = file.modifiedTime ? new Date(file.modifiedTime).getTime() : 0;
-        const edited = Boolean(liveAt) && liveAt > seenAt;
+        const edited = seenAt !== null && Boolean(liveAt) && liveAt > seenAt;
 
         // Only correct what changed, so finished clones are never rebuilt.
         const wasCopy = Boolean(existing.duplicate_of);
