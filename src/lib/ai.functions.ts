@@ -262,26 +262,40 @@ async function twoPass(data: {
   const ranAt = new Date().toISOString();
   const summary = a.summary || b.summary;
 
-  // Independent second opinion. It can flag and question, never fill in blanks,
-  // and an outage is reported honestly instead of counting as a double-check.
+  // OpenAI is a backup, not a routine second pass: it only runs when Gemini
+  // could not finish the job (file unreadable, or the two Gemini readings
+  // disagreed on something). A clean Gemini reading is trusted as-is.
   const claims = Object.entries(agreed)
     .map(([field, value]) => ({
       field,
       value: Array.isArray(value) ? value.join(", ") : String(value ?? ""),
     }))
     .filter((c) => c.value.trim() !== "");
-  const verification = await verifyWithOpenAi({
-    claims,
-    summary,
-    fileName: data.fileName,
-    mimeType: data.mimeType,
-    base64,
-    analysisProvider: "gemini",
-    analysisModel: jsonModelName(),
-    analysedAt: ranAt,
-    purpose: "evidence_extraction",
-  });
-
+  const geminiFailed = !base64 || uncertain.length > 0;
+  const verification = geminiFailed
+    ? await verifyWithOpenAi({
+        claims,
+        summary,
+        fileName: data.fileName,
+        mimeType: data.mimeType,
+        base64,
+        analysisProvider: "gemini",
+        analysisModel: jsonModelName(),
+        analysedAt: ranAt,
+        purpose: "evidence_extraction",
+      })
+    : {
+        state: "primary_only" as const,
+        fields: [],
+        notes: [],
+        analysisProvider: "gemini",
+        analysisModel: jsonModelName(),
+        analysedAt: ranAt,
+        verifierProvider: null,
+        verifierModel: null,
+        verifiedAt: null,
+        error: null,
+      };
   for (const field of verification.fields) {
     if (field.verdict !== "disagrees") continue;
     const existing = uncertain.find((u) => u.field === field.field);
