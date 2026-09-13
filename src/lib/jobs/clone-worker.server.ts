@@ -39,6 +39,9 @@ interface JobRow {
   exhibit_id: string;
   attempts: number;
   content_key?: string | null;
+  needs_rebuild?: boolean | null;
+  clone_file_id?: string | null;
+  source_modified_at?: string | null;
 }
 
 
