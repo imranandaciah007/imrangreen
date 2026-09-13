@@ -374,7 +374,9 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
 
         // Scan Drive first: if a clone of this original already exists,
         // adopt it into the ledger instead of paying to build it again.
-        const existingClone = await drive.findExistingClone(job.drive_file_id, job.exhibit_id);
+        const existingClone = rebuilding
+          ? null
+          : await drive.findExistingClone(job.drive_file_id, job.exhibit_id);
         if (existingClone) {
           await supabaseAdmin
             .from("gc_clone_jobs")
