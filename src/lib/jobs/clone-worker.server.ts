@@ -199,6 +199,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         content_key: string;
         duplicate_of: string | null;
         status: string;
+        source_modified_at: string | null;
       }[] = [];
       for (const file of originals) {
         const key = contentKeyOf(file);
