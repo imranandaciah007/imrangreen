@@ -296,19 +296,6 @@ async function twoPass(data: {
         verifiedAt: null,
         error: null,
       };
-  void verifyWithOpenAi;
-  if (false) await verifyWithOpenAi({
-    claims,
-    summary,
-    fileName: data.fileName,
-    mimeType: data.mimeType,
-    base64,
-    analysisProvider: "gemini",
-    analysisModel: jsonModelName(),
-    analysedAt: ranAt,
-    purpose: "evidence_extraction",
-  });
-
   for (const field of verification.fields) {
     if (field.verdict !== "disagrees") continue;
     const existing = uncertain.find((u) => u.field === field.field);
