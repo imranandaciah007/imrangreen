@@ -1,3 +1,5 @@
+import type { VerificationReport } from "./verification";
+
 export const CASE_SETTINGS = {
   caseName: "Imran & Aciah — Potential I-601",
   separationStartDate: "2026-08-18",
@@ -106,6 +108,8 @@ export interface AiExtraction {
   uncertain: { field: string; options: string[] }[];
   /** Raw output of both scans, kept for auditability. */
   passes?: Record<string, unknown>[] | undefined;
+  /** Independent second-reader check of what the primary reader extracted. */
+  verification?: VerificationReport | undefined;
 }
 
 export interface EvidenceItem {

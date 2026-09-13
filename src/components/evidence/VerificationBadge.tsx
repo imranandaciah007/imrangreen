@@ -61,3 +61,19 @@ export function VerificationBadge({
     </div>
   );
 }
+
+/** Chip only — safe to render inside dense list rows. */
+export function VerificationChip({ report }: { report?: VerificationReport | undefined }) {
+  if (!report) return null;
+  const state = report.state;
+  const Icon =
+    state === "verified" ? ShieldCheck : state === "disagreement" ? ShieldAlert : ShieldQuestion;
+  return (
+    <span
+      className={`inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium ${verificationTone(state)}`}
+    >
+      <Icon className="size-3 shrink-0" />
+      <span className="truncate">{verificationLabel(state)}</span>
+    </span>
+  );
+}
