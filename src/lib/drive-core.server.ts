@@ -195,6 +195,18 @@ export async function renameNode(fileId: string, name: string) {
   );
 }
 
+/** Move a file to the Drive bin. Used to retire an outdated clone before rebuilding it. */
+export async function trashNode(fileId: string) {
+  return driveJson<{ id: string }>(
+    `${GATEWAY}/drive/v3/files/${fileId}?fields=id&supportsAllDrives=true`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trashed: true }),
+    },
+  );
+}
+
 export async function moveNode(fileId: string, targetFolderId: string) {
   const current = await driveJson<{ parents?: string[] }>(
     `${GATEWAY}/drive/v3/files/${fileId}?fields=parents&supportsAllDrives=true`,

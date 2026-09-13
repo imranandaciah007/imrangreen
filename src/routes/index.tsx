@@ -167,6 +167,11 @@ function CaseApp() {
           onSearch={() => setAskOpen(true)}
           onOpenTasks={() => setTab("review")}
           onAddTask={() => setTaskOpen(true)}
+          onHome={() => setTab("home")}
+          onBack={() => {
+            if (window.history.state?.gcTab && window.history.length > 1) window.history.back();
+            else setTab("home");
+          }}
         />
 
          <main className="mx-auto max-w-[1440px] space-y-4 p-3 sm:p-5 lg:p-7">

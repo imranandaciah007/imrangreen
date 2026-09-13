@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, ListTodo, Search, Sparkles } from "lucide-react";
+import { Bell, ChevronLeft, Home, ListTodo, Search, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -32,11 +32,15 @@ export function AppHeader({
   onSearch,
   onOpenTasks,
   onAddTask,
+  onHome,
+  onBack,
 }: {
   tab: MainTab;
   onSearch: () => void;
   onOpenTasks: () => void;
   onAddTask: () => void;
+  onHome: () => void;
+  onBack: () => void;
 }) {
   const { tasks } = useEvidence();
   const [usage, setUsage] = useState<AiUsageSummary | null>(null);
@@ -76,7 +80,30 @@ export function AppHeader({
   return (
     <header className="case-topbar sticky top-0 z-30 pt-[env(safe-area-inset-top)]">
       <div className="flex min-h-[64px] flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6 lg:px-8">
-        <img src="/favicon.png" alt="GC" className="size-9 shrink-0 rounded-lg lg:hidden" />
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 text-white/70 hover:bg-white/10 hover:text-white"
+            onClick={onBack}
+            aria-label="Go back to the previous page"
+            title="Back"
+          >
+            <ChevronLeft className="size-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`size-9 hover:bg-white/10 hover:text-white ${
+              tab === "home" ? "bg-white/10 text-white" : "text-white/70"
+            }`}
+            onClick={onHome}
+            aria-label="Go to the main menu"
+            title="Home"
+          >
+            <Home className="size-5" />
+          </Button>
+        </div>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-base font-black text-white sm:text-lg">
             {page.title}

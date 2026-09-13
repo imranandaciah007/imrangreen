@@ -39,6 +39,9 @@ interface JobRow {
   exhibit_id: string;
   attempts: number;
   content_key?: string | null;
+  needs_rebuild?: boolean | null;
+  clone_file_id?: string | null;
+  source_modified_at?: string | null;
 }
 
 
@@ -152,7 +155,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
 
       const { data: known } = await supabaseAdmin
         .from("gc_clone_jobs")
-        .select("drive_file_id,content_key,status,duplicate_of");
+        .select("drive_file_id,content_key,status,duplicate_of,source_modified_at");
       const liveIds = new Set(originals.map((file) => file.id));
 
       // One exhibit per identical document: Drive checksum first, else name + byte size.
@@ -196,6 +199,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         content_key: string;
         duplicate_of: string | null;
         status: string;
+        source_modified_at: string | null;
       }[] = [];
       for (const file of originals) {
         const key = contentKeyOf(file);
@@ -213,13 +217,23 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
             content_key: key,
             duplicate_of: isCopy ? winner.id : null,
             status: isCopy ? "duplicate" : "pending",
+            source_modified_at: file.modifiedTime || null,
           });
           continue;
         }
 
+        // The original was edited in Drive after its clone was prepared: the
+        // Drive "last edited" stamp moved on, so the exhibit is rebuilt from
+        // the newest version and the outdated clone is replaced.
+        const seenAt = existing.source_modified_at
+          ? new Date(existing.source_modified_at).getTime()
+          : 0;
+        const liveAt = file.modifiedTime ? new Date(file.modifiedTime).getTime() : 0;
+        const edited = Boolean(liveAt) && liveAt > seenAt;
+
         // Only correct what changed, so finished clones are never rebuilt.
         const wasCopy = Boolean(existing.duplicate_of);
-        if (existing.content_key !== key || wasCopy !== isCopy) {
+        if (existing.content_key !== key || wasCopy !== isCopy || edited) {
           await supabaseAdmin
             .from("gc_clone_jobs")
             .update({
@@ -227,10 +241,17 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
               folder_path: file.path,
               content_key: key,
               duplicate_of: isCopy ? winner.id : null,
-              status: isCopy ? "duplicate" : existing.status === "duplicate" ? "pending" : existing.status,
+              status: isCopy
+                ? "duplicate"
+                : edited || existing.status === "duplicate"
+                  ? "pending"
+                  : existing.status,
+              ...(edited && !isCopy ? { needs_rebuild: true, attempts: 0, error: null } : {}),
+              source_modified_at: file.modifiedTime || existing.source_modified_at,
               updated_at: now.toISOString(),
             })
             .eq("drive_file_id", file.id);
+          if (edited && !isCopy) queued += 1;
         }
       }
 
@@ -298,7 +319,9 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         .update({ status: "processing", updated_at: now.toISOString() })
         .in("drive_file_id", candidateIds)
         .eq("status", "pending")
-        .select("drive_file_id,file_name,folder_path,mime_type,exhibit_id,attempts,content_key");
+        .select(
+          "drive_file_id,file_name,folder_path,mime_type,exhibit_id,attempts,content_key,needs_rebuild,clone_file_id,source_modified_at",
+        );
       claimed = (claimedRows ?? []) as JobRow[];
     }
 
@@ -314,8 +337,19 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         return;
       }
       try {
+        // The Drive original was edited since its clone was made: bin the
+        // outdated clone and rebuild from the newest version.
+        const rebuilding = Boolean(job.needs_rebuild);
+        if (rebuilding && job.clone_file_id) {
+          try {
+            await drive.trashNode(job.clone_file_id);
+          } catch (error) {
+            console.error(`Could not remove the outdated clone ${job.clone_file_id}:`, error);
+          }
+        }
+
         // Never build a second clone of a document already filed as an exhibit.
-        if (job.content_key) {
+        if (!rebuilding && job.content_key) {
           const { data: twin } = await supabaseAdmin
             .from("gc_clone_jobs")
             .select("drive_file_id")
@@ -340,7 +374,9 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
 
         // Scan Drive first: if a clone of this original already exists,
         // adopt it into the ledger instead of paying to build it again.
-        const existingClone = await drive.findExistingClone(job.drive_file_id, job.exhibit_id);
+        const existingClone = rebuilding
+          ? null
+          : await drive.findExistingClone(job.drive_file_id, job.exhibit_id);
         if (existingClone) {
           await supabaseAdmin
             .from("gc_clone_jobs")
@@ -409,6 +445,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
           .update({
             status: "done",
             clone_file_id: result.id,
+            needs_rebuild: false,
             clone_name: result.name,
             clone_link: result.webViewLink,
             original_pages: result.originalPages,
