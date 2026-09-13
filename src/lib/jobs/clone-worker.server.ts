@@ -319,7 +319,9 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         .update({ status: "processing", updated_at: now.toISOString() })
         .in("drive_file_id", candidateIds)
         .eq("status", "pending")
-        .select("drive_file_id,file_name,folder_path,mime_type,exhibit_id,attempts,content_key");
+        .select(
+          "drive_file_id,file_name,folder_path,mime_type,exhibit_id,attempts,content_key,needs_rebuild,clone_file_id,source_modified_at",
+        );
       claimed = (claimedRows ?? []) as JobRow[];
     }
 
