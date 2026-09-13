@@ -75,7 +75,9 @@ export type Database = {
           file_name: string
           folder_path: string
           mime_type: string
+          needs_rebuild: boolean
           original_pages: number | null
+          source_modified_at: string | null
           status: string
           total_pages: number | null
           updated_at: string
@@ -104,7 +106,9 @@ export type Database = {
           file_name: string
           folder_path?: string
           mime_type?: string
+          needs_rebuild?: boolean
           original_pages?: number | null
+          source_modified_at?: string | null
           status?: string
           total_pages?: number | null
           updated_at?: string
@@ -133,7 +137,9 @@ export type Database = {
           file_name?: string
           folder_path?: string
           mime_type?: string
+          needs_rebuild?: boolean
           original_pages?: number | null
+          source_modified_at?: string | null
           status?: string
           total_pages?: number | null
           updated_at?: string
