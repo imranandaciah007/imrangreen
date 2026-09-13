@@ -254,6 +254,15 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
             })
             .eq("drive_file_id", file.id);
           if (edited && !isCopy) queued += 1;
+        } else if (!existing.source_modified_at && file.modifiedTime) {
+          // Backfill the "last edited" stamp without touching status.
+          await supabaseAdmin
+            .from("gc_clone_jobs")
+            .update({
+              source_modified_at: file.modifiedTime,
+              updated_at: now.toISOString(),
+            })
+            .eq("drive_file_id", file.id);
         }
       }
 
