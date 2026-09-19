@@ -7,6 +7,8 @@ import {
   FileText,
   Loader2,
   ShieldCheck,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +40,7 @@ import { useEvidence } from "@/lib/evidence/store";
 import { CASE_SETTINGS, EXPENSE_GROUPS, DEFAULT_CATEGORIES } from "@/lib/evidence/types";
 import { uploadPacketFile } from "@/lib/drive.functions";
 import { draftFilingLanguage, type FilingLanguage } from "@/lib/filing.functions";
+import { FixWizard } from "./FixWizard";
 
 const STEPS = ["Audit", "Sections", "Exhibit index", "Generate", "Saved"] as const;
 
@@ -73,7 +76,12 @@ export function PacketBuilder({
     togglePacketExclusion,
     savePacketVersion,
     connection,
+    runExtraction,
+    extractingIds,
   } = useEvidence();
+
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStartId, setWizardStartId] = useState<string | undefined>(undefined);
 
   const [step, setStep] = useState(0);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -90,6 +98,16 @@ export function PacketBuilder({
   const blocking = findings.filter((f) => f.level === "blocking");
   const attention = findings.filter((f) => f.level === "attention");
   const optional = findings.filter((f) => f.level === "optional");
+
+  /** Every flagged document, in the order shown, so the wizard can step through them. */
+  const wizardQueue = useMemo(() => {
+    const ids: string[] = [];
+    for (const f of [...blocking, ...attention, ...optional]) {
+      const id = f.gap?.recordType === "evidence" ? f.gap.recordId : null;
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+    return ids;
+  }, [blocking, attention, optional]);
 
   const exhibits = useMemo(() => buildExhibits(items, sections), [items, sections]);
   const pageCount = exhibits.at(-1)?.lastPage ?? 0;
@@ -267,6 +285,7 @@ export function PacketBuilder({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[94svh] flex-col gap-3 overflow-hidden sm:max-w-2xl">
         <DialogHeader>
@@ -341,14 +360,40 @@ export function PacketBuilder({
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {f.gap?.recordType === "evidence" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 text-[11px]"
-                          onClick={() => openInspector(f.gap!.recordId)}
-                        >
-                          Fix now
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-9 text-[11px]"
+                            onClick={() => {
+                              setWizardStartId(f.gap!.recordId);
+                              setWizardOpen(true);
+                            }}
+                          >
+                            Fix now
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-9 text-[11px]"
+                            disabled={extractingIds.includes(f.gap.recordId)}
+                            onClick={() => void runExtraction(f.gap!.recordId)}
+                          >
+                            {extractingIds.includes(f.gap.recordId) ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Sparkles className="size-3.5" />
+                            )}
+                            Fix with AI
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-9 text-[11px]"
+                            onClick={() => openInspector(f.gap!.recordId)}
+                          >
+                            View
+                          </Button>
+                        </>
                       )}
                       {f.gap && (
                         <Button
@@ -375,6 +420,19 @@ export function PacketBuilder({
                   </li>
                 ))}
               </ul>
+
+              {wizardQueue.length > 0 && (
+                <Button
+                  className="h-11 w-full"
+                  onClick={() => {
+                    setWizardStartId(undefined);
+                    setWizardOpen(true);
+                  }}
+                >
+                  <Wand2 className="size-4" /> Step through all {wizardQueue.length} document
+                  {wizardQueue.length === 1 ? "" : "s"}
+                </Button>
+              )}
 
               {(attention.length > 0 || optional.length > 0) && (
                 <label className="flex items-center gap-2 rounded-lg border border-border bg-card p-2.5 text-[11px]">
@@ -620,5 +678,12 @@ export function PacketBuilder({
         </div>
       </DialogContent>
     </Dialog>
+    <FixWizard
+      open={wizardOpen}
+      onOpenChange={setWizardOpen}
+      itemIds={wizardQueue}
+      startId={wizardStartId}
+    />
+    </>
   );
 }
