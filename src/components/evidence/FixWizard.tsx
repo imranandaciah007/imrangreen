@@ -52,20 +52,27 @@ export function FixWizard({
   const { items, gaps, categories, updateItem, ignoreGap, runExtraction, extractingIds } =
     useEvidence();
 
-
-  const queue = useMemo(
-    () => itemIds.filter((id) => items.some((i) => i.id === id)),
-    [itemIds, items],
-  );
+  /**
+   * The list is frozen when the wizard opens. Fixing a document removes it from the
+   * live flagged list, and a shifting list would otherwise jump the user back to the start.
+   */
+  const [queue, setQueue] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
   const item = items.find((i) => i.id === queue[index]) ?? null;
   const [draft, setDraft] = useState<Draft | null>(null);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   useEffect(() => {
     if (!open) return;
-    const start = startId ? queue.indexOf(startId) : 0;
+    const frozen = itemIds.filter((id) => itemsRef.current.some((i) => i.id === id));
+    setQueue(frozen);
+    const start = startId ? frozen.indexOf(startId) : 0;
     setIndex(start >= 0 ? start : 0);
-  }, [open, startId, queue]);
+    // Deliberately keyed on `open` only: the queue must not change mid-session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
 
   useEffect(() => {
     if (!item) {
