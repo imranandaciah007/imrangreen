@@ -147,7 +147,27 @@ export function FixWizard({
     setIndex(next);
   }
 
+  /** Save what the user typed, re-read the file, then show the AI's values in the form. */
+  async function readWithAi() {
+    if (!item) return;
+    const id = item.id;
+    saveCurrent();
+    await runExtraction(id);
+    const fresh = itemsRef.current.find((i) => i.id === id);
+    if (!fresh) return;
+    setDraft({
+      title: fresh.title ?? "",
+      dateOfDocument: fresh.dateOfDocument ?? "",
+      sourceType: fresh.sourceType,
+      category: fresh.category ?? "",
+      people: (fresh.people ?? []).join(", "),
+      affectsAciah: fresh.affectsAciah ?? "",
+      notes: fresh.notes ?? "",
+    });
+  }
+
   const busy = item ? extractingIds.includes(item.id) : false;
+
 
   return (
     <Dialog
