@@ -231,7 +231,7 @@ export function FixWizard({
                 variant="outline"
                 className="h-11 w-full"
                 disabled={busy}
-                onClick={() => void runExtraction(item.id)}
+                onClick={() => void readWithAi()}
               >
                 {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                 {busy ? "Reading the document…" : "Fix with AI"}
