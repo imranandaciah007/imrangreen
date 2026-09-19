@@ -5,6 +5,7 @@ import {
   History,
   Languages,
   Link2,
+  Loader2,
   Pencil,
   Sparkles,
   Trash2,
@@ -12,7 +13,16 @@ import {
 
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -24,11 +34,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { formatBytes, formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
-import { TAGS, type EvidenceItem } from "@/lib/evidence/types";
+import { TAGS, type Category, type EvidenceItem } from "@/lib/evidence/types";
 import { toast } from "sonner";
 import { DocumentPreview, shortSummaryOf } from "./DocumentPreview";
 import { StatusSelect, TagChip } from "./status-ui";
 import { VerificationBadge } from "./VerificationBadge";
+import type { CaseGap } from "@/lib/evidence/review";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
