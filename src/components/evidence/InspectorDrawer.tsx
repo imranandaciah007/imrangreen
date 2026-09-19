@@ -5,6 +5,7 @@ import {
   History,
   Languages,
   Link2,
+  Loader2,
   Pencil,
   Sparkles,
   Trash2,
@@ -12,7 +13,16 @@ import {
 
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -24,11 +34,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { formatBytes, formatDate, formatDateTime } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
-import { TAGS, type EvidenceItem } from "@/lib/evidence/types";
+import { TAGS, type Category, type EvidenceItem } from "@/lib/evidence/types";
 import { toast } from "sonner";
 import { DocumentPreview, shortSummaryOf } from "./DocumentPreview";
 import { StatusSelect, TagChip } from "./status-ui";
 import { VerificationBadge } from "./VerificationBadge";
+import type { CaseGap } from "@/lib/evidence/review";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -39,6 +50,136 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
       <dd className="mt-0.5 truncate text-xs text-foreground">{value}</dd>
     </div>
   );
+}
+
+/**
+ * The exact field a flag is about, rendered inline under the flag message so it
+ * can be corrected right there instead of hunting for it elsewhere.
+ */
+function GapInlineField({
+  item,
+  gap,
+  categories,
+  updateItem,
+  onReadWithAi,
+  reading,
+}: {
+  item: EvidenceItem;
+  gap: CaseGap;
+  categories: Category[];
+  updateItem: (id: string, patch: Partial<EvidenceItem>, message?: string) => void;
+  onReadWithAi: () => void;
+  reading: boolean;
+}) {
+  const [peopleDraft, setPeopleDraft] = useState<string | null>(null);
+  const [impactDraft, setImpactDraft] = useState<string | null>(null);
+  useEffect(() => {
+    setPeopleDraft(null);
+    setImpactDraft(null);
+  }, [gap.id]);
+
+  const peopleValue = peopleDraft ?? (item.people ?? []).join(", ");
+  const impactValue = impactDraft ?? (item.affectsAciah ?? "");
+
+  switch (gap.kind) {
+    case "evidence-no-date":
+      return (
+        <div className="mt-2 space-y-1.5">
+          <Label className="text-[11px]">Document date</Label>
+          <Input
+            type="date"
+            value={item.dateOfDocument ?? ""}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (!value || value === (item.dateOfDocument ?? "")) return;
+              updateItem(item.id, { dateOfDocument: value }, `${item.exhibitId} dated ${value}`);
+            }}
+            className="h-10 text-xs"
+          />
+        </div>
+      );
+    case "evidence-no-person":
+      return (
+        <div className="mt-2 space-y-1.5">
+          <Label className="text-[11px]">Who this is about (comma separated)</Label>
+          <Input
+            value={peopleValue}
+            onChange={(e) => setPeopleDraft(e.target.value)}
+            onBlur={() => {
+              const people = peopleValue
+                .split(",")
+                .map((p) => p.trim())
+                .filter(Boolean);
+              if (people.join(", ") === (item.people ?? []).join(", ")) return;
+              updateItem(item.id, { people }, `${item.exhibitId} people recorded`);
+            }}
+            placeholder="e.g. Aciah, Jibril"
+            className="h-10 text-xs"
+          />
+        </div>
+      );
+    case "evidence-no-category":
+      return (
+        <div className="mt-2 space-y-1.5">
+          <Label className="text-[11px]">Hardship category</Label>
+          <Select
+            value={(item.categories?.length ? item.categories : [item.category])[0] ?? ""}
+            onValueChange={(v) =>
+              updateItem(item.id, { category: v, categories: [v] }, `Filed under ${v}`)
+            }
+          >
+            <SelectTrigger className="h-10 text-xs">
+              <SelectValue placeholder="Choose a category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((c) => (
+                <SelectItem key={c} value={c} className="text-xs">
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    case "aciah-impact":
+      return (
+        <div className="mt-2 space-y-1.5">
+          <Label className="text-[11px]">How this affects Aciah</Label>
+          <Textarea
+            value={impactValue}
+            onChange={(e) => setImpactDraft(e.target.value)}
+            onBlur={() => {
+              if (impactValue === (item.affectsAciah ?? "")) return;
+              updateItem(item.id, { affectsAciah: impactValue }, `${item.exhibitId} Aciah impact recorded`);
+            }}
+            rows={3}
+            placeholder="Explain the effect on Aciah in your own words…"
+            className="text-xs"
+          />
+        </div>
+      );
+    case "evidence-awaiting-confirmation":
+    case "evidence-ai-conflict":
+      return (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 text-[11px]"
+            disabled={reading}
+            onClick={onReadWithAi}
+          >
+            {reading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+            {reading ? "Reading…" : "Read with AI"}
+          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            Then pick the correct option in the reading below.
+          </p>
+        </div>
+      );
+    default:
+      return null;
+  }
 }
 
 export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => void }) {
@@ -56,6 +197,7 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
     profile,
     gaps,
     ignoreGap,
+    categories,
   } = useEvidence();
   const item = items.find((i) => i.id === inspectorId) ?? null;
   const itemGaps = item ? gaps.filter((g) => g.recordType === "evidence" && g.recordId === item.id) : [];
@@ -163,6 +305,14 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                       >
                         <p className="text-xs font-semibold text-destructive">{gap.label}</p>
                         <p className="mt-0.5 text-[11px] text-muted-foreground">{gap.detail}</p>
+                        <GapInlineField
+                          item={item}
+                          gap={gap}
+                          categories={categories}
+                          updateItem={updateItem}
+                          onReadWithAi={() => void runExtraction(item.id)}
+                          reading={extractingIds.includes(item.id)}
+                        />
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           <Button
                             size="sm"
