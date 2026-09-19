@@ -49,7 +49,9 @@ export function FixWizard({
   itemIds: string[];
   startId?: string | undefined;
 }) {
-  const { items, gaps, updateItem, ignoreGap, runExtraction, extractingIds } = useEvidence();
+  const { items, gaps, categories, updateItem, ignoreGap, runExtraction, extractingIds } =
+    useEvidence();
+
 
   const queue = useMemo(
     () => itemIds.filter((id) => items.some((i) => i.id === id)),
