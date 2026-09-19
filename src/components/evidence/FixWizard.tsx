@@ -191,8 +191,9 @@ export function FixWizard({
               </Button>
 
               <div className="space-y-1.5">
-                <Label className="text-[11px]">Title</Label>
+                <Label htmlFor="fw-title" className="text-[11px]">Title</Label>
                 <Input
+                  id="fw-title"
                   value={draft.title}
                   onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                   className="text-xs"
@@ -201,8 +202,9 @@ export function FixWizard({
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1.5">
-                  <Label className="text-[11px]">Document date</Label>
+                  <Label htmlFor="fw-date" className="text-[11px]">Document date</Label>
                   <Input
+                    id="fw-date"
                     type="date"
                     value={draft.dateOfDocument}
                     onChange={(e) => setDraft({ ...draft, dateOfDocument: e.target.value })}
@@ -210,12 +212,12 @@ export function FixWizard({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[11px]">Source type</Label>
+                  <Label htmlFor="fw-source" className="text-[11px]">Source type</Label>
                   <Select
                     value={draft.sourceType}
                     onValueChange={(v) => setDraft({ ...draft, sourceType: v as SourceType })}
                   >
-                    <SelectTrigger className="text-xs">
+                    <SelectTrigger id="fw-source" className="text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -230,8 +232,28 @@ export function FixWizard({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[11px]">People (separated by commas)</Label>
+                <Label htmlFor="fw-category" className="text-[11px]">Hardship category</Label>
+                <Select
+                  value={draft.category}
+                  onValueChange={(v) => setDraft({ ...draft, category: v })}
+                >
+                  <SelectTrigger id="fw-category" className="text-xs">
+                    <SelectValue placeholder="Choose a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat} className="text-xs">
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="fw-people" className="text-[11px]">People (separated by commas)</Label>
                 <Input
+                  id="fw-people"
                   value={draft.people}
                   onChange={(e) => setDraft({ ...draft, people: e.target.value })}
                   className="text-xs"
@@ -239,8 +261,9 @@ export function FixWizard({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[11px]">How this affects Aciah</Label>
+                <Label htmlFor="fw-aciah" className="text-[11px]">How this affects Aciah</Label>
                 <Textarea
+                  id="fw-aciah"
                   value={draft.affectsAciah}
                   onChange={(e) => setDraft({ ...draft, affectsAciah: e.target.value })}
                   rows={3}
@@ -249,14 +272,16 @@ export function FixWizard({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[11px]">Case notes</Label>
+                <Label htmlFor="fw-notes" className="text-[11px]">Case notes</Label>
                 <Textarea
+                  id="fw-notes"
                   value={draft.notes}
                   onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
                   rows={4}
                   className="text-xs"
                 />
               </div>
+
             </>
           )}
         </div>
