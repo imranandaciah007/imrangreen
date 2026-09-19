@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EyeOff, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
