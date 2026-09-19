@@ -275,6 +275,7 @@ export function PacketBuilder({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[94svh] flex-col gap-3 overflow-hidden sm:max-w-2xl">
         <DialogHeader>
@@ -666,12 +667,13 @@ export function PacketBuilder({
           )}
         </div>
       </DialogContent>
-      <FixWizard
-        open={wizardOpen}
-        onOpenChange={setWizardOpen}
-        itemIds={wizardQueue}
-        startId={wizardStartId}
-      />
     </Dialog>
+    <FixWizard
+      open={wizardOpen}
+      onOpenChange={setWizardOpen}
+      itemIds={wizardQueue}
+      startId={wizardStartId}
+    />
+    </>
   );
 }
