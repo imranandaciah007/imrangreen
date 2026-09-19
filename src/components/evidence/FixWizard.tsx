@@ -76,6 +76,7 @@ export function FixWizard({
       title: item.title ?? "",
       dateOfDocument: item.dateOfDocument ?? "",
       sourceType: item.sourceType,
+      category: item.category ?? "",
       people: (item.people ?? []).join(", "),
       affectsAciah: item.affectsAciah ?? "",
       notes: item.notes ?? "",
@@ -96,10 +97,23 @@ export function FixWizard({
       draft.title !== (item.title ?? "") ||
       draft.dateOfDocument !== (item.dateOfDocument ?? "") ||
       draft.sourceType !== item.sourceType ||
+      draft.category !== (item.category ?? "") ||
       people.join(", ") !== (item.people ?? []).join(", ") ||
       draft.affectsAciah !== (item.affectsAciah ?? "") ||
       draft.notes !== (item.notes ?? "");
     if (!changed) return;
+    const categoryPatch =
+      draft.category && draft.category !== item.category
+        ? {
+            category: draft.category as (typeof item)["category"],
+            categories: [
+              draft.category,
+              ...(item.categories ?? []).filter(
+                (c) => c !== draft.category && c !== item.category,
+              ),
+            ] as (typeof item)["categories"],
+          }
+        : {};
     updateItem(
       item.id,
       {
@@ -109,11 +123,13 @@ export function FixWizard({
         people,
         affectsAciah: draft.affectsAciah,
         notes: draft.notes,
+        ...categoryPatch,
       },
       `${item.exhibitId} details updated`,
     );
     toast.success("Changes saved", { description: item.exhibitId });
   }
+
 
   function go(next: number) {
     saveCurrent();
