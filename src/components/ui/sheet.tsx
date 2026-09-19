@@ -61,7 +61,7 @@ const SheetContent = React.forwardRef<
     <SheetOverlay />
     <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
       <SheetPrimitive.Close asChild>
-        <OverlayNavigation className={cn(side !== "bottom" && "-mx-6 -mt-6")} />
+        <OverlayNavigation />
       </SheetPrimitive.Close>
       {children}
     </SheetPrimitive.Content>
