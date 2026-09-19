@@ -197,6 +197,7 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
     profile,
     gaps,
     ignoreGap,
+    categories,
   } = useEvidence();
   const item = items.find((i) => i.id === inspectorId) ?? null;
   const itemGaps = item ? gaps.filter((g) => g.recordType === "evidence" && g.recordId === item.id) : [];
