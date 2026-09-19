@@ -99,6 +99,16 @@ export function PacketBuilder({
   const attention = findings.filter((f) => f.level === "attention");
   const optional = findings.filter((f) => f.level === "optional");
 
+  /** Every flagged document, in the order shown, so the wizard can step through them. */
+  const wizardQueue = useMemo(() => {
+    const ids: string[] = [];
+    for (const f of [...blocking, ...attention, ...optional]) {
+      const id = f.gap?.recordType === "evidence" ? f.gap.recordId : null;
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+    return ids;
+  }, [blocking, attention, optional]);
+
   const exhibits = useMemo(() => buildExhibits(items, sections), [items, sections]);
   const pageCount = exhibits.at(-1)?.lastPage ?? 0;
 
