@@ -27,10 +27,12 @@ interface Draft {
   title: string;
   dateOfDocument: string;
   sourceType: SourceType;
+  category: string;
   people: string;
   affectsAciah: string;
   notes: string;
 }
+
 
 /**
  * Step-by-step repair flow for the documents flagged in the packet audit.
