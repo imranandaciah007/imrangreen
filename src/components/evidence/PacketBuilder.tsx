@@ -7,6 +7,8 @@ import {
   FileText,
   Loader2,
   ShieldCheck,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +40,7 @@ import { useEvidence } from "@/lib/evidence/store";
 import { CASE_SETTINGS, EXPENSE_GROUPS, DEFAULT_CATEGORIES } from "@/lib/evidence/types";
 import { uploadPacketFile } from "@/lib/drive.functions";
 import { draftFilingLanguage, type FilingLanguage } from "@/lib/filing.functions";
+import { FixWizard } from "./FixWizard";
 
 const STEPS = ["Audit", "Sections", "Exhibit index", "Generate", "Saved"] as const;
 
@@ -73,7 +76,12 @@ export function PacketBuilder({
     togglePacketExclusion,
     savePacketVersion,
     connection,
+    runExtraction,
+    extractingIds,
   } = useEvidence();
+
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStartId, setWizardStartId] = useState<string | undefined>(undefined);
 
   const [step, setStep] = useState(0);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -341,14 +349,40 @@ export function PacketBuilder({
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {f.gap?.recordType === "evidence" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 text-[11px]"
-                          onClick={() => openInspector(f.gap!.recordId)}
-                        >
-                          Fix now
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-9 text-[11px]"
+                            onClick={() => {
+                              setWizardStartId(f.gap!.recordId);
+                              setWizardOpen(true);
+                            }}
+                          >
+                            Fix now
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-9 text-[11px]"
+                            disabled={extractingIds.includes(f.gap.recordId)}
+                            onClick={() => void runExtraction(f.gap!.recordId)}
+                          >
+                            {extractingIds.includes(f.gap.recordId) ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Sparkles className="size-3.5" />
+                            )}
+                            Fix with AI
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-9 text-[11px]"
+                            onClick={() => openInspector(f.gap!.recordId)}
+                          >
+                            View
+                          </Button>
+                        </>
                       )}
                       {f.gap && (
                         <Button
