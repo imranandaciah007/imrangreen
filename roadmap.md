@@ -10,6 +10,7 @@
 - [x] Simplify the Home view without removing case information
 - [x] Scale navigation, panels and actions cleanly across phone and desktop
 - [x] Verify every primary navigation and action path
+- [x] Keep visible Back and Home controls on every main page, dialog, sheet and document details view
 - [x] Make Drive sync a one-step action with confirmation and last-sync status
 - [x] Add persistent local reminders and dashboard visibility for every open task
 - [x] Replace iPhone PDF reading with server-side diary extraction and preserve page references

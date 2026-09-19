@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Plus, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { NAVIGATE_HOME_EVENT } from "@/components/ui/overlay-navigation";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppHeader } from "@/components/evidence/AppHeader";
@@ -54,7 +55,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CaseApp() {
-  const { loading, stats, syncDrive, scanAllDocuments, setFilters } = useEvidence();
+  const { loading, stats, syncDrive, scanAllDocuments, setFilters, openInspector } = useEvidence();
   const [tab, setTabRaw] = useState<MainTab>("home");
   const tabRef = useRef<MainTab>("home");
 
@@ -88,6 +89,24 @@ function CaseApp() {
   const [diaryOpen, setDiaryOpen] = useState(false);
   const [uploadCategory, setUploadCategory] = useState<string | undefined>(undefined);
   const [editItem, setEditItem] = useState<EvidenceItem | null>(null);
+
+  useEffect(() => {
+    const goHome = () => {
+      setConnectOpen(false);
+      setUploadOpen(false);
+      setAddOpen(false);
+      setExpenseOpen(false);
+      setEventOpen(false);
+      setTaskOpen(false);
+      setAskOpen(false);
+      setPacketOpen(false);
+      setDiaryOpen(false);
+      openInspector(null);
+      setTab("home");
+    };
+    window.addEventListener(NAVIGATE_HOME_EVENT, goHome);
+    return () => window.removeEventListener(NAVIGATE_HOME_EVENT, goHome);
+  }, [openInspector]);
 
   function openUpload(category?: string) {
     setEditItem(null);
