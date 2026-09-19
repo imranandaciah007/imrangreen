@@ -1,3 +1,4 @@
+import * as React from "react";
 import { ArrowLeft, Home } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,18 @@ import { cn } from "@/lib/utils";
 
 export const NAVIGATE_HOME_EVENT = "gc:navigate-home";
 
-export function OverlayNavigation({ className }: { className?: string }) {
+type CloseWrapper = React.ComponentType<{ asChild?: boolean; children: React.ReactNode }>;
+
+export function OverlayNavigation({
+  className,
+  Close,
+}: {
+  className?: string;
+  Close?: CloseWrapper;
+}) {
+  const Wrap = ({ children }: { children: React.ReactNode }) =>
+    Close ? <Close asChild>{children}</Close> : <>{children}</>;
+
   return (
     <div
       className={cn(
@@ -14,20 +26,25 @@ export function OverlayNavigation({ className }: { className?: string }) {
       )}
       aria-label="Page navigation"
     >
-      <Button variant="ghost" size="sm" className="h-9 px-2.5" data-overlay-back>
-        <ArrowLeft className="size-4" />
-        Back
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-9 px-2.5"
-        onClick={() => window.dispatchEvent(new Event(NAVIGATE_HOME_EVENT))}
-        data-overlay-home
-      >
-        <Home className="size-4" />
-        Home
-      </Button>
+      <Wrap>
+        <Button type="button" variant="ghost" size="sm" className="h-9 px-2.5" data-overlay-back>
+          <ArrowLeft className="size-4" />
+          Back
+        </Button>
+      </Wrap>
+      <Wrap>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-9 px-2.5"
+          onClick={() => window.dispatchEvent(new Event(NAVIGATE_HOME_EVENT))}
+          data-overlay-home
+        >
+          <Home className="size-4" />
+          Home
+        </Button>
+      </Wrap>
     </div>
   );
 }
