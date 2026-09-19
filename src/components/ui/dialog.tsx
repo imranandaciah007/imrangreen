@@ -43,9 +43,7 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       <div className="-mx-6 -mt-6">
-        <DialogPrimitive.Close asChild>
-          <OverlayNavigation />
-        </DialogPrimitive.Close>
+        <OverlayNavigation Close={DialogPrimitive.Close} />
       </div>
       {children}
     </DialogPrimitive.Content>

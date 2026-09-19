@@ -60,9 +60,7 @@ const SheetContent = React.forwardRef<
   <SheetPortal>
     <SheetOverlay />
     <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
-      <SheetPrimitive.Close asChild>
-        <OverlayNavigation />
-      </SheetPrimitive.Close>
+      <OverlayNavigation Close={SheetPrimitive.Close} />
       {children}
     </SheetPrimitive.Content>
   </SheetPortal>
