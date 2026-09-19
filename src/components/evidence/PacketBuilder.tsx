@@ -410,6 +410,19 @@ export function PacketBuilder({
                 ))}
               </ul>
 
+              {wizardQueue.length > 0 && (
+                <Button
+                  className="h-11 w-full"
+                  onClick={() => {
+                    setWizardStartId(undefined);
+                    setWizardOpen(true);
+                  }}
+                >
+                  <Wand2 className="size-4" /> Step through all {wizardQueue.length} document
+                  {wizardQueue.length === 1 ? "" : "s"}
+                </Button>
+              )}
+
               {(attention.length > 0 || optional.length > 0) && (
                 <label className="flex items-center gap-2 rounded-lg border border-border bg-card p-2.5 text-[11px]">
                   <Checkbox
@@ -653,6 +666,12 @@ export function PacketBuilder({
           )}
         </div>
       </DialogContent>
+      <FixWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        itemIds={wizardQueue}
+        startId={wizardStartId}
+      />
     </Dialog>
   );
 }
