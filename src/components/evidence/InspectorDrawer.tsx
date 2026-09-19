@@ -305,6 +305,14 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                       >
                         <p className="text-xs font-semibold text-destructive">{gap.label}</p>
                         <p className="mt-0.5 text-[11px] text-muted-foreground">{gap.detail}</p>
+                        <GapInlineField
+                          item={item}
+                          gap={gap}
+                          categories={categories}
+                          updateItem={updateItem}
+                          onReadWithAi={() => void runExtraction(item.id)}
+                          reading={extractingIds.includes(item.id)}
+                        />
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           <Button
                             size="sm"
