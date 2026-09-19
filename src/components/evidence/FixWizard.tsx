@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EyeOff, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,10 +27,12 @@ interface Draft {
   title: string;
   dateOfDocument: string;
   sourceType: SourceType;
+  category: string;
   people: string;
   affectsAciah: string;
   notes: string;
 }
+
 
 /**
  * Step-by-step repair flow for the documents flagged in the packet audit.
@@ -47,21 +49,30 @@ export function FixWizard({
   itemIds: string[];
   startId?: string | undefined;
 }) {
-  const { items, gaps, updateItem, ignoreGap, runExtraction, extractingIds } = useEvidence();
+  const { items, gaps, categories, updateItem, ignoreGap, runExtraction, extractingIds } =
+    useEvidence();
 
-  const queue = useMemo(
-    () => itemIds.filter((id) => items.some((i) => i.id === id)),
-    [itemIds, items],
-  );
+  /**
+   * The list is frozen when the wizard opens. Fixing a document removes it from the
+   * live flagged list, and a shifting list would otherwise jump the user back to the start.
+   */
+  const [queue, setQueue] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
   const item = items.find((i) => i.id === queue[index]) ?? null;
   const [draft, setDraft] = useState<Draft | null>(null);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   useEffect(() => {
     if (!open) return;
-    const start = startId ? queue.indexOf(startId) : 0;
+    const frozen = itemIds.filter((id) => itemsRef.current.some((i) => i.id === id));
+    setQueue(frozen);
+    const start = startId ? frozen.indexOf(startId) : 0;
     setIndex(start >= 0 ? start : 0);
-  }, [open, startId, queue]);
+    // Deliberately keyed on `open` only: the queue must not change mid-session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
 
   useEffect(() => {
     if (!item) {
@@ -72,6 +83,7 @@ export function FixWizard({
       title: item.title ?? "",
       dateOfDocument: item.dateOfDocument ?? "",
       sourceType: item.sourceType,
+      category: item.category ?? "",
       people: (item.people ?? []).join(", "),
       affectsAciah: item.affectsAciah ?? "",
       notes: item.notes ?? "",
@@ -92,10 +104,23 @@ export function FixWizard({
       draft.title !== (item.title ?? "") ||
       draft.dateOfDocument !== (item.dateOfDocument ?? "") ||
       draft.sourceType !== item.sourceType ||
+      draft.category !== (item.category ?? "") ||
       people.join(", ") !== (item.people ?? []).join(", ") ||
       draft.affectsAciah !== (item.affectsAciah ?? "") ||
       draft.notes !== (item.notes ?? "");
     if (!changed) return;
+    const categoryPatch =
+      draft.category && draft.category !== item.category
+        ? {
+            category: draft.category as (typeof item)["category"],
+            categories: [
+              draft.category,
+              ...(item.categories ?? []).filter(
+                (c) => c !== draft.category && c !== item.category,
+              ),
+            ] as (typeof item)["categories"],
+          }
+        : {};
     updateItem(
       item.id,
       {
@@ -105,11 +130,13 @@ export function FixWizard({
         people,
         affectsAciah: draft.affectsAciah,
         notes: draft.notes,
+        ...categoryPatch,
       },
       `${item.exhibitId} details updated`,
     );
     toast.success("Changes saved", { description: item.exhibitId });
   }
+
 
   function go(next: number) {
     saveCurrent();
@@ -120,7 +147,27 @@ export function FixWizard({
     setIndex(next);
   }
 
+  /** Save what the user typed, re-read the file, then show the AI's values in the form. */
+  async function readWithAi() {
+    if (!item) return;
+    const id = item.id;
+    saveCurrent();
+    await runExtraction(id);
+    const fresh = itemsRef.current.find((i) => i.id === id);
+    if (!fresh) return;
+    setDraft({
+      title: fresh.title ?? "",
+      dateOfDocument: fresh.dateOfDocument ?? "",
+      sourceType: fresh.sourceType,
+      category: fresh.category ?? "",
+      people: (fresh.people ?? []).join(", "),
+      affectsAciah: fresh.affectsAciah ?? "",
+      notes: fresh.notes ?? "",
+    });
+  }
+
   const busy = item ? extractingIds.includes(item.id) : false;
+
 
   return (
     <Dialog
@@ -184,15 +231,16 @@ export function FixWizard({
                 variant="outline"
                 className="h-11 w-full"
                 disabled={busy}
-                onClick={() => void runExtraction(item.id)}
+                onClick={() => void readWithAi()}
               >
                 {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                 {busy ? "Reading the document…" : "Fix with AI"}
               </Button>
 
               <div className="space-y-1.5">
-                <Label className="text-[11px]">Title</Label>
+                <Label htmlFor="fw-title" className="text-[11px]">Title</Label>
                 <Input
+                  id="fw-title"
                   value={draft.title}
                   onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                   className="text-xs"
@@ -201,8 +249,9 @@ export function FixWizard({
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1.5">
-                  <Label className="text-[11px]">Document date</Label>
+                  <Label htmlFor="fw-date" className="text-[11px]">Document date</Label>
                   <Input
+                    id="fw-date"
                     type="date"
                     value={draft.dateOfDocument}
                     onChange={(e) => setDraft({ ...draft, dateOfDocument: e.target.value })}
@@ -210,12 +259,12 @@ export function FixWizard({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[11px]">Source type</Label>
+                  <Label htmlFor="fw-source" className="text-[11px]">Source type</Label>
                   <Select
                     value={draft.sourceType}
                     onValueChange={(v) => setDraft({ ...draft, sourceType: v as SourceType })}
                   >
-                    <SelectTrigger className="text-xs">
+                    <SelectTrigger id="fw-source" className="text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -230,8 +279,28 @@ export function FixWizard({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[11px]">People (separated by commas)</Label>
+                <Label htmlFor="fw-category" className="text-[11px]">Hardship category</Label>
+                <Select
+                  value={draft.category}
+                  onValueChange={(v) => setDraft({ ...draft, category: v })}
+                >
+                  <SelectTrigger id="fw-category" className="text-xs">
+                    <SelectValue placeholder="Choose a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat} className="text-xs">
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="fw-people" className="text-[11px]">People (separated by commas)</Label>
                 <Input
+                  id="fw-people"
                   value={draft.people}
                   onChange={(e) => setDraft({ ...draft, people: e.target.value })}
                   className="text-xs"
@@ -239,8 +308,9 @@ export function FixWizard({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[11px]">How this affects Aciah</Label>
+                <Label htmlFor="fw-aciah" className="text-[11px]">How this affects Aciah</Label>
                 <Textarea
+                  id="fw-aciah"
                   value={draft.affectsAciah}
                   onChange={(e) => setDraft({ ...draft, affectsAciah: e.target.value })}
                   rows={3}
@@ -249,14 +319,16 @@ export function FixWizard({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[11px]">Case notes</Label>
+                <Label htmlFor="fw-notes" className="text-[11px]">Case notes</Label>
                 <Textarea
+                  id="fw-notes"
                   value={draft.notes}
                   onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
                   rows={4}
                   className="text-xs"
                 />
               </div>
+
             </>
           )}
         </div>
