@@ -670,6 +670,47 @@ export function PacketBuilder({
                   </p>
                 )}
               </div>
+              <div className="space-y-2 rounded-lg border border-border bg-card p-2.5">
+                <p className="text-[11px] font-semibold text-foreground">
+                  Full waiver analysis (Aciah as qualifying relative)
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {analysis
+                    ? `Prepared ${formatDateTime(analysis.generatedAt)} — ${analysis.sections.length} section(s), ${analysis.missingEvidence.length} evidence gap(s), ${analysis.contradictions.length} conflict(s), ${analysis.attorneyReview.length} item(s) for an attorney. Included with the packet.`
+                    : "Works out the possible inadmissibility ground, the waiver route, and the hardship to Aciah — separation, relocation and the combined effect — with every statement tied to an exhibit. Also lists conflicts, weak points, missing documents and anything needing an immigration attorney."}
+                </p>
+                <Button
+                  variant="outline"
+                  className="h-11 w-full"
+                  disabled={analysing || !exhibits.length}
+                  onClick={() => void runAnalysis()}
+                >
+                  {analysing ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="size-4" />
+                  )}
+                  {analysis ? "Prepare it again" : "Prepare the full waiver analysis"}
+                </Button>
+                {analysis && (
+                  <>
+                    {analysis.attorneyReview.length > 0 && (
+                      <p className="rounded-md border border-destructive/45 bg-destructive/10 p-2 text-[11px] text-foreground">
+                        <AlertTriangle className="mr-1 inline size-3.5 text-destructive" />
+                        {analysis.attorneyReview.length} point(s) need an immigration attorney before
+                        filing.
+                      </p>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="h-11 w-full"
+                      onClick={() => printAnalysis()}
+                    >
+                      <Sparkles className="size-4" /> Read the analysis / save as PDF
+                    </Button>
+                  </>
+                )}
+              </div>
               <Button variant="outline" className="h-11 w-full" onClick={printPacket}>
                 <FileText className="size-4" /> Preview / save as PDF
               </Button>
