@@ -209,6 +209,79 @@ export function PacketBuilder({
     }
   }
 
+  /**
+   * Full waiver analysis: grounds, framework, hardship to Aciah in
+   * fact/evidence/effect/relevance/exhibit form, discretion, plus the internal
+   * review page (challenges, conflicts, unverified statements, missing evidence,
+   * attorney-review flags). Written only from the recorded exhibits and events.
+   */
+  async function runAnalysis() {
+    setAnalysing(true);
+    try {
+      const flagged = new Set(
+        gaps.filter((g) => g.recordType === "evidence").map((g) => g.recordId),
+      );
+      const result = await buildWaiverAnalysis({
+        data: {
+          version: nextVersion,
+          caseName: CASE_SETTINGS.caseName,
+          qualifyingRelative: CASE_SETTINGS.primaryQualifyingRelative,
+          applicant: "Imran",
+          child: CASE_SETTINGS.child,
+          separationStartDate: CASE_SETTINGS.separationStartDate,
+          exhibits: exhibits.map((e) => ({
+            number: e.number,
+            title: e.item.title || e.item.fileName,
+            date: e.item.dateOfDocument ?? "",
+            sourceType: e.item.sourceType ?? "",
+            people: e.item.people ?? [],
+            categories: e.item.categories?.length ? e.item.categories : [e.item.category],
+            pages: `${e.firstPage}-${e.lastPage}`,
+            summary: e.item.aiExtraction?.summary || e.item.notes || "",
+            aciahImpact: e.item.affectsAciah ?? "",
+            needsAttention: flagged.has(e.item.id),
+          })),
+          events: events.map((ev) => ({
+            date: ev.date,
+            title: ev.title,
+            categories: ev.categories?.length ? ev.categories : [ev.category],
+            people: ev.people ?? [],
+            description: ev.description ?? "",
+            effectOnAciah: ev.effectOnAciah ?? "",
+            exhibits: ev.evidenceIds
+              .map((id) => exhibits.find((e) => e.item.id === id)?.number)
+              .filter((n): n is string => Boolean(n)),
+          })),
+          finance: { ...totals, currency: CASE_SETTINGS.baseCurrency },
+          openGaps: gaps.map((g) => `${g.label}: ${g.detail}`),
+        },
+      });
+      setAnalysis(result);
+      const flags =
+        result.attorneyReview.length + result.contradictions.length + result.unverified.length;
+      toast.success("Waiver analysis prepared", {
+        description: `${result.sections.length} section(s), ${result.missingEvidence.length} evidence gap(s), ${flags} item(s) flagged for your review. Read it all before filing.`,
+      });
+    } catch (err) {
+      toast.error("Could not prepare the waiver analysis", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setAnalysing(false);
+    }
+  }
+
+  const analysisDoc = () =>
+    analysis
+      ? waiverAnalysisHtml(analysis, {
+          caseName: CASE_SETTINGS.caseName,
+          version: nextVersion,
+          applicant: "Imran",
+          qualifyingRelative: CASE_SETTINGS.primaryQualifyingRelative,
+          exhibits,
+        })
+      : null;
+
   async function generate() {
     setBusy(true);
     const v = nextVersion;
