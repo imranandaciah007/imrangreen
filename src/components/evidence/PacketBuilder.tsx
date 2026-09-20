@@ -358,15 +358,24 @@ export function PacketBuilder({
     setStep(4);
   }
 
-  function printPacket() {
+  function printDoc(html: string) {
     const w = window.open("", "_blank");
     if (!w) {
       toast.error("Allow pop-ups to print or save as PDF.");
       return;
     }
-    w.document.write(packetHtml(input));
+    w.document.write(html);
     w.document.close();
     setTimeout(() => w.print(), 600);
+  }
+
+  function printPacket() {
+    printDoc(packetHtml(input));
+  }
+
+  function printAnalysis() {
+    const html = analysisDoc();
+    if (html) printDoc(html);
   }
 
   return (
