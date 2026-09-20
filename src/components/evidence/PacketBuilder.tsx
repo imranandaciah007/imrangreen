@@ -40,6 +40,8 @@ import { useEvidence } from "@/lib/evidence/store";
 import { CASE_SETTINGS, EXPENSE_GROUPS, DEFAULT_CATEGORIES } from "@/lib/evidence/types";
 import { uploadPacketFile } from "@/lib/drive.functions";
 import { draftFilingLanguage, type FilingLanguage } from "@/lib/filing.functions";
+import { buildWaiverAnalysis, type WaiverAnalysis } from "@/lib/waiver-analysis.functions";
+import { waiverAnalysisHtml } from "@/lib/evidence/waiver-analysis-html";
 import { FixWizard } from "./FixWizard";
 
 const STEPS = ["Audit", "Sections", "Exhibit index", "Generate", "Saved"] as const;
@@ -90,6 +92,8 @@ export function PacketBuilder({
   const [saved, setSaved] = useState<{ name: string; link: string; drive: boolean }[]>([]);
   const [narrative, setNarrative] = useState<FilingLanguage | null>(null);
   const [drafting, setDrafting] = useState(false);
+  const [analysis, setAnalysis] = useState<WaiverAnalysis | null>(null);
+  const [analysing, setAnalysing] = useState(false);
 
   const findings = useMemo<AuditFinding[]>(
     () => preflightAudit(items, events, finances, tasks, gaps),
@@ -205,6 +209,79 @@ export function PacketBuilder({
     }
   }
 
+  /**
+   * Full waiver analysis: grounds, framework, hardship to Aciah in
+   * fact/evidence/effect/relevance/exhibit form, discretion, plus the internal
+   * review page (challenges, conflicts, unverified statements, missing evidence,
+   * attorney-review flags). Written only from the recorded exhibits and events.
+   */
+  async function runAnalysis() {
+    setAnalysing(true);
+    try {
+      const flagged = new Set(
+        gaps.filter((g) => g.recordType === "evidence").map((g) => g.recordId),
+      );
+      const result = await buildWaiverAnalysis({
+        data: {
+          version: nextVersion,
+          caseName: CASE_SETTINGS.caseName,
+          qualifyingRelative: CASE_SETTINGS.primaryQualifyingRelative,
+          applicant: "Imran",
+          child: CASE_SETTINGS.child,
+          separationStartDate: CASE_SETTINGS.separationStartDate,
+          exhibits: exhibits.map((e) => ({
+            number: e.number,
+            title: e.item.title || e.item.fileName,
+            date: e.item.dateOfDocument ?? "",
+            sourceType: e.item.sourceType ?? "",
+            people: e.item.people ?? [],
+            categories: e.item.categories?.length ? e.item.categories : [e.item.category],
+            pages: `${e.firstPage}-${e.lastPage}`,
+            summary: e.item.aiExtraction?.summary || e.item.notes || "",
+            aciahImpact: e.item.affectsAciah ?? "",
+            needsAttention: flagged.has(e.item.id),
+          })),
+          events: events.map((ev) => ({
+            date: ev.date,
+            title: ev.title,
+            categories: ev.categories?.length ? ev.categories : [ev.category],
+            people: ev.people ?? [],
+            description: ev.description ?? "",
+            effectOnAciah: ev.effectOnAciah ?? "",
+            exhibits: ev.evidenceIds
+              .map((id) => exhibits.find((e) => e.item.id === id)?.number)
+              .filter((n): n is string => Boolean(n)),
+          })),
+          finance: { ...totals, currency: CASE_SETTINGS.baseCurrency },
+          openGaps: gaps.map((g) => `${g.label}: ${g.detail}`),
+        },
+      });
+      setAnalysis(result);
+      const flags =
+        result.attorneyReview.length + result.contradictions.length + result.unverified.length;
+      toast.success("Waiver analysis prepared", {
+        description: `${result.sections.length} section(s), ${result.missingEvidence.length} evidence gap(s), ${flags} item(s) flagged for your review. Read it all before filing.`,
+      });
+    } catch (err) {
+      toast.error("Could not prepare the waiver analysis", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setAnalysing(false);
+    }
+  }
+
+  const analysisDoc = () =>
+    analysis
+      ? waiverAnalysisHtml(analysis, {
+          caseName: CASE_SETTINGS.caseName,
+          version: nextVersion,
+          applicant: "Imran",
+          qualifyingRelative: CASE_SETTINGS.primaryQualifyingRelative,
+          exhibits,
+        })
+      : null;
+
   async function generate() {
     setBusy(true);
     const v = nextVersion;
@@ -228,6 +305,14 @@ export function PacketBuilder({
       },
       { name: `I601_Gap_Report_v${v}.html`, mime: "text/html", content: gapReportHtml(input) },
     ];
+    const analysisHtml = analysisDoc();
+    if (analysisHtml) {
+      files.unshift({
+        name: `I601_Waiver_Analysis_v${v}.html`,
+        mime: "text/html",
+        content: analysisHtml,
+      });
+    }
 
     const results: { name: string; link: string; drive: boolean }[] = [];
     for (const file of files) {
@@ -273,15 +358,24 @@ export function PacketBuilder({
     setStep(4);
   }
 
-  function printPacket() {
+  function printDoc(html: string) {
     const w = window.open("", "_blank");
     if (!w) {
       toast.error("Allow pop-ups to print or save as PDF.");
       return;
     }
-    w.document.write(packetHtml(input));
+    w.document.write(html);
     w.document.close();
     setTimeout(() => w.print(), 600);
+  }
+
+  function printPacket() {
+    printDoc(packetHtml(input));
+  }
+
+  function printAnalysis() {
+    const html = analysisDoc();
+    if (html) printDoc(html);
   }
 
   return (
@@ -583,6 +677,47 @@ export function PacketBuilder({
                     {narrative.coverLetter[0].slice(0, 260)}
                     {narrative.coverLetter[0].length > 260 ? "…" : ""}
                   </p>
+                )}
+              </div>
+              <div className="space-y-2 rounded-lg border border-border bg-card p-2.5">
+                <p className="text-[11px] font-semibold text-foreground">
+                  Full waiver analysis (Aciah as qualifying relative)
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {analysis
+                    ? `Prepared ${formatDateTime(analysis.generatedAt)} — ${analysis.sections.length} section(s), ${analysis.missingEvidence.length} evidence gap(s), ${analysis.contradictions.length} conflict(s), ${analysis.attorneyReview.length} item(s) for an attorney. Included with the packet.`
+                    : "Works out the possible inadmissibility ground, the waiver route, and the hardship to Aciah — separation, relocation and the combined effect — with every statement tied to an exhibit. Also lists conflicts, weak points, missing documents and anything needing an immigration attorney."}
+                </p>
+                <Button
+                  variant="outline"
+                  className="h-11 w-full"
+                  disabled={analysing || !exhibits.length}
+                  onClick={() => void runAnalysis()}
+                >
+                  {analysing ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="size-4" />
+                  )}
+                  {analysis ? "Prepare it again" : "Prepare the full waiver analysis"}
+                </Button>
+                {analysis && (
+                  <>
+                    {analysis.attorneyReview.length > 0 && (
+                      <p className="rounded-md border border-destructive/45 bg-destructive/10 p-2 text-[11px] text-foreground">
+                        <AlertTriangle className="mr-1 inline size-3.5 text-destructive" />
+                        {analysis.attorneyReview.length} point(s) need an immigration attorney before
+                        filing.
+                      </p>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="h-11 w-full"
+                      onClick={() => printAnalysis()}
+                    >
+                      <Sparkles className="size-4" /> Read the analysis / save as PDF
+                    </Button>
+                  </>
                 )}
               </div>
               <Button variant="outline" className="h-11 w-full" onClick={printPacket}>
