@@ -305,6 +305,14 @@ export function PacketBuilder({
       },
       { name: `I601_Gap_Report_v${v}.html`, mime: "text/html", content: gapReportHtml(input) },
     ];
+    const analysisHtml = analysisDoc();
+    if (analysisHtml) {
+      files.unshift({
+        name: `I601_Waiver_Analysis_v${v}.html`,
+        mime: "text/html",
+        content: analysisHtml,
+      });
+    }
 
     const results: { name: string; link: string; drive: boolean }[] = [];
     for (const file of files) {
