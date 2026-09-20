@@ -15,36 +15,45 @@ export function OverlayNavigation({
   className?: string;
   Close?: CloseWrapper;
 }) {
-  const Wrap = ({ children }: { children: React.ReactNode }) =>
-    Close ? <Close asChild>{children}</Close> : <>{children}</>;
+  const handleHome = () => {
+    window.dispatchEvent(new Event(NAVIGATE_HOME_EVENT));
+  };
+
+  const backButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      className="h-12 w-full touch-manipulation justify-center gap-2 px-4 text-sm font-bold"
+      data-overlay-back
+    >
+      <ArrowLeft className="size-5 shrink-0" />
+      Back
+    </Button>
+  );
+
+  const homeButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      className="h-12 w-full touch-manipulation justify-center gap-2 px-4 text-sm font-bold"
+      onClick={handleHome}
+      data-overlay-home
+    >
+      <Home className="size-5 shrink-0" />
+      Home
+    </Button>
+  );
 
   return (
     <div
       className={cn(
-        "sticky top-0 z-30 flex shrink-0 items-center gap-1 border-b border-border bg-background/95 px-2 py-2 backdrop-blur",
+        "sticky top-0 z-40 grid shrink-0 grid-cols-2 gap-2 border-b border-border bg-background/95 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] shadow-sm backdrop-blur",
         className,
       )}
       aria-label="Page navigation"
     >
-      <Wrap>
-        <Button type="button" variant="ghost" size="sm" className="h-9 px-2.5" data-overlay-back>
-          <ArrowLeft className="size-4" />
-          Back
-        </Button>
-      </Wrap>
-      <Wrap>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-9 px-2.5"
-          onClick={() => window.dispatchEvent(new Event(NAVIGATE_HOME_EVENT))}
-          data-overlay-home
-        >
-          <Home className="size-4" />
-          Home
-        </Button>
-      </Wrap>
+      {Close ? <Close asChild>{backButton}</Close> : backButton}
+      {Close ? <Close asChild>{homeButton}</Close> : homeButton}
     </div>
   );
 }
