@@ -92,6 +92,8 @@ export function PacketBuilder({
   const [saved, setSaved] = useState<{ name: string; link: string; drive: boolean }[]>([]);
   const [narrative, setNarrative] = useState<FilingLanguage | null>(null);
   const [drafting, setDrafting] = useState(false);
+  const [analysis, setAnalysis] = useState<WaiverAnalysis | null>(null);
+  const [analysing, setAnalysing] = useState(false);
 
   const findings = useMemo<AuditFinding[]>(
     () => preflightAudit(items, events, finances, tasks, gaps),
