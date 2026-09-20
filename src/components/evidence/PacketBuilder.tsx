@@ -40,6 +40,8 @@ import { useEvidence } from "@/lib/evidence/store";
 import { CASE_SETTINGS, EXPENSE_GROUPS, DEFAULT_CATEGORIES } from "@/lib/evidence/types";
 import { uploadPacketFile } from "@/lib/drive.functions";
 import { draftFilingLanguage, type FilingLanguage } from "@/lib/filing.functions";
+import { buildWaiverAnalysis, type WaiverAnalysis } from "@/lib/waiver-analysis.functions";
+import { waiverAnalysisHtml } from "@/lib/evidence/waiver-analysis-html";
 import { FixWizard } from "./FixWizard";
 
 const STEPS = ["Audit", "Sections", "Exhibit index", "Generate", "Saved"] as const;
