@@ -1,13 +1,13 @@
 /**
  * One place that talks to a model and returns strict JSON.
  *
- * When a Google AI Studio key (GEMINI_API_KEY) is configured it is used first, because the
- * case owner supplied it. If it is missing, or the call fails, we fall back to the built-in
- * Lovable AI gateway so nothing in the app stops working.
+ * Reading is done with the case owner's own Gemini key (GEMINI_API_KEY). If Gemini is
+ * unavailable or fails, the case owner's own OpenAI key (OPENAI_API_KEY) is used as the
+ * backup. No other AI service is ever used for reading or writing case material.
  */
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
-const GATEWAY_MODEL = "openai/gpt-6-astra";
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_MODEL = process.env["OPENAI_READ_MODEL"] || "gpt-4.1-mini";
 /** Everyday reading (interactive uploads, diary, questions). */
 const GEMINI_MODEL = "gemini-3.6-flash";
 /** Bulk background reading of hundreds of Drive files — cheapest capable model. */
@@ -17,6 +17,7 @@ const GEMINI_GAPFILL_MODEL = "gemini-3.8-flash";
 
 const geminiUrl = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
 
 export interface JsonModelFile {
   fileName: string;
