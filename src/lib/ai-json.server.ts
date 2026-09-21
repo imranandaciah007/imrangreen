@@ -261,7 +261,7 @@ async function topUp(
 
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const geminiKey = process.env["GEMINI_API_KEY"];
-  const lovableKey = process.env["LOVABLE_API_KEY"];
+  const openAiKey = process.env["OPENAI_API_KEY"];
   const allowFallback = req.allowFallback !== false;
   const geminiModel = req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
   if (geminiKey) {
@@ -291,18 +291,28 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
         await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
       }
     }
-    if (!allowFallback || !lovableKey) throw lastErr;
-    console.error("Gemini read failed, falling back to built-in AI:", lastErr);
+    if (!allowFallback || !openAiKey) throw lastErr;
+    console.error("Gemini read failed, falling back to ChatGPT:", lastErr);
   }
-  if (!lovableKey) throw new Error("AI is not configured for this project.");
+  if (!openAiKey) {
+    throw new Error(
+      "No AI key is configured. Add your Gemini key (and optionally your ChatGPT key) in project settings.",
+    );
+  }
   try {
-    const value = await runGateway(req, lovableKey);
-    await logAiUsage({ provider: "lovable", model: GATEWAY_MODEL, purpose: req.name, ok: true });
-    return value;
+    const out = await runOpenAi(req, openAiKey);
+    await logAiUsage({
+      provider: "openai",
+      model: OPENAI_MODEL,
+      purpose: req.name,
+      ok: true,
+      tokens: out.tokens,
+    });
+    return out.value;
   } catch (err) {
     await logAiUsage({
-      provider: "lovable",
-      model: GATEWAY_MODEL,
+      provider: "openai",
+      model: OPENAI_MODEL,
       purpose: req.name,
       ok: false,
       statusCode: statusFrom(err),
@@ -311,3 +321,4 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
     throw err;
   }
 }
+
