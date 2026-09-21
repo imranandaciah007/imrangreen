@@ -153,7 +153,7 @@ export function AppHeader({
                   </strong>
                 </li>
                 <li className="flex justify-between">
-                  <span>Paid built-in reads</span>
+                  <span>ChatGPT backup reads</span>
                   <strong className="tabular-nums">{usage?.fallbackMonth ?? 0}</strong>
                 </li>
                 <li className="flex justify-between">
@@ -165,7 +165,8 @@ export function AppHeader({
                 <p className="mt-3 rounded-md bg-destructive/10 p-2 text-[11px] font-semibold text-destructive">
                   Last Gemini problem ({formatWhen(usage.lastErrorAt)}): {usage.lastError}
                   <br />
-                  The built-in reader steps in automatically so nothing stalls.
+                  Your ChatGPT key steps in automatically so nothing stalls.
+
                 </p>
               ) : null}
             </PopoverContent>
