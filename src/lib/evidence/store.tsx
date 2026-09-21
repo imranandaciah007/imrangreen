@@ -193,7 +193,10 @@ interface EvidenceContextValue {
     duplicates: number;
     folders: number;
     files: number;
+    /** True when a synch was already running, so this press did nothing. */
+    skipped: boolean;
   }>;
+
   /** Verifies existing clones first, then only builds the ones genuinely missing. */
   scanAllDocuments: (opts?: { rescanAll?: boolean }) => Promise<{
     scanned: number;
