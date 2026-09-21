@@ -235,6 +235,7 @@ async function topUp(
   req: JsonModelRequest,
   value: Record<string, unknown>,
   geminiKey: string,
+  providerLabel: string,
 ): Promise<Record<string, unknown>> {
   const wanted = req.requiredFields ?? [];
   if (!wanted.length) return value;
@@ -252,7 +253,7 @@ async function topUp(
     const merged = { ...value };
     for (const field of missing) if (!blank(retry.value[field])) merged[field] = retry.value[field];
     await logAiUsage({
-      provider: "gemini",
+      provider: providerLabel,
       model: retry.model,
       purpose: `${req.name}:fill-gaps`,
       ok: true,
@@ -261,7 +262,7 @@ async function topUp(
     return merged;
   } catch (err) {
     await logAiUsage({
-      provider: "gemini",
+      provider: providerLabel,
       model: GEMINI_GAPFILL_MODEL,
       purpose: `${req.name}:fill-gaps`,
       ok: false,
@@ -274,27 +275,28 @@ async function topUp(
 
 
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
-  const geminiKey = process.env["GEMINI_API_KEY"];
+  const keys = geminiKeys();
   const openAiKey = process.env["OPENAI_API_KEY"];
   const allowFallback = req.allowFallback !== false;
   const geminiModel = req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
-  if (geminiKey) {
-    let lastErr: unknown = null;
+  let lastErr: unknown = null;
+
+  for (const { label, key } of keys) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const out = await runGemini(req, geminiKey);
+        const out = await runGemini(req, key);
         await logAiUsage({
-          provider: "gemini",
+          provider: label,
           model: out.model,
           purpose: req.name,
           ok: true,
           tokens: out.tokens,
         });
-        return await topUp(req, out.value, geminiKey);
+        return await topUp(req, out.value, key, label);
       } catch (err) {
         lastErr = err;
         await logAiUsage({
-          provider: "gemini",
+          provider: label,
           model: geminiModel,
           purpose: req.name,
           ok: false,
@@ -305,9 +307,12 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
         await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
       }
     }
-    if (!allowFallback || !openAiKey) throw lastErr;
-    console.error("Gemini read failed, falling back to ChatGPT:", lastErr);
+    console.error(`Gemini key ${label} could not read this material:`, lastErr);
   }
+
+  if (keys.length && (!allowFallback || !openAiKey)) throw lastErr;
+  if (keys.length) console.error("Both Gemini keys failed, falling back to ChatGPT:", lastErr);
+
   if (!openAiKey) {
     throw new Error(
       "No AI key is configured. Add your Gemini key (and optionally your ChatGPT key) in project settings.",
@@ -335,4 +340,5 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
     throw err;
   }
 }
+
 
