@@ -47,6 +47,7 @@ export const getAiUsage = createServerFn({ method: "GET" }).handler(
       let fallbackMonth = 0;
       let lastError: string | null = null;
       let lastErrorAt: string | null = null;
+      let lastOkAt: number | null = null;
       for (const row of data as {
         created_at: string;
         provider: string;
@@ -56,8 +57,9 @@ export const getAiUsage = createServerFn({ method: "GET" }).handler(
         status_code: number | null;
       }[]) {
         const at = new Date(row.created_at).getTime();
-        if (row.provider === "gemini") {
+        if (row.provider === "gemini" || row.provider === "gemini-2") {
           if (row.ok) {
+            if (lastOkAt === null || at > lastOkAt) lastOkAt = at;
             geminiMonth += 1;
             tokens += row.tokens ?? 0;
             if (at >= dayAgo) geminiToday += 1;
@@ -68,6 +70,12 @@ export const getAiUsage = createServerFn({ method: "GET" }).handler(
         } else if ((row.provider === "openai" || row.provider === "lovable") && row.ok) {
           fallbackMonth += 1;
         }
+      }
+      // A successful read after a failure means the limit is no longer hit —
+      // never keep showing a stale quota warning.
+      if (lastOkAt !== null && lastErrorAt && new Date(lastErrorAt).getTime() < lastOkAt) {
+        lastError = null;
+        lastErrorAt = null;
       }
       const outOfCredit = Boolean(
         lastError && /quota|exceeded|billing|credit|RESOURCE_EXHAUSTED|\[429\]/i.test(lastError),
