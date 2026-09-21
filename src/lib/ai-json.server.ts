@@ -148,60 +148,62 @@ async function runGemini(req: JsonModelRequest, key: string, modelOverride?: str
   };
 }
 
-async function runGateway(req: JsonModelRequest, key: string) {
-  const content: Record<string, unknown>[] = [{ type: "input_text", text: req.prompt }];
+async function runOpenAi(req: JsonModelRequest, key: string) {
+  const content: Record<string, unknown>[] = [{ type: "text", text: req.prompt }];
   if (req.file?.base64) {
     if (req.file.mimeType.startsWith("image/")) {
       content.push({
-        type: "input_image",
-        image_url: `data:${req.file.mimeType};base64,${req.file.base64}`,
+        type: "image_url",
+        image_url: { url: `data:${req.file.mimeType};base64,${req.file.base64}` },
       });
     } else {
       content.push({
-        type: "input_file",
-        filename: req.file.fileName,
-        file_data: `data:${req.file.mimeType};base64,${req.file.base64}`,
+        type: "file",
+        file: {
+          filename: req.file.fileName,
+          file_data: `data:${req.file.mimeType};base64,${req.file.base64}`,
+        },
       });
     }
   }
-  const res = await fetch(GATEWAY, {
+  const res = await fetch(OPENAI_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify({
-      model: GATEWAY_MODEL,
-      reasoning: { effort: "low" },
-      input: [{ role: "user", content }],
-      text: {
-        format: { type: "json_schema", name: req.name, strict: true, schema: req.schema },
+      model: OPENAI_MODEL,
+      messages: [{ role: "user", content }],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: req.name, strict: true, schema: req.schema },
       },
     }),
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`AI request failed [${res.status}]: ${body.slice(0, 400)}`);
+    throw new Error(`OpenAI request failed [${res.status}]: ${body.slice(0, 400)}`);
   }
   const data = (await res.json()) as {
-    output?: { content?: { type?: string; text?: string }[] }[];
-    output_text?: string;
+    choices?: { message?: { content?: string } }[];
+    usage?: { total_tokens?: number };
   };
-  let text = data.output_text ?? "";
-  if (!text) {
-    for (const part of data.output ?? []) {
-      for (const c of part.content ?? []) if (c.type === "output_text" && c.text) text += c.text;
-    }
-  }
-  return JSON.parse(text) as Record<string, unknown>;
+  const text = data.choices?.[0]?.message?.content ?? "";
+  if (!text.trim()) throw new Error("OpenAI returned an empty response.");
+  return {
+    value: JSON.parse(text) as Record<string, unknown>,
+    tokens: data.usage?.total_tokens ?? null,
+  };
 }
 
 /** Which reader answered — useful for audit trails. */
 export function jsonModelName(tier: "bulk" | "standard" = "standard") {
-  if (!process.env["GEMINI_API_KEY"]) return GATEWAY_MODEL;
+  if (!process.env["GEMINI_API_KEY"]) return `openai/${OPENAI_MODEL}`;
   return `google/${tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL}`;
 }
 
 export function geminiConfigured() {
   return Boolean(process.env["GEMINI_API_KEY"]);
 }
+
 
 /** Rate limits and brief upstream blips are retried; wrong requests are not. */
 function retryable(err: unknown) {
