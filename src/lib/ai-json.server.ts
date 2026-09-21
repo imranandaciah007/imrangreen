@@ -194,15 +194,29 @@ async function runOpenAi(req: JsonModelRequest, key: string) {
   };
 }
 
+/**
+ * Gemini keys in the order they are tried: the second key first, then the
+ * original one. Whichever still has allowance answers.
+ */
+function geminiKeys(): { label: string; key: string }[] {
+  const out: { label: string; key: string }[] = [];
+  const second = process.env["GEMINI_API_KEY_2"];
+  const first = process.env["GEMINI_API_KEY"];
+  if (second) out.push({ label: "gemini-2", key: second });
+  if (first) out.push({ label: "gemini", key: first });
+  return out;
+}
+
 /** Which reader answered — useful for audit trails. */
 export function jsonModelName(tier: "bulk" | "standard" = "standard") {
-  if (!process.env["GEMINI_API_KEY"]) return `openai/${OPENAI_MODEL}`;
+  if (!geminiKeys().length) return `openai/${OPENAI_MODEL}`;
   return `google/${tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL}`;
 }
 
 export function geminiConfigured() {
-  return Boolean(process.env["GEMINI_API_KEY"]);
+  return geminiKeys().length > 0;
 }
+
 
 
 /** Rate limits and brief upstream blips are retried; wrong requests are not. */
