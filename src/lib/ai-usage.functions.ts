@@ -65,7 +65,7 @@ export const getAiUsage = createServerFn({ method: "GET" }).handler(
             lastError = row.error;
             lastErrorAt = row.created_at;
           }
-        } else if (row.provider === "lovable" && row.ok) {
+        } else if ((row.provider === "openai" || row.provider === "lovable") && row.ok) {
           fallbackMonth += 1;
         }
       }

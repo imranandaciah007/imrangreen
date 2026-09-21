@@ -1,13 +1,13 @@
 /**
  * One place that talks to a model and returns strict JSON.
  *
- * When a Google AI Studio key (GEMINI_API_KEY) is configured it is used first, because the
- * case owner supplied it. If it is missing, or the call fails, we fall back to the built-in
- * Lovable AI gateway so nothing in the app stops working.
+ * Reading is done with the case owner's own Gemini key (GEMINI_API_KEY). If Gemini is
+ * unavailable or fails, the case owner's own OpenAI key (OPENAI_API_KEY) is used as the
+ * backup. No other AI service is ever used for reading or writing case material.
  */
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
-const GATEWAY_MODEL = "openai/gpt-6-astra";
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_MODEL = process.env["OPENAI_READ_MODEL"] || "gpt-4.1-mini";
 /** Everyday reading (interactive uploads, diary, questions). */
 const GEMINI_MODEL = "gemini-3.6-flash";
 /** Bulk background reading of hundreds of Drive files — cheapest capable model. */
@@ -17,6 +17,7 @@ const GEMINI_GAPFILL_MODEL = "gemini-3.8-flash";
 
 const geminiUrl = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
 
 export interface JsonModelFile {
   fileName: string;
@@ -147,60 +148,62 @@ async function runGemini(req: JsonModelRequest, key: string, modelOverride?: str
   };
 }
 
-async function runGateway(req: JsonModelRequest, key: string) {
-  const content: Record<string, unknown>[] = [{ type: "input_text", text: req.prompt }];
+async function runOpenAi(req: JsonModelRequest, key: string) {
+  const content: Record<string, unknown>[] = [{ type: "text", text: req.prompt }];
   if (req.file?.base64) {
     if (req.file.mimeType.startsWith("image/")) {
       content.push({
-        type: "input_image",
-        image_url: `data:${req.file.mimeType};base64,${req.file.base64}`,
+        type: "image_url",
+        image_url: { url: `data:${req.file.mimeType};base64,${req.file.base64}` },
       });
     } else {
       content.push({
-        type: "input_file",
-        filename: req.file.fileName,
-        file_data: `data:${req.file.mimeType};base64,${req.file.base64}`,
+        type: "file",
+        file: {
+          filename: req.file.fileName,
+          file_data: `data:${req.file.mimeType};base64,${req.file.base64}`,
+        },
       });
     }
   }
-  const res = await fetch(GATEWAY, {
+  const res = await fetch(OPENAI_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify({
-      model: GATEWAY_MODEL,
-      reasoning: { effort: "low" },
-      input: [{ role: "user", content }],
-      text: {
-        format: { type: "json_schema", name: req.name, strict: true, schema: req.schema },
+      model: OPENAI_MODEL,
+      messages: [{ role: "user", content }],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: req.name, strict: true, schema: req.schema },
       },
     }),
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`AI request failed [${res.status}]: ${body.slice(0, 400)}`);
+    throw new Error(`OpenAI request failed [${res.status}]: ${body.slice(0, 400)}`);
   }
   const data = (await res.json()) as {
-    output?: { content?: { type?: string; text?: string }[] }[];
-    output_text?: string;
+    choices?: { message?: { content?: string } }[];
+    usage?: { total_tokens?: number };
   };
-  let text = data.output_text ?? "";
-  if (!text) {
-    for (const part of data.output ?? []) {
-      for (const c of part.content ?? []) if (c.type === "output_text" && c.text) text += c.text;
-    }
-  }
-  return JSON.parse(text) as Record<string, unknown>;
+  const text = data.choices?.[0]?.message?.content ?? "";
+  if (!text.trim()) throw new Error("OpenAI returned an empty response.");
+  return {
+    value: JSON.parse(text) as Record<string, unknown>,
+    tokens: data.usage?.total_tokens ?? null,
+  };
 }
 
 /** Which reader answered — useful for audit trails. */
 export function jsonModelName(tier: "bulk" | "standard" = "standard") {
-  if (!process.env["GEMINI_API_KEY"]) return GATEWAY_MODEL;
+  if (!process.env["GEMINI_API_KEY"]) return `openai/${OPENAI_MODEL}`;
   return `google/${tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL}`;
 }
 
 export function geminiConfigured() {
   return Boolean(process.env["GEMINI_API_KEY"]);
 }
+
 
 /** Rate limits and brief upstream blips are retried; wrong requests are not. */
 function retryable(err: unknown) {
@@ -258,7 +261,7 @@ async function topUp(
 
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const geminiKey = process.env["GEMINI_API_KEY"];
-  const lovableKey = process.env["LOVABLE_API_KEY"];
+  const openAiKey = process.env["OPENAI_API_KEY"];
   const allowFallback = req.allowFallback !== false;
   const geminiModel = req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
   if (geminiKey) {
@@ -288,18 +291,28 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
         await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
       }
     }
-    if (!allowFallback || !lovableKey) throw lastErr;
-    console.error("Gemini read failed, falling back to built-in AI:", lastErr);
+    if (!allowFallback || !openAiKey) throw lastErr;
+    console.error("Gemini read failed, falling back to ChatGPT:", lastErr);
   }
-  if (!lovableKey) throw new Error("AI is not configured for this project.");
+  if (!openAiKey) {
+    throw new Error(
+      "No AI key is configured. Add your Gemini key (and optionally your ChatGPT key) in project settings.",
+    );
+  }
   try {
-    const value = await runGateway(req, lovableKey);
-    await logAiUsage({ provider: "lovable", model: GATEWAY_MODEL, purpose: req.name, ok: true });
-    return value;
+    const out = await runOpenAi(req, openAiKey);
+    await logAiUsage({
+      provider: "openai",
+      model: OPENAI_MODEL,
+      purpose: req.name,
+      ok: true,
+      tokens: out.tokens,
+    });
+    return out.value;
   } catch (err) {
     await logAiUsage({
-      provider: "lovable",
-      model: GATEWAY_MODEL,
+      provider: "openai",
+      model: OPENAI_MODEL,
       purpose: req.name,
       ok: false,
       statusCode: statusFrom(err),
@@ -308,3 +321,4 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
     throw err;
   }
 }
+
