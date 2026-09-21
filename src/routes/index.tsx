@@ -127,29 +127,40 @@ function CaseApp() {
 
 
   async function handleDriveSync() {
+    const { toast } = await import("sonner");
     try {
       const result = await syncDrive();
+      if (result.skipped) {
+        toast.info("A synch is already running", {
+          description: "It will finish on its own — no need to press again.",
+        });
+        return;
+      }
       const changed = result.added + result.updated + result.removed + result.duplicates;
       const description = changed
         ? `${result.added} added · ${result.updated} renamed or moved · ${result.removed} removed · ${result.duplicates} duplicate(s) merged`
         : `${result.folders} folders and ${result.files} original files already match`;
-      const { toast } = await import("sonner");
       toast.success("Drive synched successfully", { description });
       const scan = await scanAllDocuments();
       if (scan.verified || scan.total) {
-        toast.success(
-          scan.total ? `Checked ${scan.total} document(s)` : `Verified ${scan.verified} exhibit(s)`,
-          {
-            description: `${scan.verified} already built and verified · ${scan.cloned} newly built${scan.failed ? ` · ${scan.failed} could not be read` : ""}`,
-          },
-        );
+        const allFailed = scan.failed > 0 && scan.cloned === 0 && scan.verified === 0;
+        const headline = scan.total
+          ? `Checked ${scan.total} document(s)`
+          : `Verified ${scan.verified} exhibit(s)`;
+        const detail = `${scan.verified} already built and verified · ${scan.cloned} newly built${scan.failed ? ` · ${scan.failed} could not be read` : ""}`;
+        if (allFailed) {
+          toast.error("No documents could be read", { description: detail });
+        } else if (scan.failed) {
+          toast.warning(headline, { description: detail });
+        } else {
+          toast.success(headline, { description: detail });
+        }
       }
-
     } catch (error) {
-      const { toast } = await import("sonner");
       toast.error("Drive sync failed", { description: error instanceof Error ? error.message : "Please try again." });
     }
   }
+
 
   return (
     <div className="case-shell min-h-screen bg-background pb-24 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:pb-0">

@@ -1455,10 +1455,16 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     setScanProgress((prev) => ({ ...prev, phase: "Pausing after this document…" }));
     void import("@/lib/jobs/background.functions")
       .then(({ pauseBackgroundSync }) => pauseBackgroundSync())
-      .catch(() => {});
-    toast.success("Synch paused", {
-      description: "Nothing is lost — press Synch now to pick up where it stopped.",
-    });
+      .then(() => {
+        toast.success("Synch paused", {
+          description: "Nothing is lost — press Synch now to pick up where it stopped.",
+        });
+      })
+      .catch(() => {
+        toast.error("Could not pause the background builder", {
+          description: "The current document will still finish, but building may carry on. Please try again.",
+        });
+      });
   }, []);
 
   const syncDrive = useCallback(async () => {
@@ -1470,6 +1476,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         duplicates: 0,
         folders: driveTree?.folders.length ?? 0,
         files: driveTree?.files.length ?? 0,
+        skipped: true,
       };
     }
     driveSyncInFlight.current = true;
@@ -1479,6 +1486,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     void import("@/lib/jobs/background.functions")
       .then(({ resumeBackgroundSync }) => resumeBackgroundSync())
       .catch(() => {});
+
     try {
       const next = await listDriveTree();
       setDriveTree(next);
@@ -1647,7 +1655,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         duplicates: duplicateIds.length,
         folders: next.folders.length,
         files: originalFiles.length,
+        skipped: false,
       };
+
     } finally {
       driveSyncInFlight.current = false;
       setDriveSyncing(false);
