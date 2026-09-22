@@ -205,7 +205,9 @@ async function twoPass(data: {
     .filter(Boolean)
     .join("\n");
 
-  const [a, b] = await Promise.all([
+  // allSettled, never Promise.all: if one pass fails the other's rejection would become an
+  // unhandled rejection and take the server down (blank screen) instead of surfacing a message.
+  const settled = await Promise.allSettled([
     runPass({
       prompt: `${basePrompt}\nPass 1: extract carefully.`,
       fileName: data.fileName,
@@ -219,6 +221,21 @@ async function twoPass(data: {
       base64,
     }),
   ]);
+  const ok = settled.filter((s) => s.status === "fulfilled").map((s) => s.value);
+  if (ok.length === 0) {
+    const first = settled.find((s) => s.status === "rejected") as
+      | PromiseRejectedResult
+      | undefined;
+    const reason = first?.reason;
+    throw new Error(
+      reason instanceof Error ? reason.message : "This document could not be read just now.",
+    );
+  }
+  // One good read is still a read: use it for both sides so every field it found is kept,
+  // and the caller flags them for confirmation as usual.
+  const a = ok[0]!;
+  const b = ok[1] ?? ok[0]!;
+
 
   const agreed: Partial<ExtractionPass> = {};
   const uncertain: { field: string; options: string[] }[] = [];
