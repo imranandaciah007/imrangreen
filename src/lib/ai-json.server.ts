@@ -337,7 +337,7 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
       statusCode: statusFrom(err),
       error: err instanceof Error ? err.message : String(err),
     });
-    throw err;
+    throw new Error(readingUnavailableMessage(lastErr, err));
   }
 }
 
