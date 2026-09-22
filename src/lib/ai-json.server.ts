@@ -14,6 +14,9 @@ const GEMINI_MODEL = "gemini-3.6-flash";
 const GEMINI_BULK_MODEL = "gemini-3.1-flash-lite";
 /** Second attempt for anything the cheap read left blank — stronger, still free. */
 const GEMINI_GAPFILL_MODEL = "gemini-3.8-flash";
+/** Free-tier workhorse tried when the newer models' daily allowance is used up. */
+const GEMINI_FREE_MODEL = "gemini-2.0-flash";
+
 
 const geminiUrl = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
