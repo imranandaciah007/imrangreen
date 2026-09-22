@@ -225,6 +225,31 @@ function retryable(err: unknown) {
   return /\[(429|500|502|503|504)\]/.test(msg) || /fetch failed|network/i.test(msg);
 }
 
+/** True when the provider said the account is out of allowance, not merely busy. */
+function outOfAllowance(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /insufficient_quota|credit_balance_exhausted|no credits remaining|exceeded your current quota|billing/i.test(
+    msg,
+  );
+}
+
+/**
+ * Turns raw provider failures into one sentence the case owner can act on, so a
+ * read that cannot happen reports the reason instead of blanking the screen.
+ */
+function readingUnavailableMessage(geminiErr: unknown, openAiErr: unknown) {
+  const geminiSpent = outOfAllowance(geminiErr);
+  const chatGptSpent = outOfAllowance(openAiErr);
+  if (geminiSpent && chatGptSpent) {
+    return "Reading is paused: both your Gemini allowance and your ChatGPT credit are used up. Top up either one and try this document again — nothing was changed.";
+  }
+  if (chatGptSpent) {
+    return "Reading is paused: Gemini could not read this document and your ChatGPT credit is used up. Top up ChatGPT or wait for the Gemini allowance to reset, then try again — nothing was changed.";
+  }
+  const detail = openAiErr instanceof Error ? openAiErr.message : String(openAiErr);
+  return `This document could not be read just now. ${detail.slice(0, 200)}`;
+}
+
 /**
  * Blanks left by the first Gemini read are retried once with a stronger Gemini
  * model. Nothing is ever sent to the paid built-in reader for gap-filling, so
@@ -337,7 +362,7 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
       statusCode: statusFrom(err),
       error: err instanceof Error ? err.message : String(err),
     });
-    throw err;
+    throw new Error(readingUnavailableMessage(lastErr, err));
   }
 }
 
