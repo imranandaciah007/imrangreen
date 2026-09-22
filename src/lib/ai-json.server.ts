@@ -299,41 +299,64 @@ async function topUp(
 }
 
 
+/**
+ * Models tried for one key, in order. If the first model's free daily allowance is
+ * used up, the lighter free-tier models are tried next — each one has its own
+ * allowance, so reading usually keeps working without any top-up.
+ */
+function modelLadder(tier: "bulk" | "standard" | undefined) {
+  const first = tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
+  const ladder = [first, GEMINI_BULK_MODEL, GEMINI_FREE_MODEL, GEMINI_GAPFILL_MODEL];
+  return ladder.filter((m, i) => ladder.indexOf(m) === i);
+}
+
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const keys = geminiKeys();
   const openAiKey = process.env["OPENAI_API_KEY"];
   const allowFallback = req.allowFallback !== false;
-  const geminiModel = req.tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL;
+  const ladder = modelLadder(req.tier);
   let lastErr: unknown = null;
 
   for (const { label, key } of keys) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        const out = await runGemini(req, key);
-        await logAiUsage({
-          provider: label,
-          model: out.model,
-          purpose: req.name,
-          ok: true,
-          tokens: out.tokens,
-        });
-        return await topUp(req, out.value, key, label);
-      } catch (err) {
-        lastErr = err;
-        await logAiUsage({
-          provider: label,
-          model: geminiModel,
-          purpose: req.name,
-          ok: false,
-          statusCode: statusFrom(err),
-          error: err instanceof Error ? err.message : String(err),
-        });
-        if (!retryable(err) || attempt === 2) break;
-        await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
+    for (const geminiModel of ladder) {
+      let exhausted = false;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const out = await runGemini(req, key, geminiModel);
+          await logAiUsage({
+            provider: label,
+            model: out.model,
+            purpose: req.name,
+            ok: true,
+            tokens: out.tokens,
+          });
+          return await topUp(req, out.value, key, label);
+        } catch (err) {
+          lastErr = err;
+          await logAiUsage({
+            provider: label,
+            model: geminiModel,
+            purpose: req.name,
+            ok: false,
+            statusCode: statusFrom(err),
+            error: err instanceof Error ? err.message : String(err),
+          });
+          // Daily allowance gone for this model: move to the next free-tier model
+          // straight away instead of burning retries on it.
+          if (outOfAllowance(err)) {
+            exhausted = true;
+            break;
+          }
+          if (!retryable(err) || attempt === 2) break;
+          await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
+        }
       }
+      // A plain failure (bad request, unreadable file) is not fixed by another model.
+      if (!exhausted) break;
     }
     console.error(`Gemini key ${label} could not read this material:`, lastErr);
   }
+
 
   if (keys.length && (!allowFallback || !openAiKey)) throw lastErr;
   if (keys.length) console.error("Both Gemini keys failed, falling back to ChatGPT:", lastErr);
