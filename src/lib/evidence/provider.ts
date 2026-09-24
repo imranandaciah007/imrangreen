@@ -93,13 +93,26 @@ function writeJson(key: string, value: unknown) {
 
 const emptyRecords: CaseRecords = { events: [], finances: [], tasks: [], categories: [] };
 
-/** Device-local provider standing in for Google Drive. Starts empty. */
+const PENDING_KEY = "gc.cloud.pending";
+
+/**
+ * Case store shared across every device. A local copy keeps the app instant and
+ * usable offline; every change is also written to the backend, and each device
+ * pulls the latest shared copy on open, on focus and every little while.
+ */
 export class LocalCaseProvider implements DocumentProvider {
-  readonly id = "local-case-store";
+  readonly id = "shared-case-store";
   readonly displayName = "Google Drive";
 
   private items: EvidenceItem[] | null = null;
   private connection: ProviderConnection | null = null;
+  private pendingIds = new Set<string>(readJson<string[]>(PENDING_KEY, []).filter((v) => !v.startsWith("-")));
+  private pendingDeletes = new Set<string>(
+    readJson<string[]>(PENDING_KEY, []).filter((v) => v.startsWith("-")).map((v) => v.slice(1)),
+  );
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private storeCache = new Map<string, unknown>();
+  private storeTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   private loadItems(): EvidenceItem[] {
     if (!this.items) this.items = readJson<EvidenceItem[]>(ITEMS_KEY, []);
@@ -108,6 +121,115 @@ export class LocalCaseProvider implements DocumentProvider {
 
   private persistItems() {
     writeJson(ITEMS_KEY, this.items ?? []);
+  }
+
+  private savePending() {
+    writeJson(PENDING_KEY, [...this.pendingIds, ...[...this.pendingDeletes].map((id) => `-${id}`)]);
+  }
+
+  private queue(ids: string[], deleted = false) {
+    for (const id of ids) {
+      if (deleted) {
+        this.pendingDeletes.add(id);
+        this.pendingIds.delete(id);
+      } else this.pendingIds.add(id);
+    }
+    this.savePending();
+    if (typeof window === "undefined") return;
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = setTimeout(() => void this.flush(), 700);
+  }
+
+  /** Send queued changes to the shared store; anything that fails is retried later. */
+  async flush() {
+    if (!this.pendingIds.size && !this.pendingDeletes.size) return;
+    const ids = [...this.pendingIds];
+    const deletedIds = [...this.pendingDeletes];
+    const byId = new Map(this.loadItems().map((i) => [i.id, i]));
+    const items = ids
+      .map((id) => byId.get(id))
+      .filter((i): i is EvidenceItem => Boolean(i))
+      .map((i) => ({ id: i.id, data: i as unknown as Record<string, unknown> }));
+    try {
+      const { pushItems } = await import("@/lib/case-sync.functions");
+      await pushItems({ data: { items, deletedIds } });
+      ids.forEach((id) => this.pendingIds.delete(id));
+      deletedIds.forEach((id) => this.pendingDeletes.delete(id));
+      this.savePending();
+    } catch (error) {
+      console.error("Shared case save failed; will retry", error);
+      if (this.flushTimer) clearTimeout(this.flushTimer);
+      this.flushTimer = setTimeout(() => void this.flush(), 15_000);
+    }
+  }
+
+  /** Merge the shared copy into this device: the most recently edited version wins. */
+  async pull(): Promise<boolean> {
+    if (typeof window === "undefined") return false;
+    let remote: Awaited<ReturnType<typeof import("@/lib/case-sync.functions").pullCase>>;
+    try {
+      const { pullCase } = await import("@/lib/case-sync.functions");
+      remote = await pullCase();
+    } catch (error) {
+      console.error("Could not load the shared case", error);
+      return false;
+    }
+    const local = new Map(this.loadItems().map((i) => [i.id, i]));
+    const seen = new Set<string>();
+    const toPush: string[] = [];
+    for (const row of remote.items) {
+      seen.add(row.id);
+      if (this.pendingDeletes.has(row.id)) {
+        local.delete(row.id);
+        continue;
+      }
+      if (row.deleted) {
+        local.delete(row.id);
+        continue;
+      }
+      const cloud = row.data as unknown as EvidenceItem;
+      const mine = local.get(row.id);
+      if (!mine || (!this.pendingIds.has(row.id) && (cloud.updatedAt ?? "") >= (mine.updatedAt ?? ""))) {
+        local.set(row.id, cloud);
+      } else if ((mine.updatedAt ?? "") > (cloud.updatedAt ?? "")) {
+        toPush.push(row.id);
+      }
+    }
+    // Anything only on this device (e.g. before sharing existed) goes up.
+    for (const id of local.keys()) if (!seen.has(id)) toPush.push(id);
+    this.items = [...local.values()];
+    this.persistItems();
+    for (const s of remote.store) this.storeCache.set(s.key, s.data);
+    if (toPush.length) this.queue(toPush);
+    return true;
+  }
+
+  /** Read a shared value (records, ignored flags). Falls back to this device's copy. */
+  async loadShared<T>(key: string, localKey: string, fallback: T): Promise<T> {
+    if (this.storeCache.has(key)) {
+      const value = this.storeCache.get(key) as T;
+      writeJson(localKey, value);
+      return value;
+    }
+    const localValue = readJson<T>(localKey, fallback);
+    if (typeof window !== "undefined" && localStorage.getItem(localKey)) this.saveShared(key, localKey, localValue);
+    return localValue;
+  }
+
+  saveShared(key: string, localKey: string, value: unknown) {
+    writeJson(localKey, value);
+    this.storeCache.set(key, value);
+    if (typeof window === "undefined") return;
+    const prev = this.storeTimers.get(key);
+    if (prev) clearTimeout(prev);
+    this.storeTimers.set(
+      key,
+      setTimeout(() => {
+        void import("@/lib/case-sync.functions")
+          .then(({ pushStore }) => pushStore({ data: { key, data: value } }))
+          .catch((error) => console.error(`Shared save failed for ${key}`, error));
+      }, 800),
+    );
   }
 
   private loadConnection(): ProviderConnection {
@@ -145,6 +267,7 @@ export class LocalCaseProvider implements DocumentProvider {
   }
 
   async list() {
+    await this.pull();
     return clone(this.loadItems());
   }
 
@@ -171,6 +294,7 @@ export class LocalCaseProvider implements DocumentProvider {
     };
     this.items = [...this.loadItems(), created];
     this.persistItems();
+    this.queue([created.id]);
     const conn = this.loadConnection();
     this.connection = { ...conn, lastSyncedAt: now };
     writeJson(CONN_KEY, this.connection);
@@ -186,6 +310,7 @@ export class LocalCaseProvider implements DocumentProvider {
     });
     this.persistItems();
     if (!updated) throw new Error(`Unknown evidence item: ${id}`);
+    this.queue([id]);
     return updated;
   }
 
@@ -199,6 +324,7 @@ export class LocalCaseProvider implements DocumentProvider {
       return next;
     });
     this.persistItems();
+    this.queue(updated.map((i) => i.id));
     return updated;
   }
 
@@ -206,16 +332,17 @@ export class LocalCaseProvider implements DocumentProvider {
     const set = new Set(ids);
     this.items = this.loadItems().filter((item) => !set.has(item.id));
     this.persistItems();
+    if (ids.length) this.queue(ids, true);
     return ids;
   }
 
   async loadRecords() {
-    return readJson<CaseRecords>(RECORDS_KEY, emptyRecords);
+    return this.loadShared<CaseRecords>("records", RECORDS_KEY, emptyRecords);
   }
 
   async saveRecords(records: CaseRecords) {
-    writeJson(RECORDS_KEY, records);
+    this.saveShared("records", RECORDS_KEY, records);
   }
 }
 
-export const documentProvider: DocumentProvider = new LocalCaseProvider();
+export const documentProvider = new LocalCaseProvider();
