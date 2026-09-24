@@ -29,6 +29,11 @@
 ## External limitation
 - Original files are never altered; clones are always separate PDFs.
 
+## Current synchronization safeguards
+- [ ] Exclude every Drive folder named "ignore" and all contents from indexing, counts, AI reading, and clone building
+- [ ] Make Synch now automatically re-read and highlight evidence with outstanding important details
+- [ ] Preserve human corrections across later syncs and AI reads, and verify they survive a reload
+
 
 ## Background processing
 - [ ] Keep syncing and building exhibits/clones while the app is closed (needs server-side scheduled job + shared storage)
