@@ -150,7 +150,10 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
       scanned = tree.files.length;
 
       const originals = tree.files.filter(
-        (file) => !file.path.startsWith(CLONE_ROOT) && supportedFile(file.name, file.mimeType),
+        (file) =>
+          !file.path.split("/").includes(CLONE_ROOT) &&
+          !drive.isIgnoredDrivePath(file.path) &&
+          supportedFile(file.name, file.mimeType),
       );
 
       const { data: known } = await supabaseAdmin

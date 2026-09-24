@@ -396,7 +396,29 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const updateItem = useCallback(
     (id: string, patch: Partial<EvidenceItem>, message?: string) => {
       const action = message ?? `Updated ${Object.keys(patch).join(", ")}`;
-      applyPatch([id], patch, action);
+      // Anything a person edits becomes confirmed, so later AI reads or synchs never replace it.
+      const fieldMap: [keyof EvidenceItem, string][] = [
+        ["title", "title"],
+        ["dateOfDocument", "documentDate"],
+        ["people", "people"],
+        ["categories", "categories"],
+        ["category", "categories"],
+        ["sourceType", "sourceType"],
+        ["pageCount", "pageCount"],
+        ["notes", "notes"],
+        ["affectsAciah", "affectsAciah"],
+      ];
+      const touched = fieldMap.filter(([key]) => key in patch).map(([, field]) => field);
+      const current = itemsRef.current.find((item) => item.id === id);
+      const nextPatch = touched.length
+        ? {
+            ...patch,
+            confirmedFields: Array.from(
+              new Set([...(patch.confirmedFields ?? current?.confirmedFields ?? []), ...touched]),
+            ),
+          }
+        : patch;
+      applyPatch([id], nextPatch, action);
       if (message) toast.success(message);
     },
     [applyPatch],
@@ -1044,10 +1066,19 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Also re-read anything still missing important details, so one Synch
+      // fixes what it can instead of needing Fix with AI on every document.
+      const needsFix = (item: EvidenceItem) =>
+        item.status === "Needs confirmation" ||
+        !item.dateOfDocument ||
+        !(item.people ?? []).length ||
+        (item.people ?? []).every((p) => p === "Third party") ||
+        !(item.categories ?? []).length ||
+        (item.categories ?? []).every((c) => c === "Other");
       const queue = itemsRef.current.filter(
         (item) =>
           item.driveFileId &&
-          (rescan || !item.aiExtraction?.contentRead || !item.cloneFileId),
+          (rescan || !item.aiExtraction?.contentRead || !item.cloneFileId || needsFix(item)),
       );
       if (!queue.length) {
         setScanProgress({ running: false, phase: "", done: 0, total: 0, scanned: 0, cloned: 0, failed: 0 });
@@ -1073,7 +1104,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           if (scanCancelled.current) break;
           let latest = item;
           try {
-            if (rescan || !item.aiExtraction?.contentRead) {
+            if (rescan || !item.aiExtraction?.contentRead || needsFix(item)) {
               setExtractingIds((prev) => [...prev, item.id]);
               setScanProgress((prev) => ({ ...prev, phase: `Reading ${item.fileName}` }));
               try {
@@ -1082,15 +1113,20 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
                 const validCategories = (a.categories ?? []).filter((c) =>
                   categories.includes(c as Category),
                 ) as Category[];
+                const confirmed = item.confirmedFields ?? [];
                 latest = {
                   ...item,
-                  title: a.title || item.title,
+                  title: !confirmed.includes("title") && a.title ? a.title : item.title,
                   dateOfDocument:
+                    !confirmed.includes("documentDate") &&
                     a.documentDate && /^\d{4}-\d{2}-\d{2}$/.test(a.documentDate)
                       ? a.documentDate
                       : item.dateOfDocument,
-                  people: a.people?.length ? a.people : item.people,
-                  categories: validCategories.length ? validCategories : item.categories,
+                  people: !confirmed.includes("people") && a.people?.length ? a.people : item.people,
+                  categories:
+                    !confirmed.includes("categories") && validCategories.length
+                      ? validCategories
+                      : item.categories,
                   pageCount: a.pageCount && a.pageCount > 0 ? a.pageCount : item.pageCount,
                   notes: item.notes || result.summary || item.notes,
                 };
@@ -1498,6 +1534,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       const originalFiles = next.files.filter(
         (file) =>
           !file.path.split("/").includes("I601 Evidence Clones") &&
+          !file.path.split("/").some((part) => part.trim().toLowerCase() === "ignore") &&
           !file.path.includes("Generated Case Packets") &&
           Boolean(fileTypeFor(file.name, file.mimeType)),
       );

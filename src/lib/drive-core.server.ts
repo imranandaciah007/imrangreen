@@ -10,6 +10,10 @@ const GATEWAY = "https://connector-gateway.lovable.dev/google_drive";
 const UPLOAD = "https://connector-gateway.lovable.dev/google_drive/upload/drive/v3/files";
 export const CLONE_ROOT = "I601 Evidence Clones";
 
+export function isIgnoredDrivePath(path: string) {
+  return path.split("/").some((part) => part.trim().toLowerCase() === "ignore");
+}
+
 export interface DriveFolderNode {
   id: string;
   name: string;
@@ -110,10 +114,23 @@ export async function listTree(): Promise<{
     return parts.join("/");
   }
 
+  const ignoredCache = new Map<string, boolean>();
+  function ignoredFolder(id: string | null): boolean {
+    if (!id) return false;
+    const cached = ignoredCache.get(id);
+    if (cached !== undefined) return cached;
+    const meta = folderMeta.get(id);
+    const value = meta ? meta.name.trim().toLowerCase() === "ignore" || ignoredFolder(meta.parentId) : false;
+    ignoredCache.set(id, value);
+    return value;
+  }
+
   const folders: DriveFolderNode[] = [];
   const files: DriveFileNode[] = [];
 
   for (const f of raw) {
+    const ownFolderIgnored = f.mimeType === "application/vnd.google-apps.folder" && ignoredFolder(f.id);
+    if (ownFolderIgnored || ignoredFolder(f.parents?.[0] ?? null)) continue;
     const parentId = f.parents?.[0] ?? null;
     if (f.mimeType === "application/vnd.google-apps.folder") {
       folders.push({
