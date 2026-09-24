@@ -323,18 +323,51 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         try {
           const cachedTree = localStorage.getItem(DRIVE_TREE_KEY);
           if (cachedTree) setDriveTree(JSON.parse(cachedTree));
-          const savedIgnored = localStorage.getItem(IGNORED_GAPS_KEY);
-          if (savedIgnored) setIgnoredGaps(JSON.parse(savedIgnored));
-
         } catch {
           localStorage.removeItem(DRIVE_TREE_KEY);
         }
       }
+      setIgnoredGaps(await documentProvider.loadShared<string[]>("ignoredGaps", IGNORED_GAPS_KEY, []));
       hydrated.current = true;
       setLoading(false);
     })();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  // Pick up edits made on other devices: on focus and every 30 seconds.
+  useEffect(() => {
+    let busy = false;
+    const refresh = async () => {
+      if (busy || !hydrated.current || document.visibilityState === "hidden") return;
+      busy = true;
+      try {
+        await documentProvider.flush();
+        const [list, records, ignored] = await Promise.all([
+          documentProvider.list(),
+          documentProvider.loadRecords(),
+          documentProvider.loadShared<string[]>("ignoredGaps", IGNORED_GAPS_KEY, []),
+        ]);
+        setItems((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+        const same = <T,>(a: T, b: T) => (JSON.stringify(a) === JSON.stringify(b) ? a : b);
+        setEvents((p) => same(p, records.events ?? []));
+        setFinances((p) => same(p, records.finances ?? []));
+        setTasks((p) => same(p, records.tasks ?? []));
+        setPackets((p) => same(p, records.packets ?? []));
+        setDiaryImports((p) => same(p, records.diaryImports ?? []));
+        setIgnoredGaps((p) => same(p, ignored));
+      } finally {
+        busy = false;
+      }
+    };
+    const timer = setInterval(() => void refresh(), 30_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, []);
 
@@ -1798,8 +1831,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const ignoreGap = useCallback((id: string) => {
     setIgnoredGaps((prev) => {
       const next = prev.includes(id) ? prev : [...prev, id];
-      if (typeof localStorage !== "undefined")
-        localStorage.setItem(IGNORED_GAPS_KEY, JSON.stringify(next));
+      documentProvider.saveShared("ignoredGaps", IGNORED_GAPS_KEY, next);
       return next;
     });
   }, []);
@@ -1807,8 +1839,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const restoreGap = useCallback((id: string) => {
     setIgnoredGaps((prev) => {
       const next = prev.filter((g) => g !== id);
-      if (typeof localStorage !== "undefined")
-        localStorage.setItem(IGNORED_GAPS_KEY, JSON.stringify(next));
+      documentProvider.saveShared("ignoredGaps", IGNORED_GAPS_KEY, next);
       return next;
     });
   }, []);
