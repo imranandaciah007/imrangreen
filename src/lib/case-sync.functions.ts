@@ -20,12 +20,12 @@ export const pullCase = createServerFn({ method: "GET" }).handler(async () => {
     .from("gc_case_store" as never)
     .select("key,data,updated_at");
   if (error) throw new Error(error.message);
+  // Sent as one JSON string: records are free-form case data.
   return {
-    items: items.map((r) => ({ id: r.id, deleted: r.deleted, data: r.data as Record<string, unknown> })),
-    store: ((store ?? []) as unknown as { key: string; data: unknown }[]).map((s) => ({
-      key: s.key,
-      data: s.data as Record<string, unknown> | unknown[],
-    })),
+    json: JSON.stringify({
+      items: items.map((r) => ({ id: r.id, deleted: r.deleted, data: r.data })),
+      store: (store ?? []) as unknown as { key: string; data: unknown }[],
+    }),
   };
 });
 

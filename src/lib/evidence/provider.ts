@@ -152,7 +152,7 @@ export class LocalCaseProvider implements DocumentProvider {
       .map((i) => ({ id: i.id, data: i as unknown as Record<string, unknown> }));
     try {
       const { pushItems } = await import("@/lib/case-sync.functions");
-      await pushItems({ data: { items, deletedIds } });
+      await pushItems({ data: { items: items as never, deletedIds } });
       ids.forEach((id) => this.pendingIds.delete(id));
       deletedIds.forEach((id) => this.pendingDeletes.delete(id));
       this.savePending();
@@ -166,10 +166,13 @@ export class LocalCaseProvider implements DocumentProvider {
   /** Merge the shared copy into this device: the most recently edited version wins. */
   async pull(): Promise<boolean> {
     if (typeof window === "undefined") return false;
-    let remote: Awaited<ReturnType<typeof import("@/lib/case-sync.functions").pullCase>>;
+    let remote: {
+      items: { id: string; deleted: boolean; data: unknown }[];
+      store: { key: string; data: unknown }[];
+    };
     try {
       const { pullCase } = await import("@/lib/case-sync.functions");
-      remote = await pullCase();
+      remote = JSON.parse((await pullCase()).json);
     } catch (error) {
       console.error("Could not load the shared case", error);
       return false;
@@ -226,7 +229,7 @@ export class LocalCaseProvider implements DocumentProvider {
       key,
       setTimeout(() => {
         void import("@/lib/case-sync.functions")
-          .then(({ pushStore }) => pushStore({ data: { key, data: value } }))
+          .then(({ pushStore }) => pushStore({ data: { key, data: value as never } }))
           .catch((error) => console.error(`Shared save failed for ${key}`, error));
       }, 800),
     );

@@ -54,5 +54,5 @@
 
 - [ ] Redesign clone cover page: large clear headline details, routine metadata at the bottom
 - [ ] Build all remaining clones and show cloned / pending / new-this-run counters
-- [ ] Share evidence edits, records and ignored flags across every device
-- [ ] Re-link Google Drive after the latest workspace move
+- [x] Share evidence edits, records and ignored flags across every device
+- [x] Re-link Google Drive after the latest workspace move
