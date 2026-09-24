@@ -50,6 +50,45 @@ export type Database = {
         }
         Relationships: []
       }
+      gc_case_items: {
+        Row: {
+          data: Json
+          deleted: boolean
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          data: Json
+          deleted?: boolean
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          data?: Json
+          deleted?: boolean
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      gc_case_store: {
+        Row: {
+          data: Json
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          data: Json
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          data?: Json
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       gc_clone_jobs: {
         Row: {
           ai_aciah_impact: string | null
