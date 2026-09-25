@@ -88,7 +88,26 @@ export function detectGaps(
     .filter((t) => taskStatus(t) !== "Complete")
     .map((t) => t.title.toLowerCase());
 
-  for (const item of items) {
+  for (const rawItem of items) {
+    // Fields the user has confirmed by hand never get flagged again.
+    const confirmed = rawItem.confirmedFields ?? [];
+    const uncertainLeft = (rawItem.aiExtraction?.uncertain ?? []).filter(
+      (f) => !confirmed.includes(f as never),
+    );
+    const item = {
+      ...rawItem,
+      aiExtraction: rawItem.aiExtraction
+        ? { ...rawItem.aiExtraction, uncertain: uncertainLeft }
+        : rawItem.aiExtraction,
+      people: confirmed.includes("people" as never) && !(rawItem.people ?? []).length
+        ? ["Confirmed"]
+        : confirmed.includes("people" as never)
+          ? (rawItem.people ?? []).map((p) => (p === "Third party" ? "Third party (confirmed)" : p))
+          : rawItem.people,
+      status:
+        rawItem.status === "Needs confirmation" && confirmed.length > 0 ? ("Reviewed" as const) : rawItem.status,
+    };
+    const categoriesConfirmed = confirmed.includes("categories" as never);
     const base = { recordType: "evidence" as const, recordId: item.id };
     const name = item.title || item.fileName;
     if (!item.dateOfDocument) {
@@ -114,7 +133,7 @@ export function detectGaps(
       });
     }
     const cats = catsOf(item).filter((c) => c && categories.includes(c));
-    if (!cats.length || cats.every((category) => category === "Other")) {
+    if (!categoriesConfirmed && (!cats.length || cats.every((category) => category === "Other"))) {
       gaps.push({
         ...base,
         id: `${item.id}-cat`,
