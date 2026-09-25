@@ -1,4 +1,4 @@
-import { AlertTriangle, ClipboardList, EyeOff, HeartHandshake, Sparkles } from "lucide-react";
+import { AlertTriangle, EyeOff, HeartHandshake, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,6 @@ export function CaseReviewView({
     events,
     finances,
     tasks,
-    addTask,
     openInspector,
     profile,
     resolveConflict,
@@ -113,21 +112,6 @@ export function CaseReviewView({
   ];
   const needsExplanation = aciahChecks.filter((c) => c.state === "Needs explanation");
 
-  function makeTask(gap: CaseGap) {
-    addTask({
-      title: gap.taskTitle,
-      category: "",
-      dueDate: "",
-      done: false,
-      assignedTo: profile,
-      status: "To do",
-      priority: gap.severity === "high" ? "High" : "Normal",
-      notes: `${gap.label} — ${gap.detail}`,
-      ...(gap.recordType === "evidence" ? { evidenceIds: [gap.recordId] } : {}),
-      ...(gap.recordType === "event" ? { eventId: gap.recordId } : {}),
-      ...(gap.recordType === "finance" ? { financeId: gap.recordId } : {}),
-    });
-  }
 
   return (
     <div className="space-y-4">

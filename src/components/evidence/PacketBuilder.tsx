@@ -73,7 +73,6 @@ export function PacketBuilder({
     income,
     packets,
     profile,
-    addTask,
     openInspector,
     togglePacketExclusion,
     savePacketVersion,
@@ -519,27 +518,6 @@ export function PacketBuilder({
                             View
                           </Button>
                         </>
-                      )}
-                      {f.gap && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 text-[11px]"
-                          onClick={() =>
-                            addTask({
-                              title: f.gap!.taskTitle,
-                              category: "",
-                              dueDate: "",
-                              done: false,
-                              assignedTo: profile,
-                              status: "To do",
-                              priority: f.gap!.severity === "high" ? "High" : "Normal",
-                              notes: f.detail,
-                            })
-                          }
-                        >
-                          <ClipboardList className="size-3.5" /> Create task
-                        </Button>
                       )}
                     </div>
                   </li>
