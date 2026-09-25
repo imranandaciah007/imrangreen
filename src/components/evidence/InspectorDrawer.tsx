@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  CheckSquare,
   EyeOff,
   History,
   Languages,
@@ -193,7 +192,6 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
     extractingIds,
     confirmExtractionField,
     dismissExtractionField,
-    addTask,
     profile,
     gaps,
     ignoreGap,
@@ -272,23 +270,6 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                 >
                   <Sparkles className="size-3.5" />
                   {extractingIds.includes(item.id) ? "Reading…" : "Read with AI"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 text-xs"
-                  onClick={() => {
-                    addTask({
-                      title: `Follow up: ${item.title}`,
-                      category: item.category,
-                      dueDate: "",
-                      done: false,
-                      assignedTo: profile,
-                    });
-                    toast.success("Task created", { description: `Follow up: ${item.title}` });
-                  }}
-                >
-                  <CheckSquare className="size-3.5" /> Create task
                 </Button>
               </div>
 
