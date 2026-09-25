@@ -56,3 +56,7 @@
 - [ ] Build all remaining clones and show cloned / pending / new-this-run counters
 - [x] Share evidence edits, records and ignored flags across every device
 - [x] Re-link Google Drive after the latest workspace move
+
+## Workspace moves
+- [x] Remove the per-item Create task buttons next to flagged items (packet audit, review, details drawer)
+- [ ] Re-link Google Drive in the newest workspace
