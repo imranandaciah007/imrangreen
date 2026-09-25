@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Download,
+  ExternalLink,
   FileText,
   Loader2,
   ShieldCheck,
@@ -77,6 +78,7 @@ export function PacketBuilder({
     togglePacketExclusion,
     savePacketVersion,
     connection,
+    driveTree,
     runExtraction,
     extractingIds,
   } = useEvidence();
@@ -91,6 +93,7 @@ export function PacketBuilder({
   const [sections, setSections] = useState<string[]>(DEFAULT_CATEGORIES);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<{ name: string; link: string; drive: boolean }[]>([]);
+  const [savedFolderLink, setSavedFolderLink] = useState("");
   const [narrative, setNarrative] = useState<FilingLanguage | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [analysis, setAnalysis] = useState<WaiverAnalysis | null>(null);
@@ -146,6 +149,15 @@ export function PacketBuilder({
   }, [finances]);
 
   const nextVersion = packets.length + 1;
+  const latestPacket = packets.at(-1);
+  const packetFolderLink =
+    latestPacket?.driveFolderWebViewLink ??
+    (() => {
+      const folder = driveTree?.folders.find(
+        (entry) => entry.path.replace(/^\/+|\/+$/g, "") === "I601 Evidence/Generated Case Packets",
+      );
+      return folder ? `https://drive.google.com/drive/folders/${folder.id}` : "";
+    })();
 
   const input: PacketInput = {
     version: nextVersion,
@@ -316,6 +328,7 @@ export function PacketBuilder({
     }
 
     const results: { name: string; link: string; drive: boolean }[] = [];
+    let folderWebViewLink = "";
     for (const file of files) {
       download(file.name, file.mime, file.content);
       let link = "";
@@ -326,6 +339,7 @@ export function PacketBuilder({
             data: { name: file.name, mimeType: file.mime, content: file.content },
           });
           link = res.webViewLink;
+          folderWebViewLink = res.folderWebViewLink;
           drive = true;
         } catch (err) {
           console.error(err);
@@ -346,6 +360,7 @@ export function PacketBuilder({
       timelineEventCount: events.length,
       unresolvedIssues: gaps.length,
       driveFolder: "/I601 Evidence/Generated Case Packets/",
+      driveFolderWebViewLink: folderWebViewLink || undefined,
       files: results.map((r) => ({ name: r.name, webViewLink: r.link })),
       exhibitMap: exhibits.map((e) => ({
         evidenceId: e.item.id,
@@ -355,6 +370,7 @@ export function PacketBuilder({
     });
 
     setSaved(results);
+    setSavedFolderLink(folderWebViewLink);
     setBusy(false);
     setStep(4);
   }
@@ -389,6 +405,21 @@ export function PacketBuilder({
             Organises the evidence into a draft bundle. Original files are never changed, and the
             packet makes no prediction about the outcome.
           </DialogDescription>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[11px] text-muted-foreground">
+            <span>
+              Last draft: {latestPacket ? formatDateTime(latestPacket.generatedAt) : "None yet"}
+            </span>
+            {packetFolderLink && (
+              <a
+                href={packetFolderLink}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-8 items-center gap-1 font-semibold text-primary underline underline-offset-2"
+              >
+                <ExternalLink className="size-3.5" /> Open packet folder
+              </a>
+            )}
+          </div>
         </DialogHeader>
 
         <ol className="flex shrink-0 items-center gap-1 overflow-x-auto text-[10px]">
@@ -741,6 +772,13 @@ export function PacketBuilder({
                 <CheckCircle2 className="size-4 text-success" /> Case Packet v{packets.length}{" "}
                 saved.
               </div>
+              {savedFolderLink && (
+                <Button variant="outline" className="h-11 w-full" asChild>
+                  <a href={savedFolderLink} target="_blank" rel="noreferrer">
+                    <ExternalLink className="size-4" /> Open case packet folder in Drive
+                  </a>
+                </Button>
+              )}
               <ul className="space-y-1.5">
                 {saved.map((f) => (
                   <li
