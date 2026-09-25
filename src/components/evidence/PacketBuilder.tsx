@@ -436,6 +436,49 @@ export function PacketBuilder({
                 </p>
               )}
 
+              {(() => {
+                const ids = Array.from(
+                  new Set(
+                    [...blocking, ...attention]
+                      .filter((f) => f.gap?.recordType === "evidence")
+                      .map((f) => f.gap!.recordId),
+                  ),
+                );
+                if (!ids.length) return null;
+                return (
+                  <Button
+                    className="h-11 w-full"
+                    disabled={fixAllRunning}
+                    onClick={async () => {
+                      setFixAllRunning(true);
+                      let n = 0;
+                      for (const id of ids) {
+                        setFixAllProgress(`${++n} of ${ids.length}`);
+                        try {
+                          await runExtraction(id);
+                        } catch {
+                          /* keep going; it stays highlighted */
+                        }
+                      }
+                      setFixAllRunning(false);
+                      setFixAllProgress("");
+                      toast.success("Finished fixing with AI", {
+                        description: "Anything still unresolved stays highlighted.",
+                      });
+                    }}
+                  >
+                    {fixAllRunning ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="size-4" />
+                    )}
+                    {fixAllRunning
+                      ? `Fixing ${fixAllProgress}…`
+                      : `Fix all ${ids.length} outstanding with AI`}
+                  </Button>
+                );
+              })()}
+
               <ul className="space-y-2">
                 {[...blocking, ...attention, ...optional].slice(0, 40).map((f) => (
                   <li key={f.id} className="rounded-lg border border-border bg-card p-2.5">
@@ -464,20 +507,6 @@ export function PacketBuilder({
                             }}
                           >
                             Fix now
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-9 text-[11px]"
-                            disabled={extractingIds.includes(f.gap.recordId)}
-                            onClick={() => void runExtraction(f.gap!.recordId)}
-                          >
-                            {extractingIds.includes(f.gap.recordId) ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Sparkles className="size-3.5" />
-                            )}
-                            Fix with AI
                           </Button>
                           <Button
                             size="sm"
