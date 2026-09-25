@@ -61,4 +61,4 @@
 - [x] Remove the per-item Create task buttons next to flagged items (packet audit, review, details drawer)
 - [x] Re-link Google Drive in the newest workspace
 - [x] Show the latest case-packet draft time and save a direct link to its Google Drive folder
-- [ ] Reconnect Google Drive after the latest workspace move
+- [x] Reconnect Google Drive after the latest workspace move
