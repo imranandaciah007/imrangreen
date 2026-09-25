@@ -443,12 +443,28 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       ];
       const touched = fieldMap.filter(([key]) => key in patch).map(([, field]) => field);
       const current = itemsRef.current.find((item) => item.id === id);
-      const nextPatch = touched.length
+      const confirmedFields = Array.from(
+        new Set([...(patch.confirmedFields ?? current?.confirmedFields ?? []), ...touched]),
+      ) as EvidenceItem["confirmedFields"];
+      const nextPatch: Partial<EvidenceItem> = touched.length
         ? {
             ...patch,
-            confirmedFields: Array.from(
-              new Set([...(patch.confirmedFields ?? current?.confirmedFields ?? []), ...touched]),
-            ),
+            confirmedFields,
+            // A human review settles the item: clear stale AI doubts and the
+            // "Needs confirmation" status so it stops asking again.
+            ...(current?.status === "Needs confirmation" && !patch.status
+              ? { status: "Reviewed" as const }
+              : {}),
+            ...(current?.aiExtraction
+              ? {
+                  aiExtraction: {
+                    ...current.aiExtraction,
+                    uncertain: (current.aiExtraction.uncertain ?? []).filter(
+                      (f) => !(confirmedFields as string[]).includes(f.field),
+                    ),
+                  },
+                }
+              : {}),
           }
         : patch;
       applyPatch([id], nextPatch, action);
@@ -1101,13 +1117,17 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
       // Also re-read anything still missing important details, so one Synch
       // fixes what it can instead of needing Fix with AI on every document.
-      const needsFix = (item: EvidenceItem) =>
-        item.status === "Needs confirmation" ||
-        !item.dateOfDocument ||
-        !(item.people ?? []).length ||
-        (item.people ?? []).every((p) => p === "Third party") ||
-        !(item.categories ?? []).length ||
-        (item.categories ?? []).every((c) => c === "Other");
+      const needsFix = (item: EvidenceItem) => {
+        const c = (item.confirmedFields ?? []) as string[];
+        return (
+          (item.status === "Needs confirmation" && !c.length) ||
+          (!item.dateOfDocument && !c.includes("documentDate")) ||
+          (!c.includes("people") &&
+            (!(item.people ?? []).length || (item.people ?? []).every((p) => p === "Third party"))) ||
+          (!c.includes("categories") &&
+            (!(item.categories ?? []).length || (item.categories ?? []).every((c2) => c2 === "Other")))
+        );
+      };
       const queue = itemsRef.current.filter(
         (item) =>
           item.driveFileId &&

@@ -227,15 +227,11 @@ export function FixWizard({
                 </div>
               )}
 
-              <Button
-                variant="outline"
-                className="h-11 w-full"
-                disabled={busy}
-                onClick={() => void readWithAi()}
-              >
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                {busy ? "Reading the document…" : "Fix with AI"}
-              </Button>
+              {busy && (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> Reading the document…
+                </p>
+              )}
 
               <div className="space-y-1.5">
                 <Label htmlFor="fw-title" className="text-[11px]">Title</Label>
