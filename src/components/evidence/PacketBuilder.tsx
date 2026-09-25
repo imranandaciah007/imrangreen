@@ -84,6 +84,8 @@ export function PacketBuilder({
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStartId, setWizardStartId] = useState<string | undefined>(undefined);
+  const [fixAllRunning, setFixAllRunning] = useState(false);
+  const [fixAllProgress, setFixAllProgress] = useState("");
 
   const [step, setStep] = useState(0);
   const [acknowledged, setAcknowledged] = useState(false);
