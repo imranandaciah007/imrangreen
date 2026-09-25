@@ -59,4 +59,4 @@
 
 ## Workspace moves
 - [x] Remove the per-item Create task buttons next to flagged items (packet audit, review, details drawer)
-- [ ] Re-link Google Drive in the newest workspace
+- [x] Re-link Google Drive in the newest workspace
