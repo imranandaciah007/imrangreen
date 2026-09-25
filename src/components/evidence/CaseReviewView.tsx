@@ -310,14 +310,6 @@ export function CaseReviewView({
                     )}
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="h-9 text-[11px]"
-                      onClick={() => makeTask(gap)}
-                    >
-                      <ClipboardList className="size-3.5" /> Create task
-                    </Button>
-                    <Button
-                      size="sm"
                       variant="ghost"
                       className="h-9 text-[11px] text-muted-foreground"
                       onClick={() => ignoreGap(gap.id)}
@@ -372,25 +364,6 @@ export function CaseReviewView({
                         Add explanation
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-9 text-[11px]"
-                      onClick={() =>
-                        addTask({
-                          title: `Add explanation: how "${c.title}" affects Aciah`,
-                          category: "",
-                          dueDate: "",
-                          done: false,
-                          assignedTo: profile,
-                          status: "To do",
-                          priority: "Normal",
-                          ...(c.kind === "Evidence" ? { evidenceIds: [c.id] } : { eventId: c.id }),
-                        })
-                      }
-                    >
-                      Create task
-                    </Button>
                   </div>
                 </li>
               ))}
