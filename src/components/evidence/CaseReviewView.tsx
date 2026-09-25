@@ -80,8 +80,17 @@ export function CaseReviewView({
     markAllReady,
     ignoreGap,
     packets,
+    driveTree,
   } = useEvidence();
   const latestPacket = packets.at(-1);
+  const packetFolderLink =
+    latestPacket?.driveFolderWebViewLink ??
+    (() => {
+      const folder = driveTree?.folders.find(
+        (entry) => entry.path.replace(/^\/+|\/+$/g, "") === "I601 Evidence/Generated Case Packets",
+      );
+      return folder ? `https://drive.google.com/drive/folders/${folder.id}` : "";
+    })();
 
 
   const uncategorised = items.filter(
@@ -126,9 +135,9 @@ export function CaseReviewView({
             <span>
               Last draft: {latestPacket ? formatDateTime(latestPacket.generatedAt) : "None yet"}
             </span>
-            {latestPacket?.driveFolderWebViewLink && (
+            {packetFolderLink && (
               <a
-                href={latestPacket.driveFolderWebViewLink}
+                href={packetFolderLink}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex min-h-7 items-center gap-1 font-semibold text-primary underline underline-offset-2"

@@ -78,6 +78,7 @@ export function PacketBuilder({
     togglePacketExclusion,
     savePacketVersion,
     connection,
+    driveTree,
     runExtraction,
     extractingIds,
   } = useEvidence();
@@ -148,6 +149,15 @@ export function PacketBuilder({
   }, [finances]);
 
   const nextVersion = packets.length + 1;
+  const latestPacket = packets.at(-1);
+  const packetFolderLink =
+    latestPacket?.driveFolderWebViewLink ??
+    (() => {
+      const folder = driveTree?.folders.find(
+        (entry) => entry.path.replace(/^\/+|\/+$/g, "") === "I601 Evidence/Generated Case Packets",
+      );
+      return folder ? `https://drive.google.com/drive/folders/${folder.id}` : "";
+    })();
 
   const input: PacketInput = {
     version: nextVersion,
@@ -397,11 +407,11 @@ export function PacketBuilder({
           </DialogDescription>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[11px] text-muted-foreground">
             <span>
-              Last draft: {packets.length ? formatDateTime(packets.at(-1)?.generatedAt ?? "") : "None yet"}
+              Last draft: {latestPacket ? formatDateTime(latestPacket.generatedAt) : "None yet"}
             </span>
-            {packets.at(-1)?.driveFolderWebViewLink && (
+            {packetFolderLink && (
               <a
-                href={packets.at(-1)?.driveFolderWebViewLink}
+                href={packetFolderLink}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex min-h-8 items-center gap-1 font-semibold text-primary underline underline-offset-2"
