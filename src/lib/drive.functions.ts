@@ -165,5 +165,11 @@ export const uploadPacketFile = createServerFn({ method: "POST" })
       throw new Error(`Google Drive upload failed [${res.status}]: ${text}`);
     }
     const file = (await res.json()) as { id: string; name: string; webViewLink?: string };
-    return { id: file.id, name: file.name, webViewLink: file.webViewLink ?? "", folderPath };
+    return {
+      id: file.id,
+      name: file.name,
+      webViewLink: file.webViewLink ?? "",
+      folderPath,
+      folderWebViewLink: `https://drive.google.com/drive/folders/${folderId}`,
+    };
   });

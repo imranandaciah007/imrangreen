@@ -1,4 +1,4 @@
-import { AlertTriangle, EyeOff, HeartHandshake, Sparkles } from "lucide-react";
+import { AlertTriangle, ExternalLink, EyeOff, HeartHandshake, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,9 @@ export function CaseReviewView({
     resolveConflict,
     markAllReady,
     ignoreGap,
+    packets,
   } = useEvidence();
+  const latestPacket = packets.at(-1);
 
 
   const uncategorised = items.filter(
@@ -115,10 +117,27 @@ export function CaseReviewView({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button className="h-10 flex-1 text-xs" onClick={onBuildPacket}>
-          Build case packet
-        </Button>
+      <div className="flex flex-wrap items-start gap-2">
+        <div className="min-w-[12rem] flex-1">
+          <Button className="h-10 w-full text-xs" onClick={onBuildPacket}>
+            Build case packet
+          </Button>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[10px] text-muted-foreground">
+            <span>
+              Last draft: {latestPacket ? formatDateTime(latestPacket.generatedAt) : "None yet"}
+            </span>
+            {latestPacket?.driveFolderWebViewLink && (
+              <a
+                href={latestPacket.driveFolderWebViewLink}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-7 items-center gap-1 font-semibold text-primary underline underline-offset-2"
+              >
+                <ExternalLink className="size-3" /> Drive folder
+              </a>
+            )}
+          </div>
+        </div>
         <Button variant="outline" className="h-10 flex-1 text-xs" onClick={markAllReady}>
           Mark all as Ready
         </Button>

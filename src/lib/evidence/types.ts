@@ -191,6 +191,8 @@ export interface PacketVersion {
   timelineEventCount: number;
   unresolvedIssues: number;
   driveFolder: string;
+  /** Direct link to the Drive folder holding this generated packet version. */
+  driveFolderWebViewLink?: string | undefined;
   files: { name: string; driveFileId?: string | undefined; webViewLink?: string | undefined }[];
   exhibitMap: { evidenceId: string; number: string; pages: string }[];
 }
