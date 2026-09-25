@@ -192,7 +192,6 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
     extractingIds,
     confirmExtractionField,
     dismissExtractionField,
-    addTask,
     profile,
     gaps,
     ignoreGap,
