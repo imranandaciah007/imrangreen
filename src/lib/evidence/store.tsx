@@ -460,7 +460,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
                   aiExtraction: {
                     ...current.aiExtraction,
                     uncertain: (current.aiExtraction.uncertain ?? []).filter(
-                      (f) => !(confirmedFields as string[]).includes(f as string),
+                      (f) => !(confirmedFields as string[]).includes(f.field),
                     ),
                   },
                 }

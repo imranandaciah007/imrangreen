@@ -92,7 +92,7 @@ export function detectGaps(
     // Fields the user has confirmed by hand never get flagged again.
     const confirmed = rawItem.confirmedFields ?? [];
     const uncertainLeft = (rawItem.aiExtraction?.uncertain ?? []).filter(
-      (f) => !confirmed.includes(f as never),
+      (f) => !confirmed.includes(f.field as never),
     );
     const item = {
       ...rawItem,
