@@ -40,7 +40,7 @@ export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
       items
         .filter(
           (i) =>
-            !i.duplicateOf &&
+            !i.duplicateOfId &&
             (i.category === "Financial Hardship" ||
               (i.categories ?? []).includes("Financial Hardship")),
         )
