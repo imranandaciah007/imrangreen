@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiDiaryExtractRouteImport } from './routes/api/diary-extract'
-import { Route as ApiTmpFinReadRouteImport } from './routes/api/tmp-fin-read'
 import { Route as ApiPublicGcCloneTickRouteImport } from './routes/api/public/gc-clone-tick'
 
 const IndexRoute = IndexRouteImport.update({
@@ -24,11 +23,6 @@ const ApiDiaryExtractRoute = ApiDiaryExtractRouteImport.update({
   path: '/api/diary-extract',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTmpFinReadRoute = ApiTmpFinReadRouteImport.update({
-  id: '/api/tmp-fin-read',
-  path: '/api/tmp-fin-read',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicGcCloneTickRoute = ApiPublicGcCloneTickRouteImport.update({
   id: '/api/public/gc-clone-tick',
   path: '/api/public/gc-clone-tick',
@@ -38,47 +32,30 @@ const ApiPublicGcCloneTickRoute = ApiPublicGcCloneTickRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/diary-extract': typeof ApiDiaryExtractRoute
-  '/api/tmp-fin-read': typeof ApiTmpFinReadRoute
   '/api/public/gc-clone-tick': typeof ApiPublicGcCloneTickRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/diary-extract': typeof ApiDiaryExtractRoute
-  '/api/tmp-fin-read': typeof ApiTmpFinReadRoute
   '/api/public/gc-clone-tick': typeof ApiPublicGcCloneTickRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/diary-extract': typeof ApiDiaryExtractRoute
-  '/api/tmp-fin-read': typeof ApiTmpFinReadRoute
   '/api/public/gc-clone-tick': typeof ApiPublicGcCloneTickRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/api/diary-extract'
-    | '/api/tmp-fin-read'
-    | '/api/public/gc-clone-tick'
+  fullPaths: '/' | '/api/diary-extract' | '/api/public/gc-clone-tick'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/api/diary-extract'
-    | '/api/tmp-fin-read'
-    | '/api/public/gc-clone-tick'
-  id:
-    | '__root__'
-    | '/'
-    | '/api/diary-extract'
-    | '/api/tmp-fin-read'
-    | '/api/public/gc-clone-tick'
+  to: '/' | '/api/diary-extract' | '/api/public/gc-clone-tick'
+  id: '__root__' | '/' | '/api/diary-extract' | '/api/public/gc-clone-tick'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiDiaryExtractRoute: typeof ApiDiaryExtractRoute
-  ApiTmpFinReadRoute: typeof ApiTmpFinReadRoute
   ApiPublicGcCloneTickRoute: typeof ApiPublicGcCloneTickRoute
 }
 
@@ -98,13 +75,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDiaryExtractRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/tmp-fin-read': {
-      id: '/api/tmp-fin-read'
-      path: '/api/tmp-fin-read'
-      fullPath: '/api/tmp-fin-read'
-      preLoaderRoute: typeof ApiTmpFinReadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/gc-clone-tick': {
       id: '/api/public/gc-clone-tick'
       path: '/api/public/gc-clone-tick'
@@ -118,7 +88,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiDiaryExtractRoute: ApiDiaryExtractRoute,
-  ApiTmpFinReadRoute: ApiTmpFinReadRoute,
   ApiPublicGcCloneTickRoute: ApiPublicGcCloneTickRoute,
 }
 export const routeTree = rootRouteImport
