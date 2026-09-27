@@ -4,9 +4,9 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/tmp-fin-import")({
   server: {
     handlers: {
-      POST: async () => {
-        const fs = await import("fs");
-        const entries = JSON.parse(fs.readFileSync("/tmp/fin/entries.json", "utf8"));
+      POST: async ({ request }) => {
+        
+        const entries = await request.json();
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: row, error } = await supabaseAdmin
           .from("gc_case_store")
