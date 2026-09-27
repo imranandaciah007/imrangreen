@@ -24,8 +24,29 @@ function groupOf(entry: FinancialEntry): string {
 }
 
 export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
-  const { finances, updateFinance, deleteFinance, caseSettings, income, updateIncome, convert } =
-    useEvidence();
+  const {
+    finances,
+    updateFinance,
+    deleteFinance,
+    caseSettings,
+    income,
+    updateIncome,
+    convert,
+    items,
+    openInspector,
+  } = useEvidence();
+  const financialDocs = useMemo(
+    () =>
+      items
+        .filter(
+          (i) =>
+            !i.duplicateOf &&
+            (i.category === "Financial Hardship" ||
+              (i.categories ?? []).includes("Financial Hardship")),
+        )
+        .sort((a, b) => (b.dateOfDocument ?? "").localeCompare(a.dateOfDocument ?? "")),
+    [items],
+  );
   const separation = caseSettings.separationStartDate;
   const [range, setRange] = useState<"since" | "all">("since");
   const [linkFor, setLinkFor] = useState<string | null>(null);
@@ -372,6 +393,43 @@ export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
                 >
                   <Trash2 className="size-4" />
                 </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border bg-card shadow-panel">
+        <header className="border-b border-border px-3 py-2.5">
+          <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            Financial documents ({financialDocs.length})
+          </h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Receipts, letters and statements in your evidence. Tap one to open it.
+          </p>
+        </header>
+        {financialDocs.length === 0 ? (
+          <p className="px-3 py-10 text-center text-xs text-muted-foreground">
+            No financial documents yet.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border/70">
+            {financialDocs.map((doc) => (
+              <li key={doc.id}>
+                <button
+                  type="button"
+                  onClick={() => openInspector(doc.id)}
+                  className="flex min-h-12 w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-accent"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      {doc.title}
+                    </span>
+                    <span className="block font-mono text-[10px] text-muted-foreground">
+                      {doc.exhibitId} · {doc.dateOfDocument ? formatDate(doc.dateOfDocument) : "No date"}
+                    </span>
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
