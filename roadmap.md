@@ -62,3 +62,5 @@
 - [x] Re-link Google Drive in the newest workspace
 - [x] Show the latest case-packet draft time and save a direct link to its Google Drive folder
 - [x] Reconnect Google Drive after the latest workspace move
+- [ ] Fill the Finances tab from financial documents with Gemini
+- [ ] Reconnect Google Drive in the newest workspace (again)
