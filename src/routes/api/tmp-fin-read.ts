@@ -78,6 +78,17 @@ export const Route = createFileRoute("/api/tmp-fin-read")({
         );
         return Response.json(results);
       },
+      PUT: async ({ request }) => {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const entries = (await request.json()) as { id: string }[];
+        const { data: row } = await supabaseAdmin.from("gc_case_store").select("data").eq("key", "records").single();
+        const rec = (row?.data ?? {}) as { finances?: { id: string; createdBy?: string }[] };
+        const kept = (rec.finances ?? []).filter((f) => f.createdBy !== "Gemini");
+        const next = { ...rec, finances: [...kept, ...entries] };
+        const { error } = await supabaseAdmin.from("gc_case_store").upsert({ key: "records", data: next as never, updated_at: new Date().toISOString() });
+        return Response.json({ error: error?.message ?? null, total: next.finances.length });
+      },
     },
   },
 });
+
