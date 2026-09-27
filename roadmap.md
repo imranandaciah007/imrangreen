@@ -64,3 +64,4 @@
 - [x] Reconnect Google Drive after the latest workspace move
 - [x] Fill the Finances tab from financial documents with Gemini
 - [x] Reconnect Google Drive in the newest workspace (again)
+- [ ] Rebuild the money ledger by reading every financial document in full with Gemini
