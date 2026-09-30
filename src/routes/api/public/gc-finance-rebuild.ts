@@ -93,17 +93,24 @@ export const Route = createFileRoute("/api/public/gc-finance-rebuild")({
             const mime = ask.mimeType ?? "application/pdf";
             let bytes: Uint8Array;
             let sendMime = mime;
-            if (mime === "application/pdf" || mime.startsWith("image/")) {
+            if (mime === "application/pdf") {
               bytes = await fetchDriveBytes(fileId);
             } else {
-              // Word docs, spreadsheets and Google files are converted to PDF first.
+              // Word docs, spreadsheets, photos and Google files are fetched in a
+              // form the reader accepts.
               const converted = await fetchOriginalForEmbedding({
                 fileId,
                 mimeType: mime,
                 fileName: ask.fileName ?? fileId,
               });
+              if (!converted) throw new Error("This document type cannot be read.");
               bytes = converted.bytes;
-              sendMime = "application/pdf";
+              sendMime =
+                converted.kind === "pdf"
+                  ? "application/pdf"
+                  : converted.kind === "png"
+                    ? "image/png"
+                    : "image/jpeg";
             }
             let binary = "";
             for (const byte of bytes) binary += String.fromCharCode(byte);
