@@ -113,6 +113,9 @@ export class LocalCaseProvider implements DocumentProvider {
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private storeCache = new Map<string, unknown>();
   private storeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Shared by everything that starts up at once, so the cloud copy is read only once. */
+  private inflightPull: Promise<boolean> | null = null;
+  private hasPulled = false;
 
   private loadItems(): EvidenceItem[] {
     if (!this.items) this.items = readJson<EvidenceItem[]>(ITEMS_KEY, []);
