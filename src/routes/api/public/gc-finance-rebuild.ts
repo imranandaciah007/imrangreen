@@ -71,22 +71,40 @@ export const Route = createFileRoute("/api/public/gc-finance-rebuild")({
           if (unauthorized) return unauthorized;
         }
 
-        let fileIds: string[] = [];
+        type Ask = { fileId: string; mimeType?: string; fileName?: string };
+        let files: Ask[] = [];
         try {
-          const body = (await request.json()) as { fileIds?: string[] };
-          fileIds = (body?.fileIds ?? []).slice(0, 8);
+          const body = (await request.json()) as { files?: Ask[]; fileIds?: string[] };
+          files = body?.files?.length
+            ? body.files.slice(0, 8)
+            : (body?.fileIds ?? []).slice(0, 8).map((fileId) => ({ fileId }));
         } catch {
           /* handled below */
         }
-        if (!fileIds.length) return Response.json({ ok: false, error: "No documents given." }, { status: 400 });
+        if (!files.length) return Response.json({ ok: false, error: "No documents given." }, { status: 400 });
 
-        const { fetchDriveBytes } = await import("@/lib/drive-core.server");
+        const { fetchDriveBytes, fetchOriginalForEmbedding } = await import("@/lib/drive-core.server");
         const { runJsonModel } = await import("@/lib/ai-json.server");
 
         const results: Record<string, unknown>[] = [];
-        for (const fileId of fileIds) {
+        for (const ask of files) {
+          const { fileId } = ask;
           try {
-            const bytes = await fetchDriveBytes(fileId);
+            const mime = ask.mimeType ?? "application/pdf";
+            let bytes: Uint8Array;
+            let sendMime = mime;
+            if (mime === "application/pdf" || mime.startsWith("image/")) {
+              bytes = await fetchDriveBytes(fileId);
+            } else {
+              // Word docs, spreadsheets and Google files are converted to PDF first.
+              const converted = await fetchOriginalForEmbedding({
+                fileId,
+                mimeType: mime,
+                fileName: ask.fileName ?? fileId,
+              });
+              bytes = converted.bytes;
+              sendMime = "application/pdf";
+            }
             let binary = "";
             for (const byte of bytes) binary += String.fromCharCode(byte);
             const base64 = btoa(binary);
@@ -96,7 +114,7 @@ export const Route = createFileRoute("/api/public/gc-finance-rebuild")({
               name: "finance_rebuild",
               tier: "bulk",
               allowFallback: false,
-              file: { fileName: `${fileId}.pdf`, mimeType: "application/pdf", base64 },
+              file: { fileName: ask.fileName ?? fileId, mimeType: sendMime, base64 },
             });
             results.push({ fileId, ok: true, payments: out["payments"] ?? [] });
           } catch (error) {
