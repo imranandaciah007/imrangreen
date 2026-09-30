@@ -113,6 +113,9 @@ export class LocalCaseProvider implements DocumentProvider {
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private storeCache = new Map<string, unknown>();
   private storeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Shared by everything that starts up at once, so the cloud copy is read only once. */
+  private inflightPull: Promise<boolean> | null = null;
+  private hasPulled = false;
 
   private loadItems(): EvidenceItem[] {
     if (!this.items) this.items = readJson<EvidenceItem[]>(ITEMS_KEY, []);
@@ -163,8 +166,22 @@ export class LocalCaseProvider implements DocumentProvider {
     }
   }
 
-  /** Merge the shared copy into this device: the most recently edited version wins. */
+  /**
+   * One read of the shared copy, even when several parts of the app ask at the
+   * same moment. This is what stops a starting device from believing the case is
+   * empty and then saving that emptiness over everyone's records.
+   */
   async pull(): Promise<boolean> {
+    if (this.inflightPull) return this.inflightPull;
+    this.inflightPull = this.pullNow().finally(() => {
+      this.inflightPull = null;
+      this.hasPulled = true;
+    });
+    return this.inflightPull;
+  }
+
+  /** Merge the shared copy into this device: the most recently edited version wins. */
+  private async pullNow(): Promise<boolean> {
     if (typeof window === "undefined") return false;
     let remote: {
       items: { id: string; deleted: boolean; data: unknown }[];
@@ -209,6 +226,8 @@ export class LocalCaseProvider implements DocumentProvider {
 
   /** Read a shared value (records, ignored flags). Falls back to this device's copy. */
   async loadShared<T>(key: string, localKey: string, fallback: T): Promise<T> {
+    // Always know what the shared copy holds before trusting this device's copy.
+    if (!this.hasPulled) await this.pull();
     if (this.storeCache.has(key)) {
       const value = this.storeCache.get(key) as T;
       writeJson(localKey, value);
@@ -344,6 +363,19 @@ export class LocalCaseProvider implements DocumentProvider {
   }
 
   async saveRecords(records: CaseRecords) {
+    // Safety net: a device that has not yet read the shared case, or that somehow
+    // holds nothing, must never replace real payments, timeline or tasks with nothing.
+    if (!this.hasPulled) await this.pull();
+    const shared = this.storeCache.get("records") as CaseRecords | undefined;
+    const size = (r?: CaseRecords) =>
+      (r?.events?.length ?? 0) +
+      (r?.finances?.length ?? 0) +
+      (r?.tasks?.length ?? 0) +
+      (r?.packets?.length ?? 0);
+    if (size(records) === 0 && size(shared) > 0) {
+      console.warn("Refused to replace the shared case records with an empty set.");
+      return;
+    }
     this.saveShared("records", RECORDS_KEY, records);
   }
 }
