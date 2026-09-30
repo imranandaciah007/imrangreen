@@ -226,6 +226,8 @@ export class LocalCaseProvider implements DocumentProvider {
 
   /** Read a shared value (records, ignored flags). Falls back to this device's copy. */
   async loadShared<T>(key: string, localKey: string, fallback: T): Promise<T> {
+    // Always know what the shared copy holds before trusting this device's copy.
+    if (!this.hasPulled) await this.pull();
     if (this.storeCache.has(key)) {
       const value = this.storeCache.get(key) as T;
       writeJson(localKey, value);
