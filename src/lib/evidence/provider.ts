@@ -363,6 +363,19 @@ export class LocalCaseProvider implements DocumentProvider {
   }
 
   async saveRecords(records: CaseRecords) {
+    // Safety net: a device that has not yet read the shared case, or that somehow
+    // holds nothing, must never replace real payments, timeline or tasks with nothing.
+    if (!this.hasPulled) await this.pull();
+    const shared = this.storeCache.get("records") as CaseRecords | undefined;
+    const size = (r?: CaseRecords) =>
+      (r?.events?.length ?? 0) +
+      (r?.finances?.length ?? 0) +
+      (r?.tasks?.length ?? 0) +
+      (r?.packets?.length ?? 0);
+    if (size(records) === 0 && size(shared) > 0) {
+      console.warn("Refused to replace the shared case records with an empty set.");
+      return;
+    }
     this.saveShared("records", RECORDS_KEY, records);
   }
 }
