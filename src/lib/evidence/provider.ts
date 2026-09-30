@@ -166,8 +166,22 @@ export class LocalCaseProvider implements DocumentProvider {
     }
   }
 
-  /** Merge the shared copy into this device: the most recently edited version wins. */
+  /**
+   * One read of the shared copy, even when several parts of the app ask at the
+   * same moment. This is what stops a starting device from believing the case is
+   * empty and then saving that emptiness over everyone's records.
+   */
   async pull(): Promise<boolean> {
+    if (this.inflightPull) return this.inflightPull;
+    this.inflightPull = this.pullNow().finally(() => {
+      this.inflightPull = null;
+      this.hasPulled = true;
+    });
+    return this.inflightPull;
+  }
+
+  /** Merge the shared copy into this device: the most recently edited version wins. */
+  private async pullNow(): Promise<boolean> {
     if (typeof window === "undefined") return false;
     let remote: {
       items: { id: string; deleted: boolean; data: unknown }[];
