@@ -66,3 +66,9 @@
 - [x] Reconnect Google Drive in the newest workspace (again)
 - [x] Rebuild the money ledger by reading every financial document in full with Gemini
 - [x] Connect Google Drive in the newest workspace
+
+## Sync safety & finances (Sep 30)
+- [x] Stop a starting device from saving an empty case over shared records
+- [x] Reconnect Google Drive in the new workspace
+- [x] Rebuild the financial ledger from all 148 financial documents (728 payments, all "Needs confirmation")
+- [ ] Update older server-function style (warning only, not urgent)
