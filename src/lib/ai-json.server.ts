@@ -350,6 +350,12 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
             exhausted = true;
             break;
           }
+          // Model busy or rate-limited even after retries: another model usually
+          // answers straight away, so move down the ladder instead of giving up.
+          if (attempt === 2 && /\[(429|503)\]/.test(String(err))) {
+            exhausted = true;
+            break;
+          }
           if (!retryable(err) || attempt === 2) break;
           await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
         }
