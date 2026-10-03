@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiDiaryExtractRouteImport } from './routes/api/diary-extract'
 import { Route as ApiPublicGcCloneTickRouteImport } from './routes/api/public/gc-clone-tick'
 import { Route as ApiPublicGcFinanceRebuildRouteImport } from './routes/api/public/gc-finance-rebuild'
@@ -17,6 +18,11 @@ import { Route as ApiPublicGcFinanceRebuildRouteImport } from './routes/api/publ
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthRoute = ApiAuthRouteImport.update({
+  id: '/api/auth',
+  path: '/api/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDiaryExtractRoute = ApiDiaryExtractRouteImport.update({
@@ -38,12 +44,14 @@ const ApiPublicGcFinanceRebuildRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/auth': typeof ApiAuthRoute
   '/api/diary-extract': typeof ApiDiaryExtractRoute
   '/api/public/gc-clone-tick': typeof ApiPublicGcCloneTickRoute
   '/api/public/gc-finance-rebuild': typeof ApiPublicGcFinanceRebuildRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/auth': typeof ApiAuthRoute
   '/api/diary-extract': typeof ApiDiaryExtractRoute
   '/api/public/gc-clone-tick': typeof ApiPublicGcCloneTickRoute
   '/api/public/gc-finance-rebuild': typeof ApiPublicGcFinanceRebuildRoute
@@ -51,6 +59,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/auth': typeof ApiAuthRoute
   '/api/diary-extract': typeof ApiDiaryExtractRoute
   '/api/public/gc-clone-tick': typeof ApiPublicGcCloneTickRoute
   '/api/public/gc-finance-rebuild': typeof ApiPublicGcFinanceRebuildRoute
@@ -59,18 +68,21 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api/auth'
     | '/api/diary-extract'
     | '/api/public/gc-clone-tick'
     | '/api/public/gc-finance-rebuild'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api/auth'
     | '/api/diary-extract'
     | '/api/public/gc-clone-tick'
     | '/api/public/gc-finance-rebuild'
   id:
     | '__root__'
     | '/'
+    | '/api/auth'
     | '/api/diary-extract'
     | '/api/public/gc-clone-tick'
     | '/api/public/gc-finance-rebuild'
@@ -78,6 +90,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiAuthRoute: typeof ApiAuthRoute
   ApiDiaryExtractRoute: typeof ApiDiaryExtractRoute
   ApiPublicGcCloneTickRoute: typeof ApiPublicGcCloneTickRoute
   ApiPublicGcFinanceRebuildRoute: typeof ApiPublicGcFinanceRebuildRoute
@@ -90,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth': {
+      id: '/api/auth'
+      path: '/api/auth'
+      fullPath: '/api/auth'
+      preLoaderRoute: typeof ApiAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/diary-extract': {
@@ -118,6 +138,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiAuthRoute: ApiAuthRoute,
   ApiDiaryExtractRoute: ApiDiaryExtractRoute,
   ApiPublicGcCloneTickRoute: ApiPublicGcCloneTickRoute,
   ApiPublicGcFinanceRebuildRoute: ApiPublicGcFinanceRebuildRoute,

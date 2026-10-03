@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, ChevronLeft, Home, ListTodo, Search, Sparkles } from "lucide-react";
+import { Bell, ChevronLeft, Home, ListTodo, LogOut, Search, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -7,6 +7,7 @@ import { getAiUsage, type AiUsageSummary } from "@/lib/ai-usage.functions";
 import { useEvidence } from "@/lib/evidence/store";
 import { taskStatus } from "@/lib/evidence/types";
 import type { MainTab } from "@/components/evidence/BottomNav";
+import { useSignOut } from "@/components/evidence/SignInGate";
 
 const pageTitles: Record<MainTab, { title: string; subtitle: string }> = {
   home: { title: "Case overview", subtitle: "Progress, sync and what needs attention" },
@@ -43,6 +44,7 @@ export function AppHeader({
   onBack: () => void;
 }) {
   const { tasks } = useEvidence();
+  const signOut = useSignOut();
   const [usage, setUsage] = useState<AiUsageSummary | null>(null);
 
   useEffect(() => {
@@ -233,6 +235,17 @@ export function AppHeader({
               </Button>
             </PopoverContent>
           </Popover>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 text-navy-foreground/70 hover:bg-sidebar-accent/15 hover:text-navy-foreground"
+            onClick={signOut}
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <LogOut className="size-4" />
+          </Button>
         </div>
       </div>
     </header>
