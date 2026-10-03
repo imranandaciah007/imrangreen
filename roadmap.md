@@ -1,6 +1,7 @@
 # GC case portal — roadmap
 
 ## Interface reconstruction
+- [x] Replace the crowded phone navigation with the selected ergonomic command dock
 - [x] Replace installed app artwork with a crisp American flag icon
 - [x] Apply the selected Federal Clean palette with Sora and Manrope typography
 - [x] Refine the Files board into compact, information-rich explorer rows
