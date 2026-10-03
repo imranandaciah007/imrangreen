@@ -79,12 +79,12 @@ export function AppHeader({
 
   return (
     <header className="case-topbar sticky top-0 z-30 pt-[env(safe-area-inset-top)]">
-      <div className="flex min-h-[64px] flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6 lg:px-8">
+      <div className="grid min-h-[64px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6 lg:px-8">
         <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
-            className="size-9 text-white/70 hover:bg-white/10 hover:text-white"
+            className="size-11 text-navy-foreground/70 hover:bg-sidebar-accent/15 hover:text-navy-foreground sm:size-9"
             onClick={onBack}
             aria-label="Go back to the previous page"
             title="Back"
@@ -94,8 +94,8 @@ export function AppHeader({
           <Button
             variant="ghost"
             size="icon"
-            className={`size-9 hover:bg-white/10 hover:text-white ${
-              tab === "home" ? "bg-white/10 text-white" : "text-white/70"
+            className={`size-11 hover:bg-sidebar-accent/15 hover:text-navy-foreground sm:size-9 ${
+              tab === "home" ? "bg-sidebar-accent/15 text-navy-foreground" : "text-navy-foreground/70"
             }`}
             onClick={onHome}
             aria-label="Go to the main menu"
@@ -105,13 +105,13 @@ export function AppHeader({
           </Button>
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate font-display text-base font-black text-white sm:text-lg">
+          <h1 className="truncate font-display text-base font-black text-navy-foreground sm:text-lg">
             {page.title}
           </h1>
-          <p className="mt-0.5 truncate text-[10px] font-bold text-white/50">{page.subtitle}</p>
+          <p className="mt-0.5 hidden truncate text-[10px] font-bold text-navy-foreground/50 min-[390px]:block">{page.subtitle}</p>
         </div>
 
-        <div className="ml-auto hidden max-w-xs flex-1 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-white/60 xl:flex">
+        <div className="ml-auto hidden max-w-xs flex-1 items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/10 px-3 text-navy-foreground/60 xl:flex">
           <Search className="size-4" />
           <button onClick={onSearch} className="h-10 flex-1 text-left text-xs">
             Ask my evidence…
@@ -127,7 +127,7 @@ export function AppHeader({
                 aria-label="AI reader usage"
               >
                 <Sparkles className="size-3.5" />
-                <span className="hidden sm:inline">{readerLabel}</span>
+                <span className="hidden md:inline">{readerLabel}</span>
                 <span className="tabular-nums">{usage?.geminiToday ?? 0}</span>
               </button>
             </PopoverTrigger>
@@ -176,7 +176,7 @@ export function AppHeader({
           <Button
             variant="ghost"
             size="icon"
-            className="relative size-9 text-white/70 hover:bg-white/10 hover:text-white"
+            className="relative hidden size-9 text-navy-foreground/70 hover:bg-sidebar-accent/15 hover:text-navy-foreground min-[370px]:inline-flex"
             onClick={onOpenTasks}
             aria-label={`${reminders.length} reminders`}
             title="Reminders"
@@ -193,7 +193,7 @@ export function AppHeader({
           <Popover>
             <PopoverTrigger asChild>
               <button
-                className="relative flex h-9 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-[11px] font-bold text-white/80"
+                className="relative hidden h-9 items-center gap-1.5 rounded-lg border border-sidebar-border bg-sidebar-accent/10 px-2.5 text-[11px] font-bold text-navy-foreground/80 sm:flex"
                 aria-label={`${openTasks.length} open tasks`}
               >
                 <ListTodo className="size-3.5" />
