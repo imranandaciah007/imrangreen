@@ -26,10 +26,6 @@ const DEFAULT_MODEL = "gpt-4o-mini";
 const SCHEMA = VERIFICATION_SCHEMA;
 
 
-export function openAiConfigured() {
-  return Boolean(process.env["OPENAI_API_KEY"]);
-}
-
 function stateFrom(fields: VerifiedField[], overall: string): VerificationState {
   if (fields.some((f) => f.verdict === "disagrees")) return "disagreement";
   if (overall === "insufficient_material") return "needs_human_review";

@@ -73,3 +73,11 @@
 - [x] Reconnect Google Drive in the new workspace
 - [x] Rebuild the financial ledger from all 148 financial documents (728 payments, all "Needs confirmation")
 - [ ] Update older server-function style (warning only, not urgent)
+
+## Privacy and tidy-up (Oct 3)
+- [x] Require a sign-in before any case data, Drive action or AI read (stays signed in for 90 days per device)
+- [x] Sign out button in the top bar
+- [x] Remove unused interface components, an unconnected diary cross-check feature and dead helper code
+- [x] Keep tasks in one place (Review → Tasks); removed the duplicate list from the Timeline page
+- [x] Label separation costs on Home as an estimate while any payment is still unconfirmed
+- [ ] Remove the unused packages from package.json (needs the lockfile regenerated inside Lovable)

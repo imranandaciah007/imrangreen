@@ -1,5 +1,4 @@
 import {
-  CASE_SETTINGS,
   READY_STATUSES,
   taskStatus,
   type Category,
@@ -381,8 +380,6 @@ export function categoryCoverage(
     };
   });
 }
-
-export const SEPARATION_DATE = CASE_SETTINGS.separationStartDate;
 
 /**
  * Documents the hardship diary refers to (appendix A1, A24 …) that are not in the vault.

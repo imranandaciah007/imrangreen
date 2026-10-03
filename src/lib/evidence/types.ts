@@ -472,16 +472,6 @@ export function statusForStage(stage: Stage): EvidenceStatus {
 
 export const READY_STATUSES: EvidenceStatus[] = ["Ready", "Reviewed"];
 
-export const DRIVE_FOLDERS = [
-  "/I601 Evidence/Original Evidence/",
-  "/I601 Evidence/Generated Case Packets/",
-  "/I601 Evidence/Financial Evidence/",
-  "/I601 Evidence/Medical/",
-  "/I601 Evidence/Police-Government/",
-  "/I601 Evidence/Relationship/",
-  "/I601 Evidence/Other/",
-] as const;
-
 /* ------------------------------------------------------------------ *
  * Hardship Diary master import (Prompt 6)
  * ------------------------------------------------------------------ */

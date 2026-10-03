@@ -220,6 +220,8 @@ interface EvidenceContextValue {
     openTasks: number;
     timelineEvents: number;
     financialImpact: number;
+    /** Payments in that total that nobody has confirmed against the document yet. */
+    financialUnconfirmed: number;
     lastEditedAt: string | null;
     byCategory: { category: Category; total: number; ready: number; percent: number }[];
   };
@@ -1897,9 +1899,12 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       };
     });
     const since = CASE_SETTINGS.separationStartDate;
-    const financialImpact = finances
-      .filter((f) => f.date >= since)
-      .reduce((sum, f) => sum + (f.currency === "USD" ? f.amount * 0.79 : f.amount), 0);
+    const sinceSeparation = finances.filter((f) => f.date >= since);
+    const financialImpact = sinceSeparation.reduce(
+      (sum, f) => sum + (f.currency === "USD" ? f.amount * 0.79 : f.amount),
+      0,
+    );
+    const financialUnconfirmed = sinceSeparation.filter((f) => f.status !== "Verified").length;
     const editStamps = [
       ...items.map((i) => i.updatedAt),
       ...events.map((e) => e.updatedAt),
@@ -1916,6 +1921,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       openTasks: tasks.filter((t) => taskStatus(t) !== "Complete").length,
       timelineEvents: events.length,
       financialImpact,
+      financialUnconfirmed,
       lastEditedAt: editStamps.length ? editStamps.sort().at(-1)! : null,
       byCategory,
     };

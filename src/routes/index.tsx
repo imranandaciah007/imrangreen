@@ -28,6 +28,7 @@ import { AddSheet, EventDialog, ExpenseDialog, TaskDialog } from "@/components/e
 import { TimelineView } from "@/components/evidence/TimelineView";
 import { TaskReminderManager } from "@/components/evidence/TaskReminderManager";
 import { DiaryImportDialog } from "@/components/evidence/DiaryImportDialog";
+import { SignInGate } from "@/components/evidence/SignInGate";
 import { UploadDialog } from "@/components/evidence/UploadDialog";
 import { EvidenceStoreProvider, useEvidence } from "@/lib/evidence/store";
 import { type EvidenceItem } from "@/lib/evidence/types";
@@ -48,9 +49,11 @@ export const Route = createFileRoute("/")({
     ],
   }),
   component: () => (
-    <EvidenceStoreProvider>
-      <CaseApp />
-    </EvidenceStoreProvider>
+    <SignInGate>
+      <EvidenceStoreProvider>
+        <CaseApp />
+      </EvidenceStoreProvider>
+    </SignInGate>
   ),
 });
 
@@ -217,10 +220,7 @@ function CaseApp() {
 
 
             {tab === "timeline" && (
-              <TimelineView
-                onAddEvent={() => setEventOpen(true)}
-                onAddTask={() => setTaskOpen(true)}
-              />
+              <TimelineView onAddEvent={() => setEventOpen(true)} />
             )}
 
             {tab === "finances" && <FinancesView onAddExpense={() => setExpenseOpen(true)} />}
