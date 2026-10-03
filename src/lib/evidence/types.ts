@@ -299,6 +299,17 @@ export const EXPENSE_GROUPS: Record<string, ExpenseCategory[]> = {
   ],
 };
 
+/** Which reporting group a payment belongs to ("Other" when it has no expense category). */
+export function financeGroupOf(entry: { expenseCategory?: string | undefined }): string {
+  const cat = entry.expenseCategory;
+  if (cat) {
+    for (const [group, cats] of Object.entries(EXPENSE_GROUPS)) {
+      if ((cats as readonly string[]).includes(cat)) return group;
+    }
+  }
+  return "Other";
+}
+
 export const PAYERS = ["Imran", "Aciah"] as const;
 export const BENEFICIARIES = ["Aciah", "Jibril", "Family", "Immigration", "Other"] as const;
 export const FINANCE_STATUSES = ["Verified", "Needs confirmation", "Missing receipt"] as const;

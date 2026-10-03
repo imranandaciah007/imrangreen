@@ -24,7 +24,7 @@ export function TimelineView({ onAddEvent }: { onAddEvent: () => void }) {
     tasks,
     caseSettings,
     categories,
-    finances,
+    stats,
   } = useEvidence();
 
   const [range, setRange] = useState<Range>("since");
@@ -53,9 +53,7 @@ export function TimelineView({ onAddEvent }: { onAddEvent: () => void }) {
   }, [events, range, person, category, separation]);
 
   const linkedEvidenceCount = new Set(sinceEvents.flatMap((e) => e.evidenceIds ?? [])).size;
-  const documentedGbp = finances
-    .filter((f) => f.date >= separation)
-    .reduce((s, f) => s + (f.currency === "USD" ? f.amount * 0.79 : f.amount), 0);
+  const documentedGbp = stats.financialImpact;
   const openFollowUps = tasks.filter((t) => taskStatus(t) !== "Complete").length;
 
   const linkTarget = events.find((e) => e.id === linkFor) ?? null;

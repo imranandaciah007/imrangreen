@@ -50,18 +50,34 @@ export const pushItems = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * Save a shared value. When the device says which copy it started from (`base`),
+ * only its own changes are merged into the latest shared copy, so edits made on
+ * another device in the meantime are kept. Returns the merged value as JSON.
+ */
 export const pushStore = createServerFn({ method: "POST" })
-  .inputValidator((d: { key: string; data: unknown }) => {
-    if (!d?.key) throw new Error("Invalid key");
+  .inputValidator((d: { key: string; data: unknown; base?: unknown; merge?: boolean }) => {
+    if (!d?.key || typeof d.key !== "string") throw new Error("Invalid key");
     return d;
   })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let value = data.data;
+    if (data.merge) {
+      const { mergeShared } = await import("@/lib/evidence/shared-merge");
+      const { data: current, error: readError } = await supabaseAdmin
+        .from("gc_case_store" as never)
+        .select("data")
+        .eq("key", data.key)
+        .maybeSingle();
+      if (readError) throw new Error(readError.message);
+      value = mergeShared(data.base, data.data, (current as { data?: unknown } | null)?.data);
+    }
     const { error } = await supabaseAdmin
       .from("gc_case_store" as never)
-      .upsert({ key: data.key, data: data.data, updated_at: new Date().toISOString() } as never, {
+      .upsert({ key: data.key, data: value, updated_at: new Date().toISOString() } as never, {
         onConflict: "key",
       });
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { json: JSON.stringify(value ?? null) };
   });

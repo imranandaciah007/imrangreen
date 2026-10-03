@@ -169,7 +169,7 @@ export const listCloneFolders = createServerFn({ method: "GET" }).handler(async 
       else {
         entry.total += 1;
         if (row.status === "done") entry.built += 1;
-        else if (row.status === "error") entry.failed += 1;
+        else if (row.status === "failed" || row.status === "error") entry.failed += 1;
         else entry.pending += 1;
       }
       byPath.set(path, entry);

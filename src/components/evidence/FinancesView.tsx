@@ -5,23 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EvidencePicker, LinkedEvidenceChips } from "@/components/evidence/EvidencePicker";
-import { formatDate, formatDateTime } from "@/lib/evidence/format";
+import { formatDate, formatDateTime, parseDay, todayLocal } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
-import { EXPENSE_GROUPS, type ExpenseCategory, type FinancialEntry } from "@/lib/evidence/types";
+import { EXPENSE_GROUPS, financeGroupOf, type ExpenseCategory, type FinancialEntry } from "@/lib/evidence/types";
 import { cn } from "@/lib/utils";
 
 const money = (n: number, sym = "£") => `${sym}${Math.round(n).toLocaleString()}`;
 
-/** Which reporting group an entry belongs to. */
-function groupOf(entry: FinancialEntry): string {
-  const cat = entry.expenseCategory;
-  if (cat) {
-    for (const [group, cats] of Object.entries(EXPENSE_GROUPS)) {
-      if ((cats as readonly string[]).includes(cat)) return group;
-    }
-  }
-  return "Other";
-}
+const groupOf = financeGroupOf;
 
 export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
   const {
@@ -244,7 +235,7 @@ export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
                     updateIncome({
                       [key]: Number(e.target.value) || 0,
                       ...(key === "usdToGbp"
-                        ? { rateDate: new Date().toISOString().slice(0, 10) }
+                        ? { rateDate: todayLocal() }
                         : {}),
                     })
                   }
@@ -289,7 +280,7 @@ export function FinancesView({ onAddExpense }: { onAddExpense: () => void }) {
               <li key={month} className="rounded-lg border border-border/70 px-2.5 py-2 text-xs">
                 <div className="flex items-baseline justify-between">
                   <span className="font-medium text-foreground">
-                    {new Date(`${month}-01`).toLocaleDateString(undefined, {
+                    {parseDay(`${month}-01`).toLocaleDateString(undefined, {
                       month: "short",
                       year: "numeric",
                     })}

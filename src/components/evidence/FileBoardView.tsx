@@ -48,6 +48,7 @@ import {
   type DriveFolderNode,
 } from "@/lib/drive-tree.functions";
 import { cn } from "@/lib/utils";
+import { todayLocal } from "@/lib/evidence/format";
 
 interface DriveTree {
   folders: DriveFolderNode[];
@@ -358,7 +359,7 @@ export function FileBoardView() {
             meta: {
               exhibitId,
               title: file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "),
-              documentDate: new Date().toISOString().slice(0, 10),
+              documentDate: todayLocal(),
               person: "Aciah",
               categories: [],
               people: ["Aciah"],

@@ -112,6 +112,10 @@ export class LocalCaseProvider implements DocumentProvider {
   );
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private storeCache = new Map<string, unknown>();
+  /** What the shared store held for each key the last time this device read or wrote it. */
+  private storeBase = new Map<string, unknown>();
+  /** Values saved on this device that have not reached the shared store yet. */
+  private storePending = new Map<string, { localKey: string; value: unknown }>();
   private storeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   /** Shared by everything that starts up at once, so the cloud copy is read only once. */
   private inflightPull: Promise<boolean> | null = null;
@@ -145,6 +149,7 @@ export class LocalCaseProvider implements DocumentProvider {
 
   /** Send queued changes to the shared store; anything that fails is retried later. */
   async flush() {
+    await Promise.all([...this.storePending.keys()].map((key) => this.pushStoreNow(key)));
     if (!this.pendingIds.size && !this.pendingDeletes.size) return;
     const ids = [...this.pendingIds];
     const deletedIds = [...this.pendingDeletes];
@@ -219,7 +224,12 @@ export class LocalCaseProvider implements DocumentProvider {
     for (const id of local.keys()) if (!seen.has(id)) toPush.push(id);
     this.items = [...local.values()];
     this.persistItems();
-    for (const s of remote.store) this.storeCache.set(s.key, s.data);
+    for (const s of remote.store) {
+      // A change still waiting to be sent must not be replaced by the older shared copy.
+      if (this.storePending.has(s.key)) continue;
+      this.storeBase.set(s.key, s.data);
+      this.storeCache.set(s.key, s.data);
+    }
     if (toPush.length) this.queue(toPush);
     return true;
   }
@@ -242,16 +252,50 @@ export class LocalCaseProvider implements DocumentProvider {
     writeJson(localKey, value);
     this.storeCache.set(key, value);
     if (typeof window === "undefined") return;
+    this.storePending.set(key, { localKey, value });
+    this.scheduleStorePush(key, 800);
+  }
+
+  private scheduleStorePush(key: string, delay: number) {
     const prev = this.storeTimers.get(key);
     if (prev) clearTimeout(prev);
     this.storeTimers.set(
       key,
-      setTimeout(() => {
-        void import("@/lib/case-sync.functions")
-          .then(({ pushStore }) => pushStore({ data: { key, data: value as never } }))
-          .catch((error) => console.error(`Shared save failed for ${key}`, error));
-      }, 800),
+      setTimeout(() => void this.pushStoreNow(key), delay),
     );
+  }
+
+  /** Merge this device's change into the shared copy now. Retries on failure. */
+  private async pushStoreNow(key: string) {
+    const pending = this.storePending.get(key);
+    if (!pending) return;
+    const timer = this.storeTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.storeTimers.delete(key);
+    this.storePending.delete(key);
+    try {
+      const { pushStore } = await import("@/lib/case-sync.functions");
+      const result = await pushStore({
+        data: {
+          key,
+          data: pending.value as never,
+          base: this.storeBase.get(key) as never,
+          merge: true,
+        },
+      });
+      const merged = JSON.parse(result.json) as unknown;
+      // The app on this device still shows what it sent, so that stays the base for
+      // its next change; the merged copy reaches the screen on the next refresh.
+      this.storeBase.set(key, pending.value);
+      if (!this.storePending.has(key)) {
+        this.storeCache.set(key, merged);
+        writeJson(pending.localKey, merged);
+      }
+    } catch (error) {
+      console.error(`Shared save failed for ${key}; will retry`, error);
+      if (!this.storePending.has(key)) this.storePending.set(key, pending);
+      this.scheduleStorePush(key, 15_000);
+    }
   }
 
   private loadConnection(): ProviderConnection {
@@ -348,6 +392,15 @@ export class LocalCaseProvider implements DocumentProvider {
     this.persistItems();
     this.queue(updated.map((i) => i.id));
     return updated;
+  }
+
+  /** Persist whole replacement copies of items that were changed together. */
+  async putMany(changed: EvidenceItem[]) {
+    const byId = new Map(changed.map((item) => [item.id, item]));
+    this.items = this.loadItems().map((item) => byId.get(item.id) ?? item);
+    this.persistItems();
+    this.queue(changed.map((item) => item.id));
+    return changed;
   }
 
   async remove(ids: string[]) {

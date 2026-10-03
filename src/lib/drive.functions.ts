@@ -17,7 +17,7 @@ const GATEWAY = "https://connector-gateway.lovable.dev/google_drive";
 async function ensureFolder(headers: HeadersInit, path: string): Promise<string> {
   let parent = "root";
   for (const name of path.split("/").filter(Boolean)) {
-    const q = `name = '${name.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and '${parent}' in parents`;
+    const q = `name = '${name.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and '${parent}' in parents`;
     const res = await fetch(
       `${GATEWAY}/drive/v3/files?${new URLSearchParams({ q, fields: "files(id)" })}`,
       { headers },

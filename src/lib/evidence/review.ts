@@ -8,6 +8,7 @@ import {
   type DiaryImport,
   type HardshipEvent,
 } from "./types";
+import { todayLocal } from "./format";
 
 export type GapKind =
   | "event-no-evidence"
@@ -82,7 +83,7 @@ export function detectGaps(
   categories: Category[],
 ): CaseGap[] {
   const gaps: CaseGap[] = [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const openTaskTitles = tasks
     .filter((t) => taskStatus(t) !== "Complete")
     .map((t) => t.title.toLowerCase());
