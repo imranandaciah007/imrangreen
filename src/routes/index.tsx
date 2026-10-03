@@ -220,10 +220,7 @@ function CaseApp() {
 
 
             {tab === "timeline" && (
-              <TimelineView
-                onAddEvent={() => setEventOpen(true)}
-                onAddTask={() => setTaskOpen(true)}
-              />
+              <TimelineView onAddEvent={() => setEventOpen(true)} />
             )}
 
             {tab === "finances" && <FinancesView onAddExpense={() => setExpenseOpen(true)} />}

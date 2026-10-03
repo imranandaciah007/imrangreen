@@ -2,7 +2,6 @@ import { formatDate, formatDateTime } from "./format";
 import type { CaseGap } from "./review";
 import {
   CASE_SETTINGS,
-  DEFAULT_CATEGORIES,
   READY_STATUSES,
   taskStatus,
   type CaseTask,
@@ -85,8 +84,6 @@ export function preflightAudit(
 }
 
 /* ---------------------------- exhibit numbering ---------------------------- */
-
-export const PACKET_SECTIONS = DEFAULT_CATEGORIES;
 
 function sectionLetter(index: number) {
   return String.fromCharCode(65 + index);

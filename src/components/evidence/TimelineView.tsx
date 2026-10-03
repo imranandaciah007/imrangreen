@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarPlus, CheckSquare, Flag, Square, Trash2 } from "lucide-react";
+import { CalendarPlus, Flag, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { EvidencePicker, LinkedEvidenceChips } from "@/components/evidence/EvidencePicker";
@@ -16,20 +16,12 @@ function monthsBetween(fromIso: string, to: Date) {
   return { days: Math.max(0, days), months: Math.max(0, Math.floor(days / 30.44)) };
 }
 
-export function TimelineView({
-  onAddEvent,
-  onAddTask,
-}: {
-  onAddEvent: () => void;
-  onAddTask: () => void;
-}) {
+export function TimelineView({ onAddEvent }: { onAddEvent: () => void }) {
   const {
     events,
     updateEvent,
     deleteEvent,
     tasks,
-    toggleTask,
-    deleteTask,
     caseSettings,
     categories,
     finances,
@@ -216,62 +208,6 @@ export function TimelineView({
           <p className="px-3 py-6 text-center text-xs text-muted-foreground">
             No events in this view yet.
           </p>
-        )}
-      </section>
-
-      <section className="rounded-xl border border-border bg-card shadow-panel">
-        <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
-          <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-            Follow-ups
-          </h2>
-          <Button size="sm" variant="outline" className="h-9" onClick={onAddTask}>
-            <CheckSquare className="size-4" /> Add task
-          </Button>
-        </header>
-        {tasks.length === 0 ? (
-          <p className="px-3 py-8 text-center text-xs text-muted-foreground">No tasks yet.</p>
-        ) : (
-          <ul className="divide-y divide-border/70">
-            {tasks.map((t) => (
-              <li key={t.id} className="flex items-center gap-2 px-3 py-2.5">
-                <button
-                  onClick={() => toggleTask(t.id)}
-                  aria-label={t.done ? "Mark as not done" : "Mark as done"}
-                  className="flex size-9 shrink-0 items-center justify-center text-muted-foreground"
-                >
-                  {t.done ? (
-                    <CheckSquare className="size-5 text-success" />
-                  ) : (
-                    <Square className="size-5" />
-                  )}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={cn(
-                      "truncate text-sm text-foreground",
-                      t.done && "text-muted-foreground line-through",
-                    )}
-                  >
-                    {t.title}
-                  </p>
-                  <p className="font-mono text-[10px] text-muted-foreground">
-                    {t.assignedTo}
-                    {t.dueDate ? ` · due ${formatDate(t.dueDate)}` : ""}
-                    {t.category ? ` · ${t.category}` : ""}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 shrink-0 text-destructive"
-                  aria-label="Delete task"
-                  onClick={() => deleteTask(t.id)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </li>
-            ))}
-          </ul>
         )}
       </section>
 
