@@ -8,6 +8,11 @@
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODEL = process.env["OPENAI_READ_MODEL"] || "gpt-4.1-mini";
+/** Free first-choice readers: OpenRouter, then Pollinations, before Gemini/ChatGPT. */
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODEL = process.env["OPENROUTER_MODEL"] || "google/gemini-2.0-flash-exp:free";
+const POLLINATIONS_URL = "https://text.pollinations.ai/openai";
+const POLLINATIONS_MODEL = process.env["POLLINATIONS_MODEL"] || "openai";
 /** Everyday reading (interactive uploads, diary, questions). */
 const GEMINI_MODEL = "gemini-3.6-flash";
 /** Bulk background reading of hundreds of Drive files — cheapest capable model. */
@@ -197,6 +202,51 @@ async function runOpenAi(req: JsonModelRequest, key: string) {
   };
 }
 
+/** OpenAI-compatible free readers (OpenRouter, Pollinations) share this shape. */
+async function runOpenAiCompatible(
+  req: JsonModelRequest,
+  key: string,
+  url: string,
+  model: string,
+  label: string,
+) {
+  const content: Record<string, unknown>[] = [{ type: "text", text: req.prompt }];
+  if (req.file?.base64 && req.file.mimeType.startsWith("image/")) {
+    content.push({
+      type: "image_url",
+      image_url: { url: `data:${req.file.mimeType};base64,${req.file.base64}` },
+    });
+  } else if (req.file?.base64) {
+    content.push({
+      type: "file",
+      file: {
+        filename: req.file.fileName,
+        file_data: `data:${req.file.mimeType};base64,${req.file.base64}`,
+      },
+    });
+  }
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content }],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${label} request failed [${res.status}]: ${body.slice(0, 400)}`);
+  }
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+    usage?: { total_tokens?: number };
+  };
+  const text = data.choices?.[0]?.message?.content ?? "";
+  if (!text.trim()) throw new Error(`${label} returned an empty response.`);
+  return { value: JSON.parse(text) as Record<string, unknown>, tokens: data.usage?.total_tokens ?? null };
+}
+
 /**
  * Gemini keys in the order they are tried: the second key first, then the
  * original one. Whichever still has allowance answers.
@@ -210,14 +260,21 @@ function geminiKeys(): { label: string; key: string }[] {
   return out;
 }
 
-/** Which reader answered — useful for audit trails. */
+/** Which reader answers first — useful for audit trails. */
 export function jsonModelName(tier: "bulk" | "standard" = "standard") {
+  if (process.env["OPENROUTER_API_KEY"]) return `openrouter/${OPENROUTER_MODEL}`;
+  if (process.env["POLLINATIONS_API_KEY"]) return `pollinations/${POLLINATIONS_MODEL}`;
   if (!geminiKeys().length) return `openai/${OPENAI_MODEL}`;
   return `google/${tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL}`;
 }
 
+/** True when any reader key exists (OpenRouter, Pollinations, or Gemini). */
 export function geminiConfigured() {
-  return geminiKeys().length > 0;
+  return (
+    geminiKeys().length > 0 ||
+    Boolean(process.env["OPENROUTER_API_KEY"]) ||
+    Boolean(process.env["POLLINATIONS_API_KEY"])
+  );
 }
 
 
@@ -313,12 +370,62 @@ function modelLadder(tier: "bulk" | "standard" | undefined) {
   return ladder.filter((m, i) => ladder.indexOf(m) === i);
 }
 
+/**
+ * Free first-choice readers, tried before Gemini: OpenRouter, then Pollinations.
+ * Pollinations is text-only, so it is skipped when a file is attached.
+ */
+async function runFreeReaders(req: JsonModelRequest): Promise<Record<string, unknown> | null> {
+  const candidates: { label: string; key: string | undefined; url: string; model: string; files: boolean }[] = [
+    {
+      label: "openrouter",
+      key: process.env["OPENROUTER_API_KEY"],
+      url: OPENROUTER_URL,
+      model: OPENROUTER_MODEL,
+      files: true,
+    },
+    {
+      label: "pollinations",
+      key: process.env["POLLINATIONS_API_KEY"],
+      url: POLLINATIONS_URL,
+      model: POLLINATIONS_MODEL,
+      files: false,
+    },
+  ];
+  const jsonReq = { ...req, prompt: `${req.prompt}\n\nAnswer with JSON only.` };
+  for (const c of candidates) {
+    if (!c.key) continue;
+    if (!c.files && req.file?.base64) continue;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const out = await runOpenAiCompatible(jsonReq, c.key, c.url, c.model, c.label);
+        await logAiUsage({ provider: c.label, model: c.model, purpose: req.name, ok: true, tokens: out.tokens });
+        return out.value;
+      } catch (err) {
+        await logAiUsage({
+          provider: c.label,
+          model: c.model,
+          purpose: req.name,
+          ok: false,
+          statusCode: statusFrom(err),
+          error: err instanceof Error ? err.message : String(err),
+        });
+        if (outOfAllowance(err) || !retryable(err) || attempt === 2) break;
+        await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
+      }
+    }
+  }
+  return null;
+}
+
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const keys = geminiKeys();
   const openAiKey = process.env["OPENAI_API_KEY"];
   const allowFallback = req.allowFallback !== false;
   const ladder = modelLadder(req.tier);
   let lastErr: unknown = null;
+
+  const free = await runFreeReaders(req);
+  if (free) return free;
 
   for (const { label, key } of keys) {
     for (const geminiModel of ladder) {
