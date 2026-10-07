@@ -8,6 +8,11 @@
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODEL = process.env["OPENAI_READ_MODEL"] || "gpt-4.1-mini";
+/** Free first-choice readers: OpenRouter, then Pollinations, before Gemini/ChatGPT. */
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODEL = process.env["OPENROUTER_MODEL"] || "google/gemini-2.0-flash-exp:free";
+const POLLINATIONS_URL = "https://text.pollinations.ai/openai";
+const POLLINATIONS_MODEL = process.env["POLLINATIONS_MODEL"] || "openai";
 /** Everyday reading (interactive uploads, diary, questions). */
 const GEMINI_MODEL = "gemini-3.6-flash";
 /** Bulk background reading of hundreds of Drive files — cheapest capable model. */
