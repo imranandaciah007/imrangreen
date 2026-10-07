@@ -375,7 +375,7 @@ function modelLadder(tier: "bulk" | "standard" | undefined) {
  * Pollinations is text-only, so it is skipped when a file is attached.
  */
 async function runFreeReaders(req: JsonModelRequest): Promise<Record<string, unknown> | null> {
-  const candidates: { label: string; key?: string; url: string; model: string; files: boolean }[] = [
+  const candidates: { label: string; key: string | undefined; url: string; model: string; files: boolean }[] = [
     {
       label: "openrouter",
       key: process.env["OPENROUTER_API_KEY"],
