@@ -273,7 +273,8 @@ export function geminiConfigured() {
   return (
     geminiKeys().length > 0 ||
     Boolean(process.env["OPENROUTER_API_KEY"]) ||
-    Boolean(process.env["POLLINATIONS_API_KEY"])
+    Boolean(process.env["POLLINATIONS_API_KEY"]) ||
+    Boolean(process.env["GROQ_API_KEY"])
   );
 }
 
@@ -388,6 +389,13 @@ async function runFreeReaders(req: JsonModelRequest): Promise<Record<string, unk
       key: process.env["POLLINATIONS_API_KEY"],
       url: POLLINATIONS_URL,
       model: POLLINATIONS_MODEL,
+      files: false,
+    },
+    {
+      label: "groq",
+      key: process.env["GROQ_API_KEY"],
+      url: "https://api.groq.com/openai/v1/chat/completions",
+      model: process.env["GROQ_MODEL"] || "openai/gpt-oss-120b",
       files: false,
     },
   ];
