@@ -202,6 +202,51 @@ async function runOpenAi(req: JsonModelRequest, key: string) {
   };
 }
 
+/** OpenAI-compatible free readers (OpenRouter, Pollinations) share this shape. */
+async function runOpenAiCompatible(
+  req: JsonModelRequest,
+  key: string,
+  url: string,
+  model: string,
+  label: string,
+) {
+  const content: Record<string, unknown>[] = [{ type: "text", text: req.prompt }];
+  if (req.file?.base64 && req.file.mimeType.startsWith("image/")) {
+    content.push({
+      type: "image_url",
+      image_url: { url: `data:${req.file.mimeType};base64,${req.file.base64}` },
+    });
+  } else if (req.file?.base64) {
+    content.push({
+      type: "file",
+      file: {
+        filename: req.file.fileName,
+        file_data: `data:${req.file.mimeType};base64,${req.file.base64}`,
+      },
+    });
+  }
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content }],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${label} request failed [${res.status}]: ${body.slice(0, 400)}`);
+  }
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+    usage?: { total_tokens?: number };
+  };
+  const text = data.choices?.[0]?.message?.content ?? "";
+  if (!text.trim()) throw new Error(`${label} returned an empty response.`);
+  return { value: JSON.parse(text) as Record<string, unknown>, tokens: data.usage?.total_tokens ?? null };
+}
+
 /**
  * Gemini keys in the order they are tried: the second key first, then the
  * original one. Whichever still has allowance answers.
