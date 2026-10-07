@@ -363,12 +363,62 @@ function modelLadder(tier: "bulk" | "standard" | undefined) {
   return ladder.filter((m, i) => ladder.indexOf(m) === i);
 }
 
+/**
+ * Free first-choice readers, tried before Gemini: OpenRouter, then Pollinations.
+ * Pollinations is text-only, so it is skipped when a file is attached.
+ */
+async function runFreeReaders(req: JsonModelRequest): Promise<Record<string, unknown> | null> {
+  const candidates: { label: string; key?: string; url: string; model: string; files: boolean }[] = [
+    {
+      label: "openrouter",
+      key: process.env["OPENROUTER_API_KEY"],
+      url: OPENROUTER_URL,
+      model: OPENROUTER_MODEL,
+      files: true,
+    },
+    {
+      label: "pollinations",
+      key: process.env["POLLINATIONS_API_KEY"],
+      url: POLLINATIONS_URL,
+      model: POLLINATIONS_MODEL,
+      files: false,
+    },
+  ];
+  const jsonReq = { ...req, prompt: `${req.prompt}\n\nAnswer with JSON only.` };
+  for (const c of candidates) {
+    if (!c.key) continue;
+    if (!c.files && req.file?.base64) continue;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const out = await runOpenAiCompatible(jsonReq, c.key, c.url, c.model, c.label);
+        await logAiUsage({ provider: c.label, model: c.model, purpose: req.name, ok: true, tokens: out.tokens });
+        return out.value;
+      } catch (err) {
+        await logAiUsage({
+          provider: c.label,
+          model: c.model,
+          purpose: req.name,
+          ok: false,
+          statusCode: statusFrom(err),
+          error: err instanceof Error ? err.message : String(err),
+        });
+        if (outOfAllowance(err) || !retryable(err) || attempt === 2) break;
+        await sleep(1200 * (attempt + 1) + Math.floor(Math.random() * 400));
+      }
+    }
+  }
+  return null;
+}
+
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
   const keys = geminiKeys();
   const openAiKey = process.env["OPENAI_API_KEY"];
   const allowFallback = req.allowFallback !== false;
   const ladder = modelLadder(req.tier);
   let lastErr: unknown = null;
+
+  const free = await runFreeReaders(req);
+  if (free) return free;
 
   for (const { label, key } of keys) {
     for (const geminiModel of ladder) {
