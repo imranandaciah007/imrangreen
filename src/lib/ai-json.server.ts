@@ -260,14 +260,21 @@ function geminiKeys(): { label: string; key: string }[] {
   return out;
 }
 
-/** Which reader answered — useful for audit trails. */
+/** Which reader answers first — useful for audit trails. */
 export function jsonModelName(tier: "bulk" | "standard" = "standard") {
+  if (process.env["OPENROUTER_API_KEY"]) return `openrouter/${OPENROUTER_MODEL}`;
+  if (process.env["POLLINATIONS_API_KEY"]) return `pollinations/${POLLINATIONS_MODEL}`;
   if (!geminiKeys().length) return `openai/${OPENAI_MODEL}`;
   return `google/${tier === "bulk" ? GEMINI_BULK_MODEL : GEMINI_MODEL}`;
 }
 
+/** True when any reader key exists (OpenRouter, Pollinations, or Gemini). */
 export function geminiConfigured() {
-  return geminiKeys().length > 0;
+  return (
+    geminiKeys().length > 0 ||
+    Boolean(process.env["OPENROUTER_API_KEY"]) ||
+    Boolean(process.env["POLLINATIONS_API_KEY"])
+  );
 }
 
 
