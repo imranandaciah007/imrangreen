@@ -3,8 +3,16 @@
  *
  * Reading is done with the case owner's own Gemini key (GEMINI_API_KEY). If Gemini is
  * unavailable or fails, the case owner's own OpenAI key (OPENAI_API_KEY) is used as the
- * backup. No other AI service is ever used for reading or writing case material.
+ * backup. Final-packet writing (cover letter, exhibit index wording, waiver analysis)
+ * asks for `writer: "claude"` and is written by Claude with the case owner's own
+ * Anthropic key (ANTHROPIC_API_KEY); without that key, or if Claude fails, it falls
+ * back to the readers above.
  */
+
+import Anthropic from "@anthropic-ai/sdk";
+
+/** Final-packet writer. */
+const CLAUDE_MODEL = "claude-opus-5-5";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODEL = process.env["OPENAI_READ_MODEL"] || "gpt-4.1-mini";
@@ -53,6 +61,79 @@ export interface JsonModelRequest {
    * (background reading of hundreds of files).
    */
   allowGapFill?: boolean;
+  /** "claude" asks Claude to write this (final packet wording). */
+  writer?: "claude";
+}
+
+/** Key under which runJsonModel records which model actually wrote the answer. */
+export const WRITTEN_BY = "__writtenBy";
+
+/** The model that wrote a runJsonModel answer, for audit trails. */
+export function writtenBy(value: Record<string, unknown>, fallback: string): string {
+  const v = value[WRITTEN_BY];
+  return typeof v === "string" && v ? v : fallback;
+}
+
+export function claudeConfigured() {
+  return Boolean(process.env["ANTHROPIC_API_KEY"]);
+}
+
+/**
+ * Claude's structured output accepts a subset of JSON Schema: every object must
+ * say additionalProperties: false, and numeric/length limits are not allowed.
+ */
+function claudeSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(claudeSchema);
+  if (!node || typeof node !== "object") return node;
+  const drop = new Set(["minimum", "maximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems", "pattern", "$schema", "strict"]);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+    if (drop.has(k)) continue;
+    out[k] =
+      k === "properties" && v && typeof v === "object"
+        ? Object.fromEntries(
+            Object.entries(v as Record<string, unknown>).map(([pk, pv]) => [pk, claudeSchema(pv)]),
+          )
+        : claudeSchema(v);
+  }
+  if (out["type"] === "object") out["additionalProperties"] = false;
+  return out;
+}
+
+async function runClaude(req: JsonModelRequest, apiKey: string) {
+  const client = new Anthropic({ apiKey });
+  // Streamed because packet wording can be long; finalMessage() collects it.
+  const stream = client.beta.messages.stream({
+    model: CLAUDE_MODEL,
+    max_tokens: 64000,
+    thinking: { type: "adaptive" },
+    output_config: {
+      effort: "high",
+      format: { type: "json_schema", schema: claudeSchema(req.schema) as Record<string, unknown> },
+    },
+    // If a safety check declines the request, the API retries on a fallback model.
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    messages: [{ role: "user", content: req.prompt }],
+  });
+  const message = await stream.finalMessage();
+  if (message.stop_reason === "refusal") {
+    throw new Error("Claude declined to write this section.");
+  }
+  if (message.stop_reason === "max_tokens") {
+    throw new Error("Claude's answer was too long and was cut off.");
+  }
+  let text = "";
+  for (const block of message.content) {
+    if (block.type === "text") text += block.text;
+  }
+  if (!text.trim()) throw new Error("Claude returned an empty response.");
+  const usage = message.usage;
+  return {
+    value: JSON.parse(text) as Record<string, unknown>,
+    tokens: (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
+    model: message.model,
+  };
 }
 
 /** Empty string, empty list, or nothing at all. */
@@ -314,6 +395,30 @@ function modelLadder(tier: "bulk" | "standard" | undefined) {
 }
 
 export async function runJsonModel(req: JsonModelRequest): Promise<Record<string, unknown>> {
+  const anthropicKey = process.env["ANTHROPIC_API_KEY"];
+  if (req.writer === "claude" && anthropicKey) {
+    try {
+      const out = await runClaude(req, anthropicKey);
+      await logAiUsage({
+        provider: "claude",
+        model: out.model,
+        purpose: req.name,
+        ok: true,
+        tokens: out.tokens,
+      });
+      return { ...out.value, [WRITTEN_BY]: `anthropic/${out.model}` };
+    } catch (err) {
+      await logAiUsage({
+        provider: "claude",
+        model: CLAUDE_MODEL,
+        purpose: req.name,
+        ok: false,
+        statusCode: err instanceof Anthropic.APIError ? (err.status ?? null) : statusFrom(err),
+        error: err instanceof Error ? err.message : String(err),
+      });
+      console.error("Claude could not write this; falling back to the usual readers:", err);
+    }
+  }
   const keys = geminiKeys();
   const openAiKey = process.env["OPENAI_API_KEY"];
   const allowFallback = req.allowFallback !== false;
@@ -333,7 +438,7 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
             ok: true,
             tokens: out.tokens,
           });
-          return await topUp(req, out.value, key, label);
+          return { ...(await topUp(req, out.value, key, label)), [WRITTEN_BY]: `google/${out.model}` };
         } catch (err) {
           lastErr = err;
           await logAiUsage({
@@ -384,7 +489,7 @@ export async function runJsonModel(req: JsonModelRequest): Promise<Record<string
       ok: true,
       tokens: out.tokens,
     });
-    return out.value;
+    return { ...out.value, [WRITTEN_BY]: `openai/${OPENAI_MODEL}` };
   } catch (err) {
     await logAiUsage({
       provider: "openai",

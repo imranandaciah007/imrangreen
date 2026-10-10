@@ -63,7 +63,7 @@ export const draftFilingLanguage = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }): Promise<FilingLanguage> => {
-    const { runJsonModel, jsonModelName } = await import("@/lib/ai-json.server");
+    const { runJsonModel, jsonModelName, writtenBy } = await import("@/lib/ai-json.server");
     const exhibitLines = data.exhibits
       .slice(0, 400)
       .map(
@@ -96,6 +96,7 @@ Absolute rules: state only what the listed records show; never invent a document
       prompt,
       schema: SCHEMA,
       name: "filing_language",
+      writer: "claude",
       tier: "standard",
       requiredFields: ["coverLetter", "exhibitNotes"],
       allowGapFill: true,
@@ -115,7 +116,7 @@ Absolute rules: state only what the listed records show; never invent a document
     return {
       coverLetter,
       exhibitNotes,
-      model: jsonModelName("standard"),
+      model: writtenBy(value, jsonModelName("standard")),
       generatedAt: new Date().toISOString(),
     };
   });

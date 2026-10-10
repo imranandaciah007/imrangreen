@@ -14,6 +14,12 @@ export interface AiUsageSummary {
   /** True when the newest Gemini failure looks like an exhausted quota/credit. */
   outOfCredit: boolean;
   lastCallAt: string | null;
+  /** Claude writes the final packet when the Anthropic key is set. */
+  claudeConfigured: boolean;
+  /** Packet sections Claude wrote in the last 30 days. */
+  claudeMonth: number;
+  /** Latest Claude failure that has not been followed by a success. */
+  claudeLastError: string | null;
 }
 
 export const getAiUsage = createServerFn({ method: "GET" }).handler(
@@ -28,6 +34,9 @@ export const getAiUsage = createServerFn({ method: "GET" }).handler(
       lastErrorAt: null,
       outOfCredit: false,
       lastCallAt: null,
+      claudeConfigured: Boolean(process.env["ANTHROPIC_API_KEY"]),
+      claudeMonth: 0,
+      claudeLastError: null,
     };
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -48,6 +57,9 @@ export const getAiUsage = createServerFn({ method: "GET" }).handler(
       let lastError: string | null = null;
       let lastErrorAt: string | null = null;
       let lastOkAt: number | null = null;
+      let claudeMonth = 0;
+      let claudeLastError: string | null = null;
+      let claudeSeenOk = false;
       for (const row of data as {
         created_at: string;
         provider: string;
@@ -66,6 +78,14 @@ export const getAiUsage = createServerFn({ method: "GET" }).handler(
           } else if (!lastError) {
             lastError = row.error;
             lastErrorAt = row.created_at;
+          }
+        } else if (row.provider === "claude") {
+          // Rows are newest first: an error only counts if no later success.
+          if (row.ok) {
+            claudeMonth += 1;
+            claudeSeenOk = true;
+          } else if (!claudeSeenOk && !claudeLastError) {
+            claudeLastError = row.error;
           }
         } else if ((row.provider === "openai" || row.provider === "lovable") && row.ok) {
           fallbackMonth += 1;
@@ -90,6 +110,8 @@ export const getAiUsage = createServerFn({ method: "GET" }).handler(
         lastErrorAt,
         outOfCredit,
         lastCallAt: (data[0] as { created_at?: string } | undefined)?.created_at ?? null,
+        claudeMonth,
+        claudeLastError,
       };
     } catch {
       return empty;

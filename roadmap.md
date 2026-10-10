@@ -93,3 +93,9 @@
 - [x] Background builder keeps the old clone until the rebuilt one exists, reads all job rows, and failed documents are counted as failed
 - [x] A clone recorded for a different original is never adopted by exhibit number
 
+## Claude writes the final packet (Oct 10)
+- [x] Cover letter, exhibit index wording and waiver analysis are written by Claude (Opus 5.5) when ANTHROPIC_API_KEY is set; Gemini takes over if Claude is unavailable
+- [x] Each packet records which model actually wrote it
+- [x] AI usage panel shows whether Claude is connected and how many packet sections it wrote
+- [ ] Add ANTHROPIC_API_KEY in the project secrets
+
