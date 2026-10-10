@@ -164,12 +164,13 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         status: string;
         duplicate_of: string | null;
         source_modified_at: string | null;
+        clone_file_id: string | null;
       };
       const known: KnownRow[] = [];
       for (let from = 0; from < 50_000; from += 1000) {
         const { data: page, error: pageError } = await supabaseAdmin
           .from("gc_clone_jobs")
-          .select("drive_file_id,content_key,status,duplicate_of,source_modified_at")
+          .select("drive_file_id,content_key,status,duplicate_of,source_modified_at,clone_file_id")
           .order("drive_file_id")
           .range(from, from + 999);
         if (pageError) throw new Error(pageError.message);
@@ -292,15 +293,40 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         queued += slice.length;
       }
 
-      // Drop queue rows whose Drive original no longer exists.
-      const stale = (known ?? [])
-        .map((row) => row.drive_file_id)
-        .filter((id) => !liveIds.has(id));
-      for (let index = 0; index < stale.length; index += 200) {
-        await supabaseAdmin
-          .from("gc_clone_jobs")
-          .delete()
-          .in("drive_file_id", stale.slice(index, index + 200));
+      // The Drive original was deleted: bin its clone, then drop the queue row.
+      // Safety: if Drive suddenly reports most originals missing (a bad
+      // listing), skip cleanup this pass rather than binning every clone.
+      const staleRows = (known ?? []).filter((row) => !liveIds.has(row.drive_file_id));
+      const knownCount = (known ?? []).length;
+      const suspicious =
+        originals.length === 0 || (knownCount >= 20 && staleRows.length > knownCount * 0.5);
+      if (suspicious && staleRows.length) {
+        console.warn(
+          `Skipped clone cleanup: ${staleRows.length} of ${knownCount} originals look missing.`,
+        );
+      } else {
+        const cleared: string[] = [];
+        for (const row of staleRows) {
+          if (row.clone_file_id) {
+            try {
+              await drive.trashNode(row.clone_file_id);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              // Already gone from Drive counts as cleaned up; otherwise retry next pass.
+              if (!/404|notFound|not found/i.test(message)) {
+                console.error(`Could not bin the clone ${row.clone_file_id}:`, error);
+                continue;
+              }
+            }
+          }
+          cleared.push(row.drive_file_id);
+        }
+        for (let index = 0; index < cleared.length; index += 200) {
+          await supabaseAdmin
+            .from("gc_clone_jobs")
+            .delete()
+            .in("drive_file_id", cleared.slice(index, index + 200));
+        }
       }
 
       await supabaseAdmin
