@@ -23,7 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { extractUploadedFile, type ExtractionResult } from "@/lib/ai.functions";
 import { VerificationBadge } from "./VerificationBadge";
 import { generateCloneDocument, uploadEvidenceToFolder } from "@/lib/drive-tree.functions";
-import { formatBytes } from "@/lib/evidence/format";
+import { formatBytes, todayLocal } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import {
   PEOPLE,
@@ -286,7 +286,7 @@ export function UploadDialog({
     setSaving(true);
     try {
       const chosen = cats.length ? cats : [primary];
-      const docDate = dateOfDocument || new Date().toISOString().slice(0, 10);
+      const docDate = dateOfDocument || todayLocal();
       const common = {
         exhibitId: exhibitId.trim() || suggestedExhibit,
         title: title.trim(),

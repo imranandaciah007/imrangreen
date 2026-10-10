@@ -163,6 +163,25 @@ export function AppHeader({
                   <strong>{formatWhen(usage?.lastCallAt ?? null)}</strong>
                 </li>
               </ul>
+              <div className="mt-3 rounded-md border border-border p-2">
+                <p className="font-semibold">Final packet writer: Claude</p>
+                {usage?.claudeConfigured ? (
+                  <p className="mt-0.5 text-muted-foreground">
+                    Connected. Packet sections written in 30 days:{" "}
+                    <strong className="tabular-nums text-foreground">{usage.claudeMonth}</strong>
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-muted-foreground">
+                    Not connected yet. Add your Anthropic key as ANTHROPIC_API_KEY in the
+                    project secrets. Until then Gemini writes the packet.
+                  </p>
+                )}
+                {usage?.claudeLastError ? (
+                  <p className="mt-1 text-[11px] font-semibold text-destructive">
+                    Last Claude problem: {usage.claudeLastError}. Gemini wrote that section instead.
+                  </p>
+                ) : null}
+              </div>
               {usage?.lastError ? (
                 <p className="mt-3 rounded-md bg-destructive/10 p-2 text-[11px] font-semibold text-destructive">
                   Last Gemini problem ({formatWhen(usage.lastErrorAt)}): {usage.lastError}

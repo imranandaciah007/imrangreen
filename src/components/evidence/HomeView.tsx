@@ -18,10 +18,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getBackgroundStatus } from "@/lib/jobs/background.functions";
-import { formatDate } from "@/lib/evidence/format";
+import { formatDate, parseDay } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { CaseProgressPanel } from "@/components/evidence/CaseProgressPanel";
 import { isOpenTask } from "@/lib/task-reminders";
+
+function greeting() {
+  const hour = new Date().getHours();
+  return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+}
 
 function Metric({
   label,
@@ -145,7 +150,7 @@ export function HomeView({
       <section className="case-hero">
         <div className="case-hero-copy">
           <span className="case-kicker">CASE OVERVIEW</span>
-          <h2>Good morning, Imran &amp; Aciah</h2>
+          <h2>{greeting()}, Imran &amp; Aciah</h2>
           <p>
              {attentionRecords} record{attentionRecords === 1 ? "" : "s"} need supporting evidence or important details.
           </p>
@@ -235,7 +240,7 @@ export function HomeView({
           <div className="case-timeline-list">
             {recentEvents.length ? recentEvents.map((event) => (
               <button key={event.id} onClick={() => onNavigate("timeline")} className="case-timeline-row">
-                <span className="case-date-box"><strong>{new Date(event.date).getDate() || "—"}</strong><small>{new Date(event.date).toLocaleString("en", { month: "short" }).toUpperCase()}</small></span>
+                <span className="case-date-box"><strong>{parseDay(event.date).getDate() || "—"}</strong><small>{parseDay(event.date).toLocaleString("en", { month: "short" }).toUpperCase()}</small></span>
                 <span className="min-w-0 text-left"><strong>{event.title}</strong><small>{event.category}</small></span>
               </button>
             )) : <div className="case-empty"><Clock3 /> No events recorded yet.</div>}

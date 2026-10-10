@@ -156,9 +156,27 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
           supportedFile(file.name, file.mimeType),
       );
 
-      const { data: known } = await supabaseAdmin
-        .from("gc_clone_jobs")
-        .select("drive_file_id,content_key,status,duplicate_of,source_modified_at,clone_file_id");
+      // Read every row: one request stops at 1,000, and a row missed here would be
+      // treated as new and its finished clone queued for rebuilding.
+      type KnownRow = {
+        drive_file_id: string;
+        content_key: string | null;
+        status: string;
+        duplicate_of: string | null;
+        source_modified_at: string | null;
+        clone_file_id: string | null;
+      };
+      const known: KnownRow[] = [];
+      for (let from = 0; from < 50_000; from += 1000) {
+        const { data: page, error: pageError } = await supabaseAdmin
+          .from("gc_clone_jobs")
+          .select("drive_file_id,content_key,status,duplicate_of,source_modified_at,clone_file_id")
+          .order("drive_file_id")
+          .range(from, from + 999);
+        if (pageError) throw new Error(pageError.message);
+        known.push(...((page ?? []) as KnownRow[]));
+        if ((page ?? []).length < 1000) break;
+      }
       const liveIds = new Set(originals.map((file) => file.id));
 
       // One exhibit per identical document: Drive checksum first, else name + byte size.
@@ -376,16 +394,9 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         return;
       }
       try {
-        // The Drive original was edited since its clone was made: bin the
-        // outdated clone and rebuild from the newest version.
+        // The Drive original was edited since its clone was made: rebuild from the
+        // newest version. The outdated clone is binned only once the new one exists.
         const rebuilding = Boolean(job.needs_rebuild);
-        if (rebuilding && job.clone_file_id) {
-          try {
-            await drive.trashNode(job.clone_file_id);
-          } catch (error) {
-            console.error(`Could not remove the outdated clone ${job.clone_file_id}:`, error);
-          }
-        }
 
         // Never build a second clone of a document already filed as an exhibit.
         if (!rebuilding && job.content_key) {
@@ -509,6 +520,13 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
             updated_at: new Date().toISOString(),
           })
           .eq("drive_file_id", job.drive_file_id);
+        if (rebuilding && job.clone_file_id && job.clone_file_id !== result.id) {
+          try {
+            await drive.trashNode(job.clone_file_id);
+          } catch (error) {
+            console.error(`Could not remove the outdated clone ${job.clone_file_id}:`, error);
+          }
+        }
         cloned += 1;
         pauseReason = null;
       } catch (error) {

@@ -89,6 +89,7 @@ async function fetchDriveBytes(fileId: string) {
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const connectionKey = process.env["GOOGLE_DRIVE_API_KEY"];
   if (!lovableKey || !connectionKey) return null;
+  if (!/^[A-Za-z0-9_-]{6,200}$/.test(fileId)) return null;
   const res = await fetch(`${DRIVE_GATEWAY}/drive/v3/files/${fileId}?alt=media`, {
     headers: {
       Authorization: `Bearer ${lovableKey}`,

@@ -87,7 +87,7 @@ export const draftExplorerFiling = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<ExplorerFiling> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { runJsonModel, jsonModelName } = await import("@/lib/ai-json.server");
+    const { runJsonModel, jsonModelName, writtenBy } = await import("@/lib/ai-json.server");
 
     type Row = {
       drive_file_id: string;
@@ -221,6 +221,7 @@ Absolute rules: state only what the listed records show; never invent a document
 
     let coverLetter: string[] = [];
     let languageSource: "ai" | "records" = "ai";
+    let writer = jsonModelName("standard");
     let notice: string | undefined;
 
     try {
@@ -228,13 +229,16 @@ Absolute rules: state only what the listed records show; never invent a document
         prompt,
         schema: SCHEMA,
         name: "explorer_filing",
+        writer: "claude",
         tier: "standard",
         requiredFields: ["coverLetter", "exhibitNotes"],
         allowGapFill: false,
-        // Gemini only: never spend paid credits on the wording. If Gemini is
-        // out of allowance we fall back to wording built from stored records.
+        // Claude writes this when its key is set. Otherwise Gemini only: never
+        // spend other paid credits on the wording; if Gemini is out of allowance
+        // the wording is built from stored records.
         allowFallback: false,
       });
+      writer = writtenBy(value, writer);
 
       coverLetter = Array.isArray(value["coverLetter"])
         ? (value["coverLetter"] as unknown[]).map((p) => String(p)).filter((p) => p.trim())
@@ -267,7 +271,7 @@ Absolute rules: state only what the listed records show; never invent a document
       exhibits,
       folderLabel,
       totalPages,
-      model: jsonModelName("standard"),
+      model: writer,
       generatedAt: new Date().toISOString(),
       languageSource,
       ...(notice ? { notice } : {}),

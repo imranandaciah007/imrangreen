@@ -255,7 +255,7 @@ export const buildWaiverAnalysis = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }): Promise<WaiverAnalysis> => {
-    const { runJsonModel, jsonModelName } = await import("@/lib/ai-json.server");
+    const { runJsonModel, jsonModelName, writtenBy } = await import("@/lib/ai-json.server");
 
     const exhibitLines = data.exhibits
       .slice(0, 400)
@@ -320,6 +320,7 @@ OUTPUT
       prompt,
       schema: SCHEMA,
       name: "i601_waiver_analysis",
+      writer: "claude",
       tier: "standard",
       requiredFields: ["caseSummary", "sections", "conclusion"],
     });
@@ -411,7 +412,7 @@ OUTPUT
       ),
       unverified: list(value["unverified"]),
       conclusion: list(value["conclusion"]),
-      model: jsonModelName("standard"),
+      model: writtenBy(value, jsonModelName("standard")),
       generatedAt: new Date().toISOString(),
     };
   });

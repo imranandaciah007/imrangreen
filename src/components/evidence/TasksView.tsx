@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatDate, formatDateTime } from "@/lib/evidence/format";
+import { formatDate, formatDateTime, todayLocal } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import { TASK_STATUSES, taskStatus, type CaseTask, type TaskStatus } from "@/lib/evidence/types";
 import {
@@ -29,7 +29,7 @@ const COLUMNS: { status: TaskStatus; icon: typeof ListTodo }[] = [
 
 export function TasksView({ onAddTask }: { onAddTask: () => void }) {
   const { tasks, updateTask, deleteTask, items, events, finances, openInspector } = useEvidence();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const [permission, setPermission] = useState(notificationPermission());
 
   useEffect(() => {

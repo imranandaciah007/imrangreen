@@ -34,6 +34,7 @@ import {
 } from "@/lib/evidence/diary-merge";
 import { useEvidence } from "@/lib/evidence/store";
 import { EXPENSE_CATEGORIES, PEOPLE } from "@/lib/evidence/types";
+import { todayLocal } from "@/lib/evidence/format";
 
 type Phase =
   | "pick"
@@ -246,7 +247,7 @@ export function DiaryImportDialog({
             mimeType: file.type || "application/pdf",
             pageCount: pagesAnalysed,
             status: "Reviewed",
-            dateOfDocument: new Date().toISOString().slice(0, 10),
+            dateOfDocument: todayLocal(),
             tags: ["#PrimaryEvidence"],
             cloudDriveUrl: "",
             notes:

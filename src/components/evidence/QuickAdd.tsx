@@ -55,8 +55,9 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/evidence/types";
+import { todayLocal } from "@/lib/evidence/format";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayLocal();
 
 export function AddSheet({
   open,

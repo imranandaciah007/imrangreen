@@ -81,3 +81,21 @@
 - [x] Keep tasks in one place (Review → Tasks); removed the duplicate list from the Timeline page
 - [x] Label separation costs on Home as an estimate while any payment is still unconfirmed
 - [ ] Remove the unused packages from package.json (needs the lockfile regenerated inside Lovable)
+
+## Bug fixes (Oct 3)
+- [x] Bulk exhibit numbering, bulk tags, category renames and packet numbers now save to the shared case (they were lost on the next refresh)
+- [x] Timeline, payments and tasks merge per entry across devices instead of the last save overwriting everything
+- [x] Unsaved changes are sent the moment the app is closed or switched away from
+- [x] Dates show the correct day on phones outside the UK, and "today" uses the phone's own date
+- [x] Home, Timeline and Finances show the same separation-costs figure
+- [x] AI reads no longer overwrite a confirmed category or demote Ready documents; a failed read restores the old status
+- [x] New Drive imports never reuse an exhibit number; edits made during a sync are kept
+- [x] Background builder keeps the old clone until the rebuilt one exists, reads all job rows, and failed documents are counted as failed
+- [x] A clone recorded for a different original is never adopted by exhibit number
+
+## Claude writes the final packet (Oct 10)
+- [x] Cover letter, exhibit index wording and waiver analysis are written by Claude (Opus 5.5) when ANTHROPIC_API_KEY is set; Gemini takes over if Claude is unavailable
+- [x] Each packet records which model actually wrote it
+- [x] AI usage panel shows whether Claude is connected and how many packet sections it wrote
+- [ ] Add ANTHROPIC_API_KEY in the project secrets
+

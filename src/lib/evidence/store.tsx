@@ -34,6 +34,7 @@ import {
   DEFAULT_CATEGORIES,
   DEFAULT_INCOME,
   EXPENSE_CATEGORIES,
+  financeGroupOf,
   PEOPLE,
   READY_STATUSES,
   SOURCE_TYPES,
@@ -297,6 +298,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
   const [autoSyncNonce, setAutoSyncNonce] = useState(0);
   const hydrated = useRef(false);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const driveSyncInFlight = useRef(false);
 
   useEffect(() => {
@@ -363,13 +366,19 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         busy = false;
       }
     };
+    // Leaving the app (switching apps, locking the phone, closing the tab) sends
+    // anything not yet saved straight away instead of waiting for the next timer.
+    const sendNow = () => void documentProvider.flush();
+    const onVisibility = () => (document.visibilityState === "hidden" ? sendNow() : void refresh());
     const timer = setInterval(() => void refresh(), 30_000);
     window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("pagehide", sendNow);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       clearInterval(timer);
       window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("pagehide", sendNow);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 
@@ -412,6 +421,24 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }, []);
   const clearSelected = useCallback(() => setSelectedIds([]), []);
+
+  /**
+   * Change several items at once and save every changed copy to the shared case,
+   * so the edit survives the next refresh. Returns how many items changed.
+   */
+  const rewriteItems = useCallback((change: (item: EvidenceItem) => EvidenceItem) => {
+    const changed: EvidenceItem[] = [];
+    const next = itemsRef.current.map((item) => {
+      const result = change(item);
+      if (result !== item) changed.push(result);
+      return result;
+    });
+    if (!changed.length) return 0;
+    itemsRef.current = next;
+    setItems(next);
+    void documentProvider.putMany(changed);
+    return changed.length;
+  }, []);
 
   const applyPatch = useCallback(
     (ids: string[], patch: Partial<EvidenceItem>, action: string) => {
@@ -568,26 +595,24 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         toast.error("Select at least one exhibit first");
         return;
       }
-      setItems((prev) => {
-        let n = 0;
-        return prev.map((item) => {
-          if (!selectedIds.includes(item.id)) return item;
-          n += 1;
-          const exhibitId = `Exhibit ${prefix.toUpperCase()}-${n}`;
-          return {
-            ...item,
-            exhibitId,
-            lastEditedBy: profile,
-            updatedAt: nowIso(),
-            auditTrail: [...item.auditTrail, auditEntry(`Re-numbered to ${exhibitId}`)],
-          };
-        });
+      let n = 0;
+      rewriteItems((item) => {
+        if (!selectedIds.includes(item.id)) return item;
+        n += 1;
+        const exhibitId = `Exhibit ${prefix.toUpperCase()}-${n}`;
+        return {
+          ...item,
+          exhibitId,
+          lastEditedBy: profile,
+          updatedAt: nowIso(),
+          auditTrail: [...item.auditTrail, auditEntry(`Re-numbered to ${exhibitId}`)],
+        };
       });
       toast.success(
         `Re-numbered ${selectedIds.length} item(s) under prefix ${prefix.toUpperCase()}`,
       );
     },
-    [auditEntry, profile, selectedIds],
+    [auditEntry, profile, rewriteItems, selectedIds],
   );
 
   const bulkAddTag = useCallback(
@@ -596,22 +621,20 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         toast.error("Select at least one exhibit first");
         return;
       }
-      setItems((prev) =>
-        prev.map((item) =>
-          selectedIds.includes(item.id) && !item.tags.includes(tag)
-            ? {
-                ...item,
-                tags: [...item.tags, tag],
-                lastEditedBy: profile,
-                updatedAt: nowIso(),
-                auditTrail: [...item.auditTrail, auditEntry(`Tagged ${tag}`)],
-              }
-            : item,
-        ),
+      rewriteItems((item) =>
+        selectedIds.includes(item.id) && !item.tags.includes(tag)
+          ? {
+              ...item,
+              tags: [...item.tags, tag],
+              lastEditedBy: profile,
+              updatedAt: nowIso(),
+              auditTrail: [...item.auditTrail, auditEntry(`Tagged ${tag}`)],
+            }
+          : item,
       );
       toast.success(`Tagged ${selectedIds.length} item(s) with ${tag}`);
     },
-    [auditEntry, profile, selectedIds],
+    [auditEntry, profile, rewriteItems, selectedIds],
   );
 
   const deleteItem = useCallback((id: string) => {
@@ -669,19 +692,17 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       if (!clean || clean === from) return;
       setCustomCategories((prev) => [...prev.filter((c) => c !== from), clean]);
       setHiddenCategories((prev) => (prev.includes(from) ? prev : [...prev, from]));
-      setItems((prev) =>
-        prev.map((item) =>
-          item.category === from
-            ? {
-                ...item,
-                category: clean,
-                categories: (item.categories ?? [from]).map((c) => (c === from ? clean : c)),
-                lastEditedBy: profile,
-                updatedAt: nowIso(),
-                auditTrail: [...item.auditTrail, auditEntry(`Category renamed to ${clean}`)],
-              }
-            : item,
-        ),
+      rewriteItems((item) =>
+        item.category === from || item.categories?.includes(from)
+          ? {
+              ...item,
+              category: item.category === from ? clean : item.category,
+              categories: (item.categories ?? [item.category]).map((c) => (c === from ? clean : c)),
+              lastEditedBy: profile,
+              updatedAt: nowIso(),
+              auditTrail: [...item.auditTrail, auditEntry(`Category renamed to ${clean}`)],
+            }
+          : item,
       );
       setFiltersState((prev) => ({
         ...prev,
@@ -689,7 +710,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       }));
       toast.success(`Category renamed to "${clean}"`);
     },
-    [auditEntry, profile],
+    [auditEntry, profile, rewriteItems],
   );
 
   const deleteCategory = useCallback(
@@ -934,6 +955,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       guard("documentDate", "dateOfDocument", a.documentDate);
       guard("people", "people", a.people);
       guard("categories", "categories", a.categories);
+      if (confirmed.includes("categories")) delete patch.category;
       guard("sourceType", "sourceType", a.sourceType);
       guard("pageCount", "pageCount", a.pageCount);
       if (conflicts.length) patch.aiConflicts = conflicts;
@@ -948,10 +970,15 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         passes: result.passes as unknown as Record<string, unknown>[] | undefined,
         verification: result.verification,
       };
+      // A clean read settles new or doubtful items; it never moves a document
+      // someone already marked Ready (or archived, etc.) back down a stage.
+      const unsettled: EvidenceItem["status"][] = ["New", "AI processing", "Needs confirmation"];
       patch.status =
         result.uncertain.length > 0 || conflicts.length > (item.aiConflicts?.length ?? 0)
           ? "Needs confirmation"
-          : "Reviewed";
+          : unsettled.includes(item.status)
+            ? "Reviewed"
+            : item.status;
 
       if (result.summary && !item.notes.trim()) patch.notes = result.summary;
 
@@ -983,7 +1010,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           toast.success("Verified by double scan", { description: item.fileName });
         }
       } catch (error) {
-        applyPatch([id], { status: "Needs confirmation" }, "AI read failed");
+        applyPatch([id], { status: item.status }, "AI read failed");
         toast.error("AI read failed", {
           description: error instanceof Error ? error.message.slice(0, 160) : "Please try again.",
         });
@@ -1010,7 +1037,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         ok += 1;
         if (result.uncertain.length) needs += 1;
       } catch {
-        applyPatch([item.id], { status: "Needs confirmation" }, "AI read failed");
+        applyPatch([item.id], { status: item.status }, "AI read failed");
       } finally {
         setExtractingIds((prev) => prev.filter((x) => x !== item.id));
       }
@@ -1021,8 +1048,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   }, [applyPatch, categories, items, runOne, selectedIds]);
 
   // ---- Deep scan: read every document, then build its detailed clone --------
-  const itemsRef = useRef(items);
-  itemsRef.current = items;
   const scanInFlight = useRef(false);
   const scanCancelled = useRef(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress>({
@@ -1081,7 +1106,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
                 categories.includes(c as Category),
               ) as Category[];
               if (row.ai_title && !confirmed.includes("title")) patch.title = row.ai_title;
-              if (row.ai_date && !confirmed.includes("dateOfDocument"))
+              if (row.ai_date && !confirmed.includes("documentDate"))
                 patch.dateOfDocument = row.ai_date;
               if (row.ai_people?.length && !confirmed.includes("people"))
                 patch.people = row.ai_people;
@@ -1647,7 +1672,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         return true;
       });
       const created: EvidenceItem[] = [];
-      for (const [index, file] of fresh.entries()) {
+      // Continue after the highest D number in use, so a deleted exhibit never
+      // causes two documents to share the same number.
+      let nextDNumber =
+        items.reduce((max, item) => {
+          const match = /^Exhibit D-(\d+)$/i.exec(item.exhibitId.trim());
+          return match ? Math.max(max, Number(match[1])) : max;
+        }, 0) + 1;
+      for (const file of fresh) {
         const classification = classifyDriveFile({
           ...file,
           parentFolders: file.path.split("/").filter(Boolean),
@@ -1662,7 +1694,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           people.length === 0 ||
           people.every((person) => person === "Third party");
         const record = await documentProvider.create({
-          exhibitId: `Exhibit D-${items.length + index + 1}`,
+          exhibitId: `Exhibit D-${nextDNumber++}`,
           fileName: file.name,
           title: titleFromName(file.name),
           category: categories[0] ?? "Other",
@@ -1692,7 +1724,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         created.push(record);
       }
 
-      const statusCorrectedIds = new Set<string>();
       const reconciled = [...updatedItems, ...created].map((item) => {
         if (item.status !== "Needs confirmation") return item;
         const hasUncertainty = (item.aiExtraction?.uncertain.length ?? 0) > 0;
@@ -1705,7 +1736,6 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           !(item.categories ?? []).length ||
           (item.categories ?? []).every((category) => category === "Other");
         if (hasUncertainty || hasConflict || missingImportant) return item;
-        statusCorrectedIds.add(item.id);
         return { ...item, status: "Ready" as EvidenceStatus };
       });
 
@@ -1733,14 +1763,27 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       const duplicateSet = new Set(duplicateIds);
       const deduped = reconciled.filter((item) => !duplicateSet.has(item.id));
 
-      setItems(deduped);
-      await documentProvider.remove([...removedIds, ...duplicateIds]);
-      const finalById = new Map(deduped.map((item) => [item.id, item]));
-      await Promise.all(
+      // Apply only what the sync changed on top of the latest copy, so edits made
+      // while the sync was running are not replaced by the older snapshot.
+      const syncChanged = new Map(
         deduped
-          .filter((item) => updatedItems.some((updatedItem) => updatedItem.id === item.id) || statusCorrectedIds.has(item.id))
-          .map((item) => documentProvider.update(item.id, finalById.get(item.id) ?? item)),
+          .filter((item) => {
+            const before = items.find((original) => original.id === item.id);
+            return before !== undefined && before !== item;
+          })
+          .map((item) => [item.id, item]),
       );
+      const goneIds = new Set([...removedIds, ...duplicateIds]);
+      const keptCreated = created.filter((item) => !goneIds.has(item.id));
+      const latest = itemsRef.current
+        .filter((item) => !goneIds.has(item.id))
+        .map((item) => syncChanged.get(item.id) ?? item);
+      const latestIds = new Set(latest.map((item) => item.id));
+      const merged = [...latest, ...keptCreated.filter((item) => !latestIds.has(item.id))];
+      itemsRef.current = merged;
+      setItems(merged);
+      await documentProvider.remove([...goneIds]);
+      await documentProvider.putMany([...syncChanged.values()]);
       const conn = await documentProvider.connect({ accountLabel: "Google Drive", folderPath: "/My Drive/" });
       setConnection({ ...conn, lastSyncedAt: next.syncedAt });
       return {
@@ -1838,16 +1881,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         generatedBy: profile,
       };
       setPackets((prev) => [...prev, version]);
-      setItems((prev) =>
-        prev.map((item) => {
-          const mapped = record.exhibitMap.find((m) => m.evidenceId === item.id);
-          if (!mapped || item.packetExhibitNo) return item;
-          return { ...item, packetExhibitNo: mapped.number };
-        }),
-      );
+      rewriteItems((item) => {
+        const mapped = record.exhibitMap.find((m) => m.evidenceId === item.id);
+        if (!mapped || item.packetExhibitNo) return item;
+        return { ...item, packetExhibitNo: mapped.number, updatedAt: nowIso() };
+      });
       return version;
     },
-    [packets.length, profile],
+    [packets.length, profile, rewriteItems],
   );
 
   const ignoreGap = useCallback((id: string) => {
@@ -1899,9 +1940,12 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       };
     });
     const since = CASE_SETTINGS.separationStartDate;
-    const sinceSeparation = finances.filter((f) => f.date >= since);
+    // Same rule as "Documented burden" on the Finances page, so both show one figure.
+    const sinceSeparation = finances.filter(
+      (f) => !f.excluded && f.date >= since && financeGroupOf(f) !== "UK fixed obligations",
+    );
     const financialImpact = sinceSeparation.reduce(
-      (sum, f) => sum + (f.currency === "USD" ? f.amount * 0.79 : f.amount),
+      (sum, f) => sum + (f.gbpEquivalent ?? convert(f.amount, f.currency).gbp),
       0,
     );
     const financialUnconfirmed = sinceSeparation.filter((f) => f.status !== "Verified").length;
@@ -1925,7 +1969,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       lastEditedAt: editStamps.length ? editStamps.sort().at(-1)! : null,
       byCategory,
     };
-  }, [items, categories, events, finances, tasks]);
+  }, [items, categories, events, finances, tasks, convert]);
 
   const value: EvidenceContextValue = {
     loading,

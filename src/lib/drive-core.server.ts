@@ -36,6 +36,17 @@ export interface DriveFileNode {
   checksum?: string;
 }
 
+/** Drive ids are letters, digits, "-" and "_". Anything else is refused before it reaches a URL. */
+export function driveId(id: string): string {
+  if (id === "root" || /^[A-Za-z0-9_-]{6,200}$/.test(id)) return id;
+  throw new Error("That Drive file reference is not valid.");
+}
+
+/** Quote a value for a Drive search query (backslashes first, then quotes). */
+export function driveQueryText(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
 export function driveHeaders() {
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const connectionKey = process.env["GOOGLE_DRIVE_API_KEY"];
@@ -174,7 +185,7 @@ export async function ensureFolder(path: string): Promise<string> {
   let parent = "root";
   for (const name of path.split("/").filter(Boolean)) {
     const q = [
-      `name = '${name.replace(/'/g, "\\'")}'`,
+      `name = '${driveQueryText(name)}'`,
       "mimeType = 'application/vnd.google-apps.folder'",
       "trashed = false",
       `'${parent}' in parents`,
@@ -203,7 +214,7 @@ export async function ensureFolder(path: string): Promise<string> {
 
 export async function renameNode(fileId: string, name: string) {
   return driveJson<{ id: string; name: string }>(
-    `${GATEWAY}/drive/v3/files/${fileId}?fields=id,name&supportsAllDrives=true`,
+    `${GATEWAY}/drive/v3/files/${driveId(fileId)}?fields=id,name&supportsAllDrives=true`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -215,7 +226,7 @@ export async function renameNode(fileId: string, name: string) {
 /** Move a file to the Drive bin. Used to retire an outdated clone before rebuilding it. */
 export async function trashNode(fileId: string) {
   return driveJson<{ id: string }>(
-    `${GATEWAY}/drive/v3/files/${fileId}?fields=id&supportsAllDrives=true`,
+    `${GATEWAY}/drive/v3/files/${driveId(fileId)}?fields=id&supportsAllDrives=true`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -226,17 +237,17 @@ export async function trashNode(fileId: string) {
 
 export async function moveNode(fileId: string, targetFolderId: string) {
   const current = await driveJson<{ parents?: string[] }>(
-    `${GATEWAY}/drive/v3/files/${fileId}?fields=parents&supportsAllDrives=true`,
+    `${GATEWAY}/drive/v3/files/${driveId(fileId)}?fields=parents&supportsAllDrives=true`,
   );
   const removeParents = (current.parents ?? []).join(",");
   const params = new URLSearchParams({
     fields: "id,name,parents",
-    addParents: targetFolderId,
+    addParents: driveId(targetFolderId),
     supportsAllDrives: "true",
   });
   if (removeParents) params.set("removeParents", removeParents);
   return driveJson<{ id: string; name: string; parents?: string[] }>(
-    `${GATEWAY}/drive/v3/files/${fileId}?${params.toString()}`,
+    `${GATEWAY}/drive/v3/files/${driveId(fileId)}?${params.toString()}`,
     { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" },
   );
 }
@@ -252,21 +263,28 @@ export async function findExistingClone(
   originalDriveId: string,
   exhibitId: string,
 ): Promise<{ id: string; name: string; webViewLink: string } | null> {
-  const fields = "files(id,name,webViewLink)";
-  const byProperty = await driveJson<{ files?: { id: string; name: string; webViewLink?: string }[] }>(
+  type Found = { id: string; name: string; webViewLink?: string; properties?: Record<string, string> };
+  const fields = "files(id,name,webViewLink,properties)";
+  const byProperty = await driveJson<{ files?: Found[] }>(
     `${GATEWAY}/drive/v3/files?q=${encodeURIComponent(
-      `properties has { key='originalDriveId' and value='${originalDriveId}' } and trashed=false`,
+      `properties has { key='originalDriveId' and value='${driveId(originalDriveId)}' } and trashed=false`,
     )}&fields=${encodeURIComponent(fields)}&pageSize=5`,
   );
   const hit = byProperty.files?.[0];
   if (hit) return { id: hit.id, name: hit.name, webViewLink: hit.webViewLink ?? "" };
 
-  const byName = await driveJson<{ files?: { id: string; name: string; webViewLink?: string }[] }>(
+  // Older clones were found by exhibit number. Exhibit numbers can be reassigned,
+  // so a clone that records a different original is never adopted this way.
+  const byName = await driveJson<{ files?: Found[] }>(
     `${GATEWAY}/drive/v3/files?q=${encodeURIComponent(
-      `name contains '${exhibitId}_' and trashed=false`,
+      `name contains '${driveQueryText(exhibitId)}_' and trashed=false`,
     )}&fields=${encodeURIComponent(fields)}&pageSize=5`,
   );
-  const named = byName.files?.find((f) => f.name.startsWith(`${exhibitId}_`));
+  const named = byName.files?.find(
+    (f) =>
+      f.name.startsWith(`${exhibitId}_`) &&
+      (!f.properties?.["originalDriveId"] || f.properties["originalDriveId"] === originalDriveId),
+  );
   if (named) return { id: named.id, name: named.name, webViewLink: named.webViewLink ?? "" };
   return null;
 }
@@ -315,7 +333,7 @@ export async function uploadMultipart(input: {
 }
 
 export async function fetchDriveBytes(fileId: string): Promise<Uint8Array> {
-  const res = await fetch(`${GATEWAY}/drive/v3/files/${fileId}?alt=media`, {
+  const res = await fetch(`${GATEWAY}/drive/v3/files/${driveId(fileId)}?alt=media`, {
     headers: driveHeaders(),
   });
   if (!res.ok) {
@@ -344,7 +362,7 @@ const OFFICE_TO_GOOGLE: Record<string, string> = {
 
 async function exportAsPdf(fileId: string): Promise<Uint8Array> {
   const res = await fetch(
-    `${GATEWAY}/drive/v3/files/${fileId}/export?mimeType=application%2Fpdf`,
+    `${GATEWAY}/drive/v3/files/${driveId(fileId)}/export?mimeType=application%2Fpdf`,
     { headers: driveHeaders() },
   );
   if (!res.ok) {
@@ -386,7 +404,7 @@ export async function fetchOriginalForEmbedding(input: {
 
   // Convert through a throwaway Google-format copy, then remove the copy.
   const copy = await driveJson<{ id: string }>(
-    `${GATEWAY}/drive/v3/files/${input.fileId}/copy?fields=id`,
+    `${GATEWAY}/drive/v3/files/${driveId(input.fileId)}/copy?fields=id`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -396,7 +414,7 @@ export async function fetchOriginalForEmbedding(input: {
   try {
     return { bytes: await exportAsPdf(copy.id), kind: "pdf" };
   } finally {
-    await fetch(`${GATEWAY}/drive/v3/files/${copy.id}`, {
+    await fetch(`${GATEWAY}/drive/v3/files/${driveId(copy.id)}`, {
       method: "DELETE",
       headers: driveHeaders(),
     }).catch(() => undefined);
@@ -794,7 +812,7 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
 
 
   // ---- Verification zone: page references and the routine trail, kept last.
-  let totalPages = originalPages + 1;
+  const totalPages = originalPages + 1;
   const pageReference = originalPages
     ? `Cover sheet: page 1 of ${totalPages} · Original document: pages 2–${totalPages} (${originalPages} page${originalPages > 1 ? "s" : ""})`
     : `Cover sheet: page 1 of ${totalPages} · Original document held separately in Drive`;
