@@ -19,6 +19,7 @@ import {
 import type { DiaryPlan } from "./diary-merge";
 import { classifyDriveFile, fileTypeFor, titleFromName } from "./drive-classify";
 import { documentProvider, type ProviderConnection } from "./provider";
+import type { MoneyFoundMap } from "@/lib/jobs/clone-worker.server";
 import {
   JOBS_KEY,
   JOBS_LOCAL_KEY,
@@ -216,7 +217,7 @@ interface EvidenceContextValue {
   }>;
 
   /** Verifies existing clones first, then only builds the ones genuinely missing. */
-  /** Looks through receipts, transfers and statements for payments, and lists them to confirm. */
+  /** Collects payments the background worker found in documents, listed to confirm. */
   findAmounts: () => Promise<{ documents: number; found: number }>;
   scanAllDocuments: (opts?: { rescanAll?: boolean }) => Promise<{
     scanned: number;
@@ -333,6 +334,10 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
   const [jobsHere, setJobsHere] = useState<Partial<Record<JobKind, boolean>>>({});
+  /** Changes whenever the background worker has saved new payments for the app to collect. */
+  const [moneyStamp, setMoneyStamp] = useState("");
+  const moneyStampOf = () =>
+    Object.keys(documentProvider.peekShared<Record<string, unknown>>("moneyFound") ?? {}).length.toString();
   const reportJob = useCallback(
     (kind: JobKind, patch: Partial<SharedJob> & { status: SharedJob["status"] }) => {
       const next: SharedJobs = {
@@ -388,6 +393,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       }
       setIgnoredGaps(await documentProvider.loadShared<string[]>("ignoredGaps", IGNORED_GAPS_KEY, []));
       setJobs(documentProvider.peekShared<SharedJobs>(JOBS_KEY) ?? {});
+      setMoneyStamp(moneyStampOf());
       hydrated.current = true;
       setLoading(false);
     })();
@@ -413,6 +419,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         const conn = await documentProvider.getConnection();
         setConnection((p) => (JSON.stringify(p) === JSON.stringify(conn) ? p : conn));
         const sharedJobs = documentProvider.peekShared<SharedJobs>(JOBS_KEY) ?? {};
+        setMoneyStamp(moneyStampOf());
         if (JSON.stringify(sharedJobs) !== JSON.stringify(jobsRef.current)) {
           jobsRef.current = sharedJobs;
           setJobs(sharedJobs);
@@ -1142,6 +1149,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
       // Step 1 — verify: adopt clones that already exist on record before building anything.
       let verified = 0;
+      /** What the background worker has done with each Drive file (null if unknown). */
+      let backendStatus: Map<string, string> | null = null;
       if (!rescan) {
         setScanProgress({
           running: true,
@@ -1155,6 +1164,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         try {
           const { listCloneLedger } = await import("@/lib/jobs/background.functions");
           const { clones } = await listCloneLedger();
+          backendStatus = new Map(clones.map((row) => [row.drive_file_id, row.status]));
           // A clone that is no longer in Drive (binned or deleted) is not adopted;
           // the document is rebuilt below instead.
           const live = liveDriveIds.current;
@@ -1243,10 +1253,20 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
             (!(item.categories ?? []).length || (item.categories ?? []).every((c2) => c2 === "Other")))
         );
       };
+      // The background worker reads every document on the server, even with the app
+      // closed. Here we only read what it has finished with but could not read, and
+      // give each document with missing details one extra try, not one per update.
+      const backendBusy = (item: EvidenceItem) => {
+        const status = backendStatus?.get(item.driveFileId ?? "");
+        return status === "pending" || status === "processing" || (backendStatus !== null && !status);
+      };
       const queue = itemsRef.current.filter(
         (item) =>
           item.driveFileId &&
-          (rescan || !item.aiExtraction?.contentRead || needsFix(item)),
+          (rescan ||
+            (!backendBusy(item) &&
+              ((!item.aiExtraction?.contentRead && !item.fixTriedAt) ||
+                (needsFix(item) && !item.fixTriedAt)))),
       );
       if (!queue.length) {
         setScanProgress({ running: false, phase: "", done: 0, total: 0, scanned: 0, cloned: 0, failed: 0 });
@@ -1280,6 +1300,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
               scanned += 1;
             } finally {
               setExtractingIds((prev) => prev.filter((x) => x !== item.id));
+              // Tried once here, whether or not it worked; the worker and Review take it from here.
+              applyPatch([item.id], { fixTriedAt: nowIso() }, "Read in the app");
             }
           } catch {
             failed += 1;
@@ -1308,34 +1330,19 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
 
   /**
-   * Money documents (receipts, invoices, transfer screenshots, bank statements)
-   * are read for the payments in them. Each payment found by both reads becomes
-   * an expense waiting for confirmation, linked to the document as proof. A
-   * payment already recorded (same date, amount, currency and kind) only gains
-   * the extra document, so nothing is counted twice. Each document is read once.
+   * The background worker reads money documents (receipts, invoices, transfer
+   * screenshots, bank statements) for their payments while the app is closed.
+   * This collects what it found: each payment becomes an expense waiting for
+   * confirmation, linked to its document. A payment already recorded (same
+   * date, amount, currency and kind) only gains the extra document, so nothing
+   * is counted twice. Each document's results are collected once.
    */
   const findAmounts = useCallback(async () => {
-    if (scanInFlight.current) return { documents: 0, found: 0 };
-    const looksLikeMoney = (item: EvidenceItem) => {
-      if (["Video", "Audio", "Zip"].includes(item.fileType)) return false;
-      if (item.sourceType === "Financial / Bank" || item.sourceType === "Receipt / Purchase") return true;
-      if ((item.categories?.length ? item.categories : [item.category]).includes("Financial Hardship")) return true;
-      return /(receipt|invoice|statement|transfer|remit|wise|western union|paypal|payment|bank|bill)/i.test(
-        `${item.title} ${item.fileName}`,
-      );
-    };
-    const queue = itemsRef.current.filter(
-      (item) => item.driveFileId && !item.moneyReadAt && !item.duplicateOfId && looksLikeMoney(item),
+    const found = documentProvider.peekShared<MoneyFoundMap>("moneyFound") ?? {};
+    const ready = itemsRef.current.filter(
+      (item) => item.driveFileId && !item.moneyReadAt && found[item.driveFileId],
     );
-    if (!queue.length) return { documents: 0, found: 0 };
-
-    scanInFlight.current = true;
-    scanCancelled.current = false;
-    let done = 0;
-    let found = 0;
-    setScanProgress({ running: true, phase: "Finding amounts", done: 0, total: queue.length, scanned: 0, cloned: 0, failed: 0 });
-    reportJob("read", { status: "running", done: 0, total: queue.length });
-    const { extractMoney } = await import("@/lib/ai.functions");
+    if (!ready.length) return { documents: 0, found: 0 };
     const kindFor = (category: string): FinancialEntry["kind"] =>
       /childcare/.test(category)
         ? "Childcare"
@@ -1350,100 +1357,88 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
                 : /Communication/.test(category)
                   ? "Communication"
                   : "Other";
-    try {
-      for (const item of queue) {
-        if (scanCancelled.current) break;
-        try {
-          const read = await extractMoney({
-            data: {
-              driveFileId: item.driveFileId,
-              fileName: item.fileName,
-              mimeType: item.mimeType ?? "",
-              title: item.title,
-              separationStartDate: CASE_SETTINGS.separationStartDate,
-            },
-          });
-          const payments = read.payments.filter((p) => p.category !== "Not hardship");
-          if (payments.length) {
-            const now = nowIso();
-            setFinances((prev) => {
-              const next = [...prev];
-              for (const p of payments) {
-                const category = p.category as ExpenseCategory;
-                const label = p.payee || p.description || "Payment";
-                const key = `${p.date}|${p.amount.toFixed(2)}|${p.currency}|${label.trim().toLowerCase()}`;
-                const twin = next.findIndex(
-                  (f) =>
-                    f.transferKey === key ||
-                    (f.date === p.date &&
-                      f.currency === p.currency &&
-                      Math.abs(f.amount - p.amount) < 0.005 &&
-                      financeGroupOf(f) === financeGroupOf({ expenseCategory: category })),
-                );
-                if (twin >= 0) {
-                  const f = next[twin]!;
-                  if (!(f.evidenceIds ?? []).includes(item.id)) {
-                    next[twin] = { ...f, evidenceIds: [...(f.evidenceIds ?? []), item.id], updatedAt: now };
-                  }
-                  continue;
-                }
-                const conv = convert(p.amount, p.currency);
-                next.push({
-                  id: rid("fin"),
-                  date: p.date,
-                  label,
-                  kind: kindFor(category),
-                  amount: p.amount,
-                  currency: p.currency,
-                  recurring: false,
-                  notes: `Found in "${item.title || item.fileName}"${p.categoryAgreed ? "" : " — check the type"}`,
-                  evidenceIds: [item.id],
-                  expenseCategory: category,
-                  payer: p.payer === "Aciah" ? "Aciah" : "Imran",
-                  beneficiary: (BENEFICIARIES as readonly string[]).includes(p.beneficiary)
-                    ? (p.beneficiary as FinancialEntry["beneficiary"])
-                    : undefined,
-                  merchant: p.payee || undefined,
-                  purpose: p.description || undefined,
-                  gbpEquivalent: Math.round(conv.gbp * 100) / 100,
-                  usdEquivalent: Math.round(conv.usd * 100) / 100,
-                  exchangeRate: conv.rate,
-                  exchangeRateDate: income.rateDate || now.slice(0, 10),
-                  exchangeRateSource: income.rateSource,
-                  status: "Needs confirmation",
-                  transferKey: key,
-                  autoFound: true,
-                  createdBy: profile,
-                  lastEditedBy: profile,
-                  createdAt: now,
-                  updatedAt: now,
-                });
-                found += 1;
-              }
-              return next;
-            });
+    const now = nowIso();
+    let added = 0;
+    setFinances((prev) => {
+      const next = [...prev];
+      for (const item of ready) {
+        const payments = found[item.driveFileId!]!.payments.filter((p) => p.category !== "Not hardship");
+        for (const p of payments) {
+          const category = p.category as ExpenseCategory;
+          const label = p.payee || p.description || "Payment";
+          const key = `${p.date}|${p.amount.toFixed(2)}|${p.currency}|${label.trim().toLowerCase()}`;
+          const twin = next.findIndex(
+            (f) =>
+              f.transferKey === key ||
+              (f.date === p.date &&
+                f.currency === p.currency &&
+                Math.abs(f.amount - p.amount) < 0.005 &&
+                financeGroupOf(f) === financeGroupOf({ expenseCategory: category })),
+          );
+          if (twin >= 0) {
+            const f = next[twin]!;
+            if (!(f.evidenceIds ?? []).includes(item.id)) {
+              next[twin] = { ...f, evidenceIds: [...(f.evidenceIds ?? []), item.id], updatedAt: now };
+            }
+            continue;
           }
-          // Mark it read (even with nothing found) so it is not paid for again.
-          if (read.contentRead) applyPatch([item.id], { moneyReadAt: nowIso() }, "Looked for payments");
-        } catch {
-          // Left unmarked, so the next update tries this document again.
-        } finally {
-          done += 1;
-          setScanProgress((prev) => ({ ...prev, done }));
-          reportJob("read", { status: "running", done, total: queue.length });
+          const conv = convert(p.amount, p.currency);
+          next.push({
+            id: rid("fin"),
+            date: p.date,
+            label,
+            kind: kindFor(category),
+            amount: p.amount,
+            currency: p.currency,
+            recurring: false,
+            notes: `Found in "${item.title || item.fileName}"${p.categoryAgreed ? "" : " — check the type"}`,
+            evidenceIds: [item.id],
+            expenseCategory: category,
+            payer: p.payer === "Aciah" ? "Aciah" : "Imran",
+            beneficiary: (BENEFICIARIES as readonly string[]).includes(p.beneficiary)
+              ? (p.beneficiary as FinancialEntry["beneficiary"])
+              : undefined,
+            merchant: p.payee || undefined,
+            purpose: p.description || undefined,
+            gbpEquivalent: Math.round(conv.gbp * 100) / 100,
+            usdEquivalent: Math.round(conv.usd * 100) / 100,
+            exchangeRate: conv.rate,
+            exchangeRateDate: income.rateDate || now.slice(0, 10),
+            exchangeRateSource: income.rateSource,
+            status: "Needs confirmation",
+            transferKey: key,
+            autoFound: true,
+            createdBy: profile,
+            lastEditedBy: profile,
+            createdAt: now,
+            updatedAt: now,
+          });
+          added += 1;
         }
       }
-    } finally {
-      scanInFlight.current = false;
-      setScanProgress((prev) => ({ ...prev, running: false, phase: "" }));
-      reportJob("read", {
-        status: done >= queue.length ? "done" : scanCancelled.current ? "paused" : "stopped",
-        done,
-        total: queue.length,
-      });
-    }
-    return { documents: done, found };
-  }, [applyPatch, convert, income.rateDate, income.rateSource, profile, reportJob]);
+      return next;
+    });
+    applyPatch(
+      ready.map((item) => item.id),
+      { moneyReadAt: now },
+      "Payments collected",
+    );
+    return { documents: ready.length, found: added };
+  }, [applyPatch, convert, income.rateDate, income.rateSource, profile]);
+
+  // Collect new findings when the app opens and whenever the worker saves more.
+  useEffect(() => {
+    if (loading || !moneyStamp || moneyStamp === "0") return;
+    void findAmounts().then((result) => {
+      if (result.found) {
+        toast.info(`Found ${result.found} payment(s) in your documents`, {
+          description: "They are on your Review list to confirm before they count.",
+        });
+      }
+    });
+    // Runs on new findings only; findAmounts itself changes with every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, moneyStamp, items.length]);
 
   const applyConfirmed = useCallback((item: EvidenceItem, field: string, value: string) => {
     const patch: Partial<EvidenceItem> = {};

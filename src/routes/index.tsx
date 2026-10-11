@@ -175,12 +175,7 @@ function CaseApp() {
           toast.success(headline, { description: detail });
         }
       }
-      const money = await findAmounts();
-      if (money.found) {
-        toast.info(`Found ${money.found} payment(s) in your documents`, {
-          description: "They are on your Review list to confirm before they count.",
-        });
-      }
+      await findAmounts();
     } catch (error) {
       toast.error("Drive sync failed", { description: error instanceof Error ? error.message : "Please try again." });
     }

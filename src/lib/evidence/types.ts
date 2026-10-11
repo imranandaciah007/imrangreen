@@ -159,6 +159,8 @@ export interface EvidenceItem {
   cloneUrl?: string | undefined;
   cloneFileName?: string | undefined;
   cloneGeneratedAt?: string | undefined;
+  /** When the app last tried to read this document itself, so it is not retried on every update. */
+  fixTriedAt?: string | undefined;
   /** When the payments in this document were looked for (money documents only). */
   moneyReadAt?: string | undefined;
   /** Fields a human has confirmed — AI must never silently overwrite these. */
