@@ -55,7 +55,7 @@ export function ProgressStrip({
   if (scanProgress.running) {
     lines.push({
       key: "read",
-      text: `${scanProgress.phase.startsWith("Finding amounts") ? "Finding amounts" : "Reading documents"}: ${scanProgress.done} of ${scanProgress.total}`,
+      text: `Reading documents: ${scanProgress.done} of ${scanProgress.total}`,
       done: scanProgress.done,
       total: scanProgress.total,
     });

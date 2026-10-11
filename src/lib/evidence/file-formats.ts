@@ -28,7 +28,14 @@ const SYSTEM_JUNK =
 
 export function isEvidenceFile(name: string, mimeType: string): boolean {
   if (NOT_EVIDENCE_MIME.test(mimeType || "")) return false;
+  // Temporary copies the app makes while printing Office files, if one is ever left behind.
+  if (/^GC conversion /.test(name || "")) return false;
   return !SYSTEM_JUNK.test((name || "").trim());
+}
+
+/** Files the app itself writes to Drive (built packets), which are never evidence. */
+export function isAppOutputPath(path: string): boolean {
+  return path.includes("Generated Case Packets");
 }
 
 function extOf(name: string) {

@@ -20,6 +20,7 @@ import type { DiaryPlan } from "./diary-merge";
 import { classifyDriveFile, fileTypeFor, titleFromName } from "./drive-classify";
 import { documentProvider, type ProviderConnection } from "./provider";
 import type { MoneyFoundMap } from "@/lib/jobs/clone-worker.server";
+import { isAppOutputPath } from "./file-formats";
 import {
   JOBS_KEY,
   JOBS_LOCAL_KEY,
@@ -334,6 +335,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
   const [jobsHere, setJobsHere] = useState<Partial<Record<JobKind, boolean>>>({});
+  const financesRef = useRef(finances);
+  financesRef.current = finances;
   /** Changes whenever the background worker has saved new payments for the app to collect. */
   const [moneyStamp, setMoneyStamp] = useState("");
   const moneyStampOf = () =>
@@ -1340,7 +1343,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   const findAmounts = useCallback(async () => {
     const found = documentProvider.peekShared<MoneyFoundMap>("moneyFound") ?? {};
     const ready = itemsRef.current.filter(
-      (item) => item.driveFileId && !item.moneyReadAt && found[item.driveFileId],
+      (item) => item.driveFileId && !item.moneyReadAt && found[item.driveFileId] && !found[item.driveFileId]!.failed,
     );
     if (!ready.length) return { documents: 0, found: 0 };
     const kindFor = (category: string): FinancialEntry["kind"] =>
@@ -1359,10 +1362,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
                   : "Other";
     const now = nowIso();
     let added = 0;
-    setFinances((prev) => {
-      const next = [...prev];
+    // Worked out from the current list (not inside a state update) so the count is right.
+    const next = [...financesRef.current];
+    {
       for (const item of ready) {
-        const payments = found[item.driveFileId!]!.payments.filter((p) => p.category !== "Not hardship");
+        // Only costs since the separation count; earlier ones are left out.
+        const payments = found[item.driveFileId!]!.payments.filter(
+          (p) => p.category !== "Not hardship" && p.date >= CASE_SETTINGS.separationStartDate,
+        );
         for (const p of payments) {
           const category = p.category as ExpenseCategory;
           const label = p.payee || p.description || "Payment";
@@ -1416,8 +1423,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           added += 1;
         }
       }
-      return next;
-    });
+    }
+    financesRef.current = next;
+    setFinances(next);
     applyPatch(
       ready.map((item) => item.id),
       { moneyReadAt: now },
@@ -1809,7 +1817,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         (file) =>
           !file.path.split("/").includes("I601 Evidence Clones") &&
           !file.path.split("/").some((part) => part.trim().toLowerCase() === "ignore") &&
-          !file.path.includes("Generated Case Packets") &&
+          !isAppOutputPath(file.path) &&
           Boolean(fileTypeFor(file.name, file.mimeType)),
       );
       const liveIds = new Set(originalFiles.map((file) => file.id));
