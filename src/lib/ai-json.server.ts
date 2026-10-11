@@ -283,7 +283,18 @@ async function runOpenAi(req: JsonModelRequest, key: string) {
   };
 }
 
-/** OpenAI-compatible free readers (OpenRouter, Pollinations) share this shape. */
+/**
+ * Required fields (from the schema and the request) that an answer left out
+ * entirely. An empty value is allowed: a document can genuinely be undated.
+ */
+function missingFields(value: Record<string, unknown>, req: JsonModelRequest): string[] {
+  const schema = (req.schema ?? {}) as { required?: unknown };
+  const fromSchema = Array.isArray(schema.required) ? (schema.required as string[]) : [];
+  const wanted = new Set([...fromSchema, ...(req.requiredFields ?? [])]);
+  return [...wanted].filter((field) => !(field in value));
+}
+
+/** OpenAI-compatible free readers (OpenRouter, Pollinations, Groq) share this shape. */
 async function runOpenAiCompatible(
   req: JsonModelRequest,
   key: string,
@@ -480,13 +491,23 @@ async function runFreeReaders(req: JsonModelRequest): Promise<Record<string, unk
       files: false,
     },
   ];
-  const jsonReq = { ...req, prompt: `${req.prompt}\n\nAnswer with JSON only.` };
+  // These readers cannot be held to a schema, so they are given it in words and
+  // their answer is checked: a reply missing required fields is treated as a
+  // failed read, so the next reader (and Gemini) still get their turn.
+  const jsonReq = {
+    ...req,
+    prompt: `${req.prompt}\n\nAnswer with JSON only, as one object that matches this JSON Schema exactly (same field names):\n${JSON.stringify(req.schema)}`,
+  };
   for (const c of candidates) {
     if (!c.key) continue;
     if (!c.files && req.file?.base64) continue;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const out = await runOpenAiCompatible(jsonReq, c.key, c.url, c.model, c.label);
+        const missing = missingFields(out.value, req);
+        if (missing.length) {
+          throw new Error(`${c.label} answer was missing ${missing.slice(0, 5).join(", ")}`);
+        }
         await logAiUsage({ provider: c.label, model: c.model, purpose: req.name, ok: true, tokens: out.tokens });
         return { ...out.value, [WRITTEN_BY]: `${c.label}/${c.model}` };
       } catch (err) {

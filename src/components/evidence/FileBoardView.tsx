@@ -152,6 +152,10 @@ export function FileBoardView() {
   const treeRef = useRef<DriveTree | null>(tree);
   treeRef.current = tree;
   const inFlight = useRef(false);
+  // syncDrive changes identity whenever the case changes (every synch changes
+  // it), so it is read through a ref: otherwise each synch would start the next.
+  const syncDriveRef = useRef(syncDrive);
+  syncDriveRef.current = syncDrive;
 
   const sync = useCallback(async (mode: "manual" | "auto" = "manual") => {
     if (inFlight.current) return;
@@ -159,8 +163,10 @@ export function FileBoardView() {
     if (mode === "manual") setSyncing(true);
     else setAutoSyncing(true);
     try {
-      const result = await syncDrive();
-      const next = readJson<DriveTree | null>(TREE_KEY, null);
+      // Background refreshes are quiet checks: they never lift a pause and
+      // start a background build run at most every couple of minutes.
+      const result = await syncDriveRef.current(mode === "auto" ? { auto: true } : undefined);
+      const next = (result.tree as DriveTree | undefined) ?? readJson<DriveTree | null>(TREE_KEY, null);
       if (!next) throw new Error("Drive returned no file list.");
       const before = treeRef.current;
       const changes = countChanges(before, next);
@@ -182,7 +188,7 @@ export function FileBoardView() {
       setSyncing(false);
       setAutoSyncing(false);
     }
-  }, [syncDrive]);
+  }, []);
 
   useEffect(() => {
     if (driveTree) setTree(driveTree);

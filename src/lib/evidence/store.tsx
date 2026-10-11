@@ -196,6 +196,8 @@ interface EvidenceContextValue {
     files: number;
     /** True when a synch was already running, so this press did nothing. */
     skipped: boolean;
+    /** The fresh Drive picture this synch read (absent when skipped). */
+    tree?: { folders: DriveFolderNode[]; files: DriveFileNode[]; syncedAt: string };
   }>;
 
   /** Verifies existing clones first, then only builds the ones genuinely missing. */
@@ -298,6 +300,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
 
   const [autoSyncNonce, setAutoSyncNonce] = useState(0);
   const hydrated = useRef(false);
+  /** File ids present in Drive at the last full sync; null until a complete listing. */
+  const liveDriveIds = useRef<Set<string> | null>(null);
+  const lastBackgroundKick = useRef(0);
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const driveSyncInFlight = useRef(false);
@@ -1082,7 +1087,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         try {
           const { listCloneLedger } = await import("@/lib/jobs/background.functions");
           const { clones } = await listCloneLedger();
-          const byDriveId = new Map(clones.map((row) => [row.drive_file_id, row]));
+          // A clone that is no longer in Drive (binned or deleted) is not adopted;
+          // the document is rebuilt below instead.
+          const live = liveDriveIds.current;
+          const byDriveId = new Map(
+            clones
+              .filter((row) => !live || !row.clone_file_id || live.has(row.clone_file_id))
+              .map((row) => [row.drive_file_id, row]),
+          );
           for (const item of itemsRef.current) {
             if (!item.driveFileId) continue;
             const row = byDriveId.get(item.driveFileId);
@@ -1606,18 +1618,30 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     // 15-minute cache): match originals to copies, bin copies whose original is
     // gone, queue copies for new originals. The quiet check on returning to the
     // app scans afresh too, but never lifts a pause and builds fewer copies.
+    // Quiet checks happen often (the Files board refreshes every 20 seconds), so
+    // they start a background run at most once every two minutes.
     const auto = options?.auto === true;
-    void import("@/lib/jobs/background.functions")
-      .then(async ({ resumeBackgroundSync, runBackgroundBatch }) => {
-        if (!auto) await resumeBackgroundSync();
-        await runBackgroundBatch({ data: { batch: auto ? 2 : 12, freshScan: true } });
-      })
-      .catch(() => {});
+    const kickDue = !auto || Date.now() - lastBackgroundKick.current > 2 * 60_000;
+    if (kickDue) {
+      lastBackgroundKick.current = Date.now();
+      void import("@/lib/jobs/background.functions")
+        .then(async ({ resumeBackgroundSync, runBackgroundBatch }) => {
+          if (!auto) await resumeBackgroundSync();
+          await runBackgroundBatch({ data: { batch: auto ? 2 : 12, freshScan: true } });
+        })
+        .catch(() => {});
+    }
 
     try {
       const next = await listDriveTree();
       setDriveTree(next);
-      if (typeof localStorage !== "undefined") localStorage.setItem(DRIVE_TREE_KEY, JSON.stringify(next));
+      liveDriveIds.current = next.complete ? new Set(next.files.map((file) => file.id)) : null;
+      try {
+        // A big Drive can exceed the browser's storage limit; the cache is optional.
+        if (typeof localStorage !== "undefined") localStorage.setItem(DRIVE_TREE_KEY, JSON.stringify(next));
+      } catch {
+        /* storage full */
+      }
 
       const originalFiles = next.files.filter(
         (file) =>
@@ -1645,7 +1669,12 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           const nextTitle = (item.confirmedFields ?? []).includes("title")
             ? item.title
             : titleFromName(file.name);
+          // Its clone was binned or deleted in Drive: forget it, so the next
+          // build makes a fresh one (or adopts another clone of the same file).
+          const live = liveDriveIds.current;
+          const cloneGone = Boolean(live && item.cloneFileId && !live.has(item.cloneFileId));
           const changed =
+            cloneGone ||
             item.fileName !== file.name ||
             item.driveFolder !== file.path ||
             item.cloudDriveUrl !== file.webViewLink ||
@@ -1655,6 +1684,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           updated += 1;
           return {
             ...item,
+            ...(cloneGone
+              ? {
+                  cloneFileId: undefined,
+                  cloneUrl: undefined,
+                  cloneFileName: undefined,
+                  cloneGeneratedAt: undefined,
+                }
+              : {}),
             fileName: file.name,
             title: nextTitle,
             driveFolder: file.path,
@@ -1802,6 +1839,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         folders: next.folders.length,
         files: originalFiles.length,
         skipped: false,
+        tree: next,
       };
 
     } finally {
@@ -1817,7 +1855,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   syncDriveRef.current = syncDrive;
   useEffect(() => {
     if (autoSyncNonce > 0 && connectionRef.current?.connected) {
-      void syncDriveRef.current();
+      void syncDriveRef.current({ auto: true });
     }
   }, [autoSyncNonce]);
 

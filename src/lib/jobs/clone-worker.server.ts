@@ -343,6 +343,42 @@ export async function runCloneTick(
       // original are left alone, and nothing is binned from a partial listing.
       if (tree.complete) {
         const existing = new Set(tree.allFileIds);
+
+        // Clones that were binned or deleted while their original is still in
+        // Drive: queue the document again so it gets a clone. Building first
+        // looks for another live clone of the same original and adopts it, so
+        // this never makes a second copy of something that already has one.
+        const doneRows = (known ?? []).filter((row) => row.status === "done" && !row.duplicate_of);
+        const lostClones = doneRows.filter(
+          (row) =>
+            row.clone_file_id &&
+            liveIds.has(row.drive_file_id) &&
+            !existing.has(row.clone_file_id),
+        );
+        if (doneRows.length >= 20 && lostClones.length > doneRows.length * 0.5) {
+          console.warn(
+            `Skipped re-queue: ${lostClones.length} of ${doneRows.length} clones look missing.`,
+          );
+        } else if (lostClones.length) {
+          const ids = lostClones.map((row) => row.drive_file_id);
+          for (let index = 0; index < ids.length; index += 200) {
+            await supabaseAdmin
+              .from("gc_clone_jobs")
+              .update({
+                status: "pending",
+                clone_file_id: null,
+                clone_name: null,
+                clone_link: null,
+                needs_rebuild: false,
+                attempts: 0,
+                error: null,
+                updated_at: now.toISOString(),
+              })
+              .in("drive_file_id", ids.slice(index, index + 200));
+          }
+          queued += lostClones.length;
+        }
+
         const cloneFiles = tree.files.filter(
           (file) => file.path.split("/").includes(CLONE_ROOT) && file.originalId,
         );
