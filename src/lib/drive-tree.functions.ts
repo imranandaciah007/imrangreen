@@ -9,8 +9,8 @@ export type {
 /** Whole-Drive folder tree plus files, each with its full folder path. */
 export const listDriveTree = createServerFn({ method: "GET" }).handler(async () => {
   const { listTree } = await import("./drive-core.server");
-  const { folders, files, syncedAt } = await listTree();
-  return { folders, files, syncedAt };
+  const { folders, files, syncedAt, complete } = await listTree();
+  return { folders, files, syncedAt, complete };
 });
 
 /** Rename a Drive file or folder (contents stay untouched). */
