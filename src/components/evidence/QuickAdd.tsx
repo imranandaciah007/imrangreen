@@ -1,3 +1,4 @@
+import { statusLabel } from "@/components/evidence/status-ui";
 import { BookOpenText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -212,7 +213,7 @@ export function ExpenseDialog({
       if (relevant.length === 0 && result.total) setAmount(String(result.total));
       toast.success(
         result.uncertain.length === 0
-          ? "Verified by double scan"
+          ? "Checked twice and matched"
           : "Read — please confirm the highlighted fields",
       );
     } catch (err) {
@@ -335,7 +336,7 @@ export function ExpenseDialog({
             <div className="rounded-lg border border-border bg-muted/40 p-2.5 text-[11px]">
               <p className="font-semibold text-foreground">
                 {scan.uncertain.length === 0
-                  ? "Verified by double scan"
+                  ? "Checked twice and matched"
                   : "Read twice — confirm the fields below"}
               </p>
               {scan.uncertain.length > 0 && (
@@ -853,7 +854,7 @@ export function EventDialog({
                 <SelectContent>
                   {EVENT_STATUSES.map((s) => (
                     <SelectItem key={s} value={s} className="text-xs">
-                      {s}
+                      {statusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1129,7 +1130,7 @@ export function TaskDialog({
                 <SelectContent>
                   {TASK_STATUSES.map((s) => (
                     <SelectItem key={s} value={s} className="text-xs">
-                      {s}
+                      {statusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1144,7 +1145,7 @@ export function TaskDialog({
                 <SelectContent>
                   {TASK_PRIORITIES.map((s) => (
                     <SelectItem key={s} value={s} className="text-xs">
-                      {s}
+                      {statusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>

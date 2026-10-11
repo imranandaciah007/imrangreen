@@ -1,3 +1,4 @@
+import { statusLabel } from "@/components/evidence/status-ui";
 import { Check, ChevronDown, FolderInput, Search, Sparkles, Tags, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -186,7 +187,7 @@ export function FilterToolbar() {
                   className="text-xs"
                   onSelect={() => bulkUpdate({ status: s }, `Status → ${s}`)}
                 >
-                  {s}
+                  {statusLabel(s)}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

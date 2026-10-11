@@ -1,3 +1,4 @@
+import { statusLabel } from "@/components/evidence/status-ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Camera, FileUp, Save, Sparkles, UploadCloud } from "lucide-react";
 
@@ -482,7 +483,7 @@ export function UploadDialog({
                 {aiRunning
                   ? "Reading the document twice…"
                   : uncertain.length === 0
-                    ? "Verified by double scan"
+                    ? "Checked twice and matched"
                     : `${uncertain.length} field(s) need your confirmation`}
               </p>
               {ai && !ai.contentRead && (
@@ -603,7 +604,7 @@ export function UploadDialog({
                 <SelectContent>
                   {SOURCE_TYPES.map((s) => (
                     <SelectItem key={s} value={s} className="text-xs">
-                      {s}
+                      {statusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -618,7 +619,7 @@ export function UploadDialog({
                 <SelectContent>
                   {STATUSES.map((s) => (
                     <SelectItem key={s} value={s} className="text-xs">
-                      {s}
+                      {statusLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>

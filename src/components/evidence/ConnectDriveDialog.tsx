@@ -67,7 +67,7 @@ export function ConnectDriveDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <CloudCog className="size-4" /> Synch Drive
+            <CloudCog className="size-4" /> Update from Drive
           </DialogTitle>
           <DialogDescription className="text-xs">
             Your Google Drive account is linked. Sync scans it, imports each PDF, Word document or
@@ -90,7 +90,7 @@ export function ConnectDriveDialog({
               <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/10 p-3">
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
                 <div>
-                  <p className="text-sm font-bold text-foreground">Drive synched successfully</p>
+                  <p className="text-sm font-bold text-foreground">Updated from Drive</p>
                   <p className="text-[11px] text-muted-foreground">
                     Your latest Drive files have been checked and the case is up to date.
                   </p>
@@ -118,7 +118,7 @@ export function ConnectDriveDialog({
           )}
 
           <p className="text-[11px] text-muted-foreground">
-            Last synched:{" "}
+            Last updated:{" "}
             {connection?.lastSyncedAt
               ? new Date(connection.lastSyncedAt).toLocaleString()
               : "never"}
@@ -141,7 +141,7 @@ export function ConnectDriveDialog({
             ) : (
               <FolderSync className="size-3.5" />
             )}
-            {syncing ? "Synching Drive…" : "Synch Drive again"}
+            {syncing ? "Updating from Drive…" : "Update from Drive again"}
           </Button>
         </DialogFooter>
       </DialogContent>

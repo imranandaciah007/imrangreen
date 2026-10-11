@@ -44,7 +44,7 @@ export function DocumentPreview({ item, className }: { item: EvidenceItem; class
                 className="h-8 text-[11px]"
                 onClick={() => setShowing("clone")}
               >
-                Exhibit clone
+                Exhibit copy
               </Button>
               <Button
                 size="sm"
@@ -82,7 +82,7 @@ export function DocumentPreview({ item, className }: { item: EvidenceItem; class
           <FileText className="size-8 opacity-50" />
           <p className="text-xs font-medium">No file stored for this record yet</p>
           <p className="max-w-[80%] text-center text-[10px]">
-            Synch Drive or upload the document to preview it here.
+            Update from Drive or upload the document to preview it here.
           </p>
         </div>
       )}

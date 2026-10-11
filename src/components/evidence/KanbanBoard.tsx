@@ -1,3 +1,4 @@
+import { statusLabel } from "@/components/evidence/status-ui";
 import { FileText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ export function KanbanBoard() {
           >
             <div className="border-b border-border px-3 py-2">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-xs font-semibold tracking-tight text-foreground">{stage}</h3>
+                <h3 className="text-xs font-semibold tracking-tight text-foreground">{statusLabel(stage)}</h3>
                 <span className="rounded bg-navy px-1.5 py-0.5 font-mono text-[10px] text-navy-foreground">
                   {rows.length}
                 </span>

@@ -19,11 +19,12 @@ export function OverlayNavigation({
     window.dispatchEvent(new Event(NAVIGATE_HOME_EVENT));
   };
 
+  // One slim row so pop-ups keep their space for content on a phone.
   const backButton = (
     <Button
       type="button"
       variant="ghost"
-      className="h-12 w-full touch-manipulation justify-center gap-2 px-4 text-sm font-bold"
+      className="h-10 touch-manipulation justify-start gap-1.5 px-2.5 text-sm font-semibold"
       data-overlay-back
     >
       <ArrowLeft className="size-5 shrink-0" />
@@ -35,19 +36,20 @@ export function OverlayNavigation({
     <Button
       type="button"
       variant="ghost"
-      className="h-12 w-full touch-manipulation justify-center gap-2 px-4 text-sm font-bold"
+      className="h-10 touch-manipulation gap-1.5 px-2.5 text-sm font-semibold"
       onClick={handleHome}
+      aria-label="Go to Home"
       data-overlay-home
     >
       <Home className="size-5 shrink-0" />
-      Home
+      <span className="sr-only sm:not-sr-only">Home</span>
     </Button>
   );
 
   return (
     <div
       className={cn(
-        "sticky top-0 z-40 grid shrink-0 grid-cols-2 gap-2 border-b border-border bg-background/95 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] shadow-sm backdrop-blur",
+        "sticky top-0 z-40 flex shrink-0 items-center justify-between border-b border-border bg-background/95 px-1.5 pb-1 pt-[calc(env(safe-area-inset-top)+0.25rem)] backdrop-blur",
         className,
       )}
       aria-label="Page navigation"

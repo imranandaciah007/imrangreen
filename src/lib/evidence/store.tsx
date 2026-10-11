@@ -1006,8 +1006,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         [item.id],
         patch,
         result.uncertain.length
-          ? `AI read the document — ${result.uncertain.length} field(s) need confirmation`
-          : "AI read the document — verified by double scan",
+          ? `Document read — ${result.uncertain.length} detail(s) to check`
+          : "Document read — checked twice and matched",
       );
       return result;
     },
@@ -1019,7 +1019,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       const item = items.find((i) => i.id === id);
       if (!item) return;
       setExtractingIds((prev) => [...prev, id]);
-      applyPatch([id], { status: "AI processing" }, "AI read started");
+      applyPatch([id], { status: "AI processing" }, "Reading started");
       try {
         const result = await runOne(item, categories);
         if (result.uncertain.length) {
@@ -1027,11 +1027,11 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
             description: item.fileName,
           });
         } else {
-          toast.success("Verified by double scan", { description: item.fileName });
+          toast.success("Read and checked", { description: item.fileName });
         }
       } catch (error) {
-        applyPatch([id], { status: item.status }, "AI read failed");
-        toast.error("AI read failed", {
+        applyPatch([id], { status: item.status }, "Reading failed");
+        toast.error("Could not read the document", {
           description: error instanceof Error ? error.message.slice(0, 160) : "Please try again.",
         });
       } finally {
@@ -1057,13 +1057,13 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         ok += 1;
         if (result.uncertain.length) needs += 1;
       } catch {
-        applyPatch([item.id], { status: item.status }, "AI read failed");
+        applyPatch([item.id], { status: item.status }, "Reading failed");
       } finally {
         setExtractingIds((prev) => prev.filter((x) => x !== item.id));
       }
     }
-    toast.success(`AI read ${ok} document(s)`, {
-      description: needs ? `${needs} need your confirmation` : "All verified by double scan",
+    toast.success(`Read ${ok} document(s)`, {
+      description: needs ? `${needs} have details to check` : "All checked twice and matched",
     });
   }, [applyPatch, categories, items, runOne, selectedIds]);
 
@@ -1167,8 +1167,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
               [item.id],
               patch,
               row.ai_read_at
-                ? "Background AI read adopted — exhibit details verified"
-                : `Existing clone verified — ${row.clone_name ?? row.clone_file_id}`,
+                ? "Background reading applied — exhibit details checked"
+                : `Existing exhibit copy found — ${row.clone_name ?? row.clone_file_id}`,
             );
             verified += 1;
           }
@@ -1493,7 +1493,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           assignedTo: profile,
           status: "To do",
           priority: "Normal",
-          notes: `Hardship diary page ${link.pages.join(", ") || "?"} refers to ${link.ref} but no matching document is in the vault.`,
+          notes: `Hardship diary page ${link.pages.join(", ") || "?"} refers to ${link.ref} but no matching document is in Documents.`,
           createdBy: profile,
           lastEditedBy: profile,
           createdAt: importedAt,
@@ -1553,8 +1553,8 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     void import("@/lib/jobs/background.functions")
       .then(({ pauseBackgroundSync }) => pauseBackgroundSync())
       .then(() => {
-        toast.success("Synch paused", {
-          description: "Nothing is lost — press Synch now to pick up where it stopped.",
+        toast.success("Update paused", {
+          description: "Nothing is lost — press Update from Drive to pick up where it stopped.",
         });
       })
       .catch(() => {

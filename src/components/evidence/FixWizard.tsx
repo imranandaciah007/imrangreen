@@ -1,3 +1,4 @@
+import { statusLabel } from "@/components/evidence/status-ui";
 import { useEffect, useRef, useState } from "react";
 import { EyeOff, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -266,7 +267,7 @@ export function FixWizard({
                     <SelectContent>
                       {SOURCE_TYPES.map((s) => (
                         <SelectItem key={s} value={s} className="text-xs">
-                          {s}
+                          {statusLabel(s)}
                         </SelectItem>
                       ))}
                     </SelectContent>

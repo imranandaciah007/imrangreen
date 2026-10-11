@@ -231,7 +231,7 @@ export function CaseReviewView({
                         {item.exhibitId} · {c.field}
                       </p>
                       <p className="mt-1 text-[11px] text-muted-foreground">
-                        You confirmed “{c.existing}”. A later AI read suggested “{c.aiValue}”.
+                        You confirmed “{c.existing}”. A later reading suggested “{c.aiValue}”.
                       </p>
                       <div className="mt-2 flex gap-2">
                         <Button
