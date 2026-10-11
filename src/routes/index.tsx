@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Plus, ShieldCheck } from "lucide-react";
+import { Plus, Settings, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { NAVIGATE_HOME_EVENT } from "@/components/ui/overlay-navigation";
@@ -23,6 +23,7 @@ import { TimelineView } from "@/components/evidence/TimelineView";
 import { ProgressStrip } from "@/components/evidence/ProgressStrip";
 import { TaskReminderManager } from "@/components/evidence/TaskReminderManager";
 import { DiaryImportDialog } from "@/components/evidence/DiaryImportDialog";
+import { SettingsDialog } from "@/components/evidence/SettingsDialog";
 import { SignInGate } from "@/components/evidence/SignInGate";
 import { UploadDialog } from "@/components/evidence/UploadDialog";
 import { useSharedPref } from "@/lib/evidence/shared-state";
@@ -64,6 +65,7 @@ function CaseApp() {
   // button returns to the previous page instead of leaving the app.
   function setTab(next: MainTab) {
     if (next === tabRef.current) return;
+    if (next !== "review") setReviewTasks(false);
     tabRef.current = next;
     setTabRaw(next);
     window.history.pushState({ gcTab: next }, "");
@@ -94,6 +96,9 @@ function CaseApp() {
     if (!next) setPacketResume(false);
   }
   const [diaryOpen, setDiaryOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // The reminders bell opens Review with the task list unfolded.
+  const [reviewTasks, setReviewTasks] = useState(false);
   const [uploadCategory, setUploadCategory] = useState<string | undefined>(undefined);
   const [editItem, setEditItem] = useState<EvidenceItem | null>(null);
 
@@ -108,6 +113,7 @@ function CaseApp() {
       setAskOpen(false);
       setPacketOpen(false);
       setDiaryOpen(false);
+      setSettingsOpen(false);
       openInspector(null);
       setTab("home");
     };
@@ -200,6 +206,14 @@ function CaseApp() {
               </Button>
             );
           })}
+          <Button
+            variant="ghost"
+            onClick={() => setSettingsOpen(true)}
+            className="case-side-link h-11 w-full justify-start gap-3 px-4 text-sm font-bold text-white/60 hover:bg-white/5 hover:text-white"
+          >
+            <Settings className="size-5" />
+            Settings
+          </Button>
         </nav>
         <div className="case-sidebar-status"><ShieldCheck /><div><strong>Private case</strong><span>Imran &amp; Aciah</span></div></div>
       </aside>
@@ -207,10 +221,11 @@ function CaseApp() {
       <div className="min-w-0 lg:col-start-2">
         <AppHeader
           tab={tab}
-          onSearch={() => setAskOpen(true)}
-          onOpenTasks={() => setTab("review")}
-          onAddTask={() => setTaskOpen(true)}
-          onHome={() => setTab("home")}
+          onOpenTasks={() => {
+            setReviewTasks(true);
+            setTab("review");
+          }}
+          onSettings={() => setSettingsOpen(true)}
           onBack={() => {
             if (window.history.state?.gcTab && window.history.length > 1) window.history.back();
             else setTab("home");
@@ -235,19 +250,12 @@ function CaseApp() {
                   if (t === "documents") setLayout("list");
                   setTab(t);
                 }}
-                onOpenFolders={() => {
-                  setLayout("folders");
-                  setTab("documents");
-                }}
-                onUpload={() => openUpload()}
-                onAddTask={() => setTaskOpen(true)}
                 onBuildPacket={() => setPacketOpen(true)}
                 onResumeFiling={() => {
                   setPacketResume(true);
                   setPacketOpen(true);
                 }}
                 onSyncDrive={handleDriveSync}
-                onOpenCategory={openCategory}
               />
             )}
 
@@ -270,15 +278,18 @@ function CaseApp() {
             {tab === "review" && (
               <CaseReviewView
                 onAddTask={() => setTaskOpen(true)}
-                onBuildPacket={() => setPacketOpen(true)}
                 onOpenCategory={openCategory}
+                onOpenFolders={() => {
+                  setLayout("folders");
+                  setTab("documents");
+                }}
+                onOpenTimeline={() => setTab("timeline")}
+                onOpenFinances={() => setTab("finances")}
+                focusTasks={reviewTasks}
               />
             )}
 
 
-            <p className="pt-2 text-center text-[10px] font-semibold text-muted-foreground">
-              {stats.total} exhibits · {stats.totalPages} pages
-            </p>
           </>
         )}
         </main>
@@ -308,6 +319,13 @@ function CaseApp() {
       <EventDialog open={eventOpen} onOpenChange={setEventOpen} />
       <PacketBuilder open={packetOpen} onOpenChange={setPacketOpen} resumeOnOpen={packetResume} />
       <AskEvidenceDialog open={askOpen} onOpenChange={setAskOpen} />
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onSyncDrive={() => void handleDriveSync()}
+        onAskEvidence={() => setAskOpen(true)}
+        onImportDiary={() => setDiaryOpen(true)}
+      />
       <TaskDialog open={taskOpen} onOpenChange={setTaskOpen} />
       <BottomNav tab={tab} onTab={openNavItem} onAdd={() => setAddOpen(true)} />
     </div>

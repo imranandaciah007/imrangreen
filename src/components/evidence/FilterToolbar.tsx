@@ -1,5 +1,5 @@
 import { statusLabel } from "@/components/evidence/status-ui";
-import { Check, ChevronDown, FolderInput, Search, Sparkles, Tags, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, FolderInput, Search, SlidersHorizontal, Sparkles, Tags, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -76,7 +76,14 @@ function MultiSelect<T extends string>({
   );
 }
 
-export function FilterToolbar() {
+export function FilterToolbar({
+  showFilters = true,
+  onToggleFilters,
+}: {
+  /** Filters stay folded away until asked for, so the list is the first thing you see. */
+  showFilters?: boolean;
+  onToggleFilters?: () => void;
+} = {}) {
   const {
     filters,
     setFilters,
@@ -103,19 +110,41 @@ export function FilterToolbar() {
     filters.exhibitGroups.length +
     (filters.translationOnly ? 1 : 0) +
     (filters.query ? 1 : 0);
+  const filterCount = activeCount - (filters.query ? 1 : 0);
 
   return (
     <div className="space-y-2 rounded-xl border border-border bg-card p-2.5 shadow-panel">
-      <div className="relative">
-        <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={filters.query}
-          onChange={(e) => setFilters({ query: e.target.value })}
-          placeholder="Search titles, files, notes, people, tags, dates…"
-          className="h-11 pl-9 text-sm"
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={filters.query}
+            onChange={(e) => setFilters({ query: e.target.value })}
+            placeholder="Search documents…"
+            className="h-11 pl-9 text-sm"
+          />
+        </div>
+        {onToggleFilters && (
+          <Button
+            variant={showFilters || filterCount ? "default" : "outline"}
+            className="h-11 shrink-0"
+            onClick={onToggleFilters}
+            aria-expanded={showFilters}
+          >
+            <SlidersHorizontal className="size-4" /> Filter{filterCount ? ` (${filterCount})` : ""}
+          </Button>
+        )}
       </div>
+      {!showFilters && activeCount > 0 && (
+        <p className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
+          Showing {filtered.length} of {items.length}
+          <button type="button" className="font-semibold text-primary underline" onClick={resetFilters}>
+            Show all
+          </button>
+        </p>
+      )}
 
+      {showFilters && (
       <div className="flex flex-wrap items-center gap-2">
         <MultiSelect
           label="Category"
@@ -158,6 +187,7 @@ export function FilterToolbar() {
           </Button>
         )}
       </div>
+      )}
 
       {selectedIds.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-navy/25 bg-navy/6 p-2">
