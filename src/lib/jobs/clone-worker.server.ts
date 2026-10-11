@@ -146,6 +146,18 @@ export async function runCloneTick(
       files = tree.files.length;
       scanned = tree.files.length;
 
+      // Bin temporary "GC conversion" copies left behind by an interrupted print.
+      const stale = Date.now() - 30 * 60_000;
+      for (const leftover of tree.files.filter(
+        (file) => /^GC conversion /.test(file.name) && Date.parse(file.modifiedTime || "") < stale,
+      )) {
+        try {
+          await drive.trashNode(leftover.id);
+        } catch (error) {
+          console.error(`Could not bin the leftover ${leftover.name}:`, error);
+        }
+      }
+
       const originals = tree.files.filter(
         (file) =>
           !file.path.split("/").includes(CLONE_ROOT) &&
