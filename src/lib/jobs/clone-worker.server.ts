@@ -6,7 +6,7 @@
  * file, and pauses itself if the AI/Drive gateway blocks the workspace.
  */
 
-import { isEvidenceFile } from "@/lib/evidence/file-formats";
+import { isAppOutputPath, isEvidenceFile } from "@/lib/evidence/file-formats";
 import { classifyDriveFile } from "@/lib/evidence/drive-classify";
 
 const LEASE_MINUTES = 3;
@@ -150,6 +150,8 @@ export async function runCloneTick(
         (file) =>
           !file.path.split("/").includes(CLONE_ROOT) &&
           !drive.isIgnoredDrivePath(file.path) &&
+          // Packets the app built are outputs, not evidence.
+          !isAppOutputPath(file.path) &&
           supportedFile(file.name, file.mimeType),
       );
 
@@ -689,8 +691,15 @@ const MONEY_PER_RUN = 6;
 
 export type MoneyFoundMap = Record<
   string,
-  { readAt: string; payments: import("@/lib/jobs/money-read.server").FoundPayment[] }
+  {
+    readAt: string;
+    payments: import("@/lib/jobs/money-read.server").FoundPayment[];
+    /** Set while the document could not be read; it is tried up to three times. */
+    failed?: boolean;
+    attempts?: number;
+  }
 >;
+const MONEY_MAX_ATTEMPTS = 3;
 
 /**
  * Reads a few finished money documents (receipts, transfers, statements) for the
@@ -732,7 +741,9 @@ async function findPaymentsInDoneDocuments(deadline: number) {
       .range(from, from + 999);
     if (error) throw new Error(error.message);
     for (const row of (page ?? []) as DoneRow[]) {
-      if (already[row.drive_file_id]) continue;
+      const seen = already[row.drive_file_id];
+      // Done, or given up on after three failed reads: never read again.
+      if (seen && (!seen.failed || (seen.attempts ?? 0) >= MONEY_MAX_ATTEMPTS)) continue;
       if (
         !looksLikeMoneyDocument({
           fileName: row.file_name,
@@ -752,16 +763,25 @@ async function findPaymentsInDoneDocuments(deadline: number) {
   const results: MoneyFoundMap = {};
   for (const row of candidates) {
     if (Date.now() > deadline) break;
-    const read = await readPayments({
-      driveFileId: row.drive_file_id,
-      fileName: row.file_name,
-      mimeType: row.mime_type,
-      title: row.ai_title ?? "",
-      separationStartDate: CASE_SETTINGS.separationStartDate,
-    });
-    // A file that could not be opened is left for the next run.
-    if (read.contentRead) {
-      results[row.drive_file_id] = { readAt: new Date().toISOString(), payments: read.payments };
+    let read: Awaited<ReturnType<typeof readPayments>> | null = null;
+    try {
+      read = await readPayments({
+        driveFileId: row.drive_file_id,
+        fileName: row.file_name,
+        mimeType: row.mime_type,
+        title: row.ai_title ?? "",
+        separationStartDate: CASE_SETTINGS.separationStartDate,
+      });
+    } catch (error) {
+      console.error(`Could not look for payments in ${row.file_name}:`, error);
+    }
+    const readAt = new Date().toISOString();
+    if (read?.contentRead) {
+      results[row.drive_file_id] = { readAt, payments: read.payments };
+    } else {
+      // Counted, so a file that can never be read stops taking a place in every run.
+      const attempts = (already[row.drive_file_id]?.attempts ?? 0) + 1;
+      results[row.drive_file_id] = { readAt, payments: [], failed: true, attempts };
     }
   }
   if (!Object.keys(results).length) return;
