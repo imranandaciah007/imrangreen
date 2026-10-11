@@ -202,6 +202,21 @@ export interface PacketVersion {
   filingFiles?: { name: string; webViewLink: string }[] | undefined;
   filingBuiltAt?: string | undefined;
   filingPageCount?: number | undefined;
+  /** The cover letter drafted for this version, so any device can build its filing packet. */
+  coverLetter?: string[] | undefined;
+  /** Filing parts already built, so a build stopped on one device carries on from another. */
+  filingParts?: FilingPartRecord[] | undefined;
+  /** Which exhibits went into which part; saved parts are reused only while it still matches. */
+  filingPlanKey?: string | undefined;
+}
+
+export interface FilingPartRecord {
+  name: string;
+  fileId: string;
+  webViewLink: string;
+  firstPage: number;
+  lastPage: number;
+  exhibits: { number: string; firstPage: number; lastPage: number; included: boolean; note?: string | undefined }[];
 }
 
 export const EVENT_STATUSES = ["Recorded", "Needs evidence", "Confirmed", "Resolved"] as const;

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -38,7 +38,7 @@ import {
   type PacketInput,
 } from "@/lib/evidence/packet";
 import { useEvidence } from "@/lib/evidence/store";
-import { CASE_SETTINGS, EXPENSE_GROUPS, DEFAULT_CATEGORIES } from "@/lib/evidence/types";
+import { CASE_SETTINGS, EXPENSE_GROUPS, DEFAULT_CATEGORIES, type FilingPartRecord } from "@/lib/evidence/types";
 import { uploadPacketFile } from "@/lib/drive.functions";
 import { draftFilingLanguage, type FilingLanguage } from "@/lib/filing.functions";
 import {
@@ -66,9 +66,12 @@ function download(name: string, mimeType: string, content: string) {
 export function PacketBuilder({
   open,
   onOpenChange,
+  resumeOnOpen = false,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** Open straight at the latest saved packet's filing step, to carry on a build. */
+  resumeOnOpen?: boolean;
 }) {
   const {
     items,
@@ -89,6 +92,7 @@ export function PacketBuilder({
     driveTree,
     runExtraction,
     extractingIds,
+    reportJob,
   } = useEvidence();
 
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -108,7 +112,7 @@ export function PacketBuilder({
   const [filingMissing, setFilingMissing] = useState<{ number: string; title: string; note: string }[]>([]);
   const [filingError, setFilingError] = useState<string | null>(null);
   /** Parts already built for this packet, so a retry carries on from the failed part. */
-  const filingDone = useRef<{ packetId: string; parts: FilingPartResult[] } | null>(null);
+  const filingDone = useRef<{ packetId: string; planKey: string; parts: FilingPartRecord[] } | null>(null);
   const [narrative, setNarrative] = useState<FilingLanguage | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [analysis, setAnalysis] = useState<WaiverAnalysis | null>(null);
@@ -377,6 +381,7 @@ export function PacketBuilder({
       driveFolder: "/I601 Evidence/Generated Case Packets/",
       driveFolderWebViewLink: folderWebViewLink || undefined,
       files: results.map((r) => ({ name: r.name, webViewLink: r.link })),
+      coverLetter: narrative?.coverLetter,
       exhibitMap: exhibits.map((e) => ({
         evidenceId: e.item.id,
         number: e.number,
@@ -394,6 +399,28 @@ export function PacketBuilder({
     setBusy(false);
     setStep(4);
   }
+
+  /** Pick up the latest saved packet, e.g. on another device, at the filing step. */
+  function resumeLatestPacket() {
+    if (!latestPacket) return;
+    setSections(latestPacket.sections.length ? latestPacket.sections : DEFAULT_CATEGORIES);
+    setSaved(
+      latestPacket.files.map((f) => ({ name: f.name, link: f.webViewLink ?? "", drive: Boolean(f.webViewLink) })),
+    );
+    setSavedFolderLink(latestPacket.driveFolderWebViewLink ?? "");
+    setSavedPacket({ id: latestPacket.id, version: latestPacket.version });
+    setFilingFiles(latestPacket.filingFiles ?? []);
+    setFilingMissing([]);
+    setFilingError(null);
+    filingDone.current = null;
+    setStep(4);
+  }
+
+  useEffect(() => {
+    if (open && resumeOnOpen && latestPacket && !savedPacket) resumeLatestPacket();
+    // Only when the dialog opens for a resume.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, resumeOnOpen]);
 
   /**
    * The finished filing packet: built from the Drive originals in parts of a few
@@ -428,12 +455,19 @@ export function PacketBuilder({
     }
     if (!plan.length) return;
 
-    if (filingDone.current?.packetId !== savedPacket.id) {
-      filingDone.current = { packetId: savedPacket.id, parts: [] };
+    // Parts already built (on this device or another) are reused while the plan matches.
+    const planKey = plan.map((p) => p.exhibits.map((e) => `${e.number}=${e.item.id}`).join(",")).join("|");
+    const record = packets.find((p) => p.id === savedPacket.id);
+    let done = filingDone.current;
+    if (!done || done.packetId !== savedPacket.id || done.planKey !== planKey) {
+      const savedParts = record?.filingPlanKey === planKey ? (record.filingParts ?? []) : [];
+      done = { packetId: savedPacket.id, planKey, parts: [...savedParts] };
+      filingDone.current = done;
     }
-    const done = filingDone.current;
+    const total = plan.length + 1;
     setFilingError(null);
-    setFilingProgress({ done: done.parts.length, total: plan.length + 1 });
+    setFilingProgress({ done: done.parts.length, total });
+    reportJob("filing", { status: "running", done: done.parts.length, total, packetId: savedPacket.id });
     try {
       for (let i = done.parts.length; i < plan.length; i += 1) {
         const part = plan[i]!;
@@ -460,7 +494,9 @@ export function PacketBuilder({
           },
         });
         done.parts.push(result);
-        setFilingProgress({ done: done.parts.length, total: plan.length + 1 });
+        setFilingProgress({ done: done.parts.length, total });
+        updatePacketVersion(savedPacket.id, { filingParts: [...done.parts], filingPlanKey: planKey });
+        reportJob("filing", { status: "running", done: done.parts.length, total, packetId: savedPacket.id });
       }
 
       const pagesOf = new Map(done.parts.flatMap((p) => p.exhibits).map((e) => [e.number, e]));
@@ -488,7 +524,7 @@ export function PacketBuilder({
           applicant: CASE_SETTINGS.applicantFullName,
           qualifyingRelative: CASE_SETTINGS.qualifyingRelativeFullName,
           preparedOn: formatDate(new Date().toISOString().slice(0, 10)),
-          coverLetter: narrative?.coverLetter ?? [],
+          coverLetter: narrative?.coverLetter ?? record?.coverLetter ?? [],
           tabs,
           parts: done.parts.map((p) => ({ name: p.name.replace(/\.pdf$/, ""), firstPage: p.firstPage, lastPage: p.lastPage })),
         },
@@ -519,6 +555,7 @@ export function PacketBuilder({
           return { evidenceId: e.item.id, number: e.number, pages: p ? `${p.firstPage}-${p.lastPage}` : "" };
         }),
       });
+      reportJob("filing", { status: "done", done: total, total, packetId: savedPacket.id });
       toast.success(`Filing packet ready: ${totalPages} numbered pages`, {
         description: missing.length
           ? `${missing.length} original(s) need inserting by hand — listed below.`
@@ -527,6 +564,7 @@ export function PacketBuilder({
     } catch (error) {
       const message = error instanceof Error ? error.message : "The filing packet could not be built.";
       setFilingError(message);
+      reportJob("filing", { status: "stopped", done: done.parts.length, total, packetId: savedPacket.id });
       toast.error("The filing packet stopped part-way", {
         description: `${message} Press the button again to carry on from where it stopped.`,
       });
@@ -600,6 +638,26 @@ export function PacketBuilder({
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-0.5">
           {step === 0 && (
             <>
+              {latestPacket && !savedPacket && (
+                <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-2.5">
+                  <p className="text-[11px] font-semibold text-foreground">
+                    Packet v{latestPacket.version} is saved
+                    {latestPacket.filingBuiltAt
+                      ? " and its filing packet is built."
+                      : latestPacket.filingParts?.length
+                        ? `. Its filing packet stopped after ${latestPacket.filingParts.length} part(s).`
+                        : ", but its filing packet is not built yet."}
+                  </p>
+                  <Button variant="outline" className="h-10 w-full" onClick={resumeLatestPacket}>
+                    {latestPacket.filingBuiltAt
+                      ? `Open packet v${latestPacket.version}`
+                      : `Carry on with packet v${latestPacket.version}`}
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground">
+                    Or continue below to check the evidence and make a new version.
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-2">
                 {[
                   {
@@ -1009,7 +1067,9 @@ export function PacketBuilder({
                     {filingProgress ? <Loader2 className="size-4 animate-spin" /> : <FileText className="size-4" />}
                     {filingProgress
                       ? `Building part ${Math.min(filingProgress.done + 1, filingProgress.total)} of ${filingProgress.total}…`
-                      : filingError
+                      : filingError ||
+                          (!filingFiles.length &&
+                            packets.find((p) => p.id === savedPacket?.id)?.filingParts?.length)
                         ? "Carry on building the filing packet"
                         : filingFiles.length
                           ? "Build the filing packet again"

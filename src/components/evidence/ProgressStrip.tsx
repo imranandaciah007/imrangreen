@@ -1,16 +1,41 @@
 import { useEffect } from "react";
-import { Loader2, PauseCircle } from "lucide-react";
+import { Loader2, PauseCircle, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 
 import { getBackgroundStatus } from "@/lib/jobs/background.functions";
+import { STALE_JOB_MS, deviceId, type JobKind, type SharedJob } from "@/lib/evidence/shared-state";
 import { useEvidence } from "@/lib/evidence/store";
 
-type Line = { key: string; text: string; done?: number; total?: number; paused?: boolean };
+type Line = {
+  key: string;
+  text: string;
+  done?: number;
+  total?: number;
+  paused?: boolean;
+  onContinue?: () => void;
+  onDismiss?: () => void;
+};
 
-/** One thin line per job that is running now, shown at the top of every screen. */
-export function ProgressStrip() {
-  const { driveSyncing, scanProgress } = useEvidence();
+const JOB_NAMES: Record<JobKind, string> = {
+  drive: "Update from Drive",
+  read: "Reading documents",
+  filing: "Filing packet",
+};
+
+/**
+ * One thin line per job, shown at the top of every screen. Jobs are shared, so a
+ * run that stopped on another device (or when this one was closed) shows here
+ * with a Continue button that picks it up from where it stopped.
+ */
+export function ProgressStrip({
+  onContinueUpdate,
+  onContinueFiling,
+}: {
+  onContinueUpdate: () => void;
+  onContinueFiling: () => void;
+}) {
+  const { driveSyncing, scanProgress, jobs, jobsHere, reportJob } = useEvidence();
   const fetchStatus = useServerFn(getBackgroundStatus);
   const { data, refetch } = useQuery({
     queryKey: ["gc-background-status"],
@@ -35,6 +60,45 @@ export function ProgressStrip() {
       total: scanProgress.total,
     });
   }
+
+  // Jobs recorded by another device, or by this one before it was closed.
+  const me = deviceId();
+  const runningHere: Record<JobKind, boolean> = {
+    drive: driveSyncing,
+    read: scanProgress.running,
+    filing: false,
+  };
+  const describe = (kind: JobKind, job: SharedJob) =>
+    job.total ? `${JOB_NAMES[kind]}: ${job.done} of ${job.total}` : JOB_NAMES[kind];
+  for (const kind of ["drive", "read", "filing"] as const) {
+    const job = jobs[kind];
+    if (!job || job.status === "done" || runningHere[kind]) continue;
+    const fresh = Date.now() - Date.parse(job.updatedAt) < STALE_JOB_MS;
+    if (job.status === "running" && (fresh || jobsHere[kind])) {
+      lines.push({
+        key: `job-${kind}`,
+        text:
+          job.device === me
+            ? describe(kind, job).replace("Filing packet:", "Building filing packet: part")
+            : `On your other device — ${describe(kind, job)}`,
+        done: job.done,
+        total: job.total,
+      });
+      continue;
+    }
+    // The update and the reading resume together: Update from Drive does both.
+    if (kind === "drive" && jobs.read && jobs.read.status !== "done") continue;
+    lines.push({
+      key: `job-${kind}`,
+      text: `${describe(kind, job)} — ${job.status === "paused" ? "paused" : "stopped before finishing"}`,
+      done: job.done,
+      total: job.total,
+      paused: true,
+      onContinue: kind === "filing" ? onContinueFiling : onContinueUpdate,
+      onDismiss: () => reportJob(kind, { status: "done" }),
+    });
+  }
+
   if (data?.status === "paused") {
     lines.push({
       key: "copies",
@@ -67,7 +131,26 @@ export function ProgressStrip() {
               <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
             )}
             <span className="min-w-0 truncate">{line.text}</span>
-            {line.total ? (
+            {line.onContinue && (
+              <button
+                type="button"
+                onClick={line.onContinue}
+                className="ml-auto h-7 shrink-0 rounded-md bg-primary px-2.5 text-[11px] font-bold text-primary-foreground"
+              >
+                Continue
+              </button>
+            )}
+            {line.onDismiss && (
+              <button
+                type="button"
+                onClick={line.onDismiss}
+                aria-label="Hide this"
+                className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+            {line.total && !line.onContinue ? (
               <span className="ml-auto h-1 w-20 shrink-0 overflow-hidden rounded-full bg-border sm:w-32">
                 <span
                   className="block h-full rounded-full bg-primary transition-[width]"

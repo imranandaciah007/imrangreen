@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { statusLabel } from "@/components/evidence/status-ui";
 import { formatDate, parseDay } from "@/lib/evidence/format";
+import { STALE_JOB_MS } from "@/lib/evidence/shared-state";
 import { useEvidence } from "@/lib/evidence/store";
 import { CaseProgressPanel } from "@/components/evidence/CaseProgressPanel";
 import { isOpenTask } from "@/lib/task-reminders";
@@ -67,6 +68,7 @@ export function HomeView({
   onUpload,
   onAddTask,
   onBuildPacket,
+  onResumeFiling,
   onSyncDrive,
   onOpenCategory,
 }: {
@@ -75,10 +77,11 @@ export function HomeView({
   onUpload: () => void;
   onAddTask: () => void;
   onBuildPacket: () => void;
+  onResumeFiling: () => void;
   onSyncDrive: () => Promise<void>;
   onOpenCategory: (category: string) => void;
 }) {
-  const { stats, caseSettings, tasks, events, items, gaps, packets, connection, driveSyncing, scanProgress, pauseSync, openInspector } = useEvidence();
+  const { stats, caseSettings, tasks, events, items, gaps, packets, connection, driveSyncing, scanProgress, pauseSync, openInspector, jobs, jobsHere } = useEvidence();
   const busy = driveSyncing || scanProgress.running;
   const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const openTasks = tasks.filter(isOpenTask);
@@ -104,6 +107,16 @@ export function HomeView({
     .filter(Boolean)
     .join(" · ");
 
+  // Work left unfinished, on this device or another one, comes first.
+  const unfinished = (kind: "drive" | "read" | "filing") => {
+    const job = jobs[kind];
+    if (!job || job.status === "done" || jobsHere[kind]) return null;
+    const quiet = Date.now() - Date.parse(job.updatedAt) > STALE_JOB_MS;
+    return job.status !== "running" || quiet ? job : null;
+  };
+  const stoppedRead = unfinished("read") ?? unfinished("drive");
+  const stoppedFiling = unfinished("filing");
+
   // The single most useful thing to do next, in the order a filing comes together.
   const next: NextStep = busy
     ? {
@@ -112,6 +125,22 @@ export function HomeView({
         icon: <PauseCircle />,
         run: () => pauseSync(),
       }
+    : stoppedRead && connection?.lastSyncedAt
+      ? {
+          label: stoppedRead.total
+            ? `Carry on reading (${stoppedRead.done} of ${stoppedRead.total})`
+            : "Carry on updating from Drive",
+          why: "The last run stopped before it finished. It picks up where it left off; nothing is read twice.",
+          icon: <RefreshCw />,
+          run: () => void onSyncDrive(),
+        }
+      : stoppedFiling && latestPacket && !latestPacket.filingBuiltAt
+        ? {
+            label: `Carry on the filing packet (part ${stoppedFiling.done + 1} of ${stoppedFiling.total})`,
+            why: "The finished parts are already saved, so it carries on from the next one.",
+            icon: <FileStack />,
+            run: onResumeFiling,
+          }
     : !connection?.lastSyncedAt
       ? {
           label: "Update from Drive",

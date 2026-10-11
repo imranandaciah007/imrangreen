@@ -115,7 +115,7 @@ export class LocalCaseProvider implements DocumentProvider {
   /** What the shared store held for each key the last time this device read or wrote it. */
   private storeBase = new Map<string, unknown>();
   /** Values saved on this device that have not reached the shared store yet. */
-  private storePending = new Map<string, { localKey: string; value: unknown }>();
+  private storePending = new Map<string, { localKey: string; value: unknown; replace?: boolean }>();
   private storeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   /** Shared by everything that starts up at once, so the cloud copy is read only once. */
   private inflightPull: Promise<boolean> | null = null;
@@ -248,12 +248,21 @@ export class LocalCaseProvider implements DocumentProvider {
     return localValue;
   }
 
-  saveShared(key: string, localKey: string, value: unknown) {
+  /**
+   * Save a shared value. `replace` stores it as given instead of merging, for
+   * single values such as settings and progress, where the newest one wins.
+   */
+  saveShared(key: string, localKey: string, value: unknown, options?: { replace?: boolean }) {
     writeJson(localKey, value);
     this.storeCache.set(key, value);
     if (typeof window === "undefined") return;
-    this.storePending.set(key, { localKey, value });
+    this.storePending.set(key, { localKey, value, replace: options?.replace === true });
     this.scheduleStorePush(key, 800);
+  }
+
+  /** The shared value as of the last refresh, without waiting for the network. */
+  peekShared<T>(key: string): T | undefined {
+    return this.storeCache.get(key) as T | undefined;
   }
 
   private scheduleStorePush(key: string, delay: number) {
@@ -280,7 +289,7 @@ export class LocalCaseProvider implements DocumentProvider {
           key,
           data: pending.value as never,
           base: this.storeBase.get(key) as never,
-          merge: true,
+          merge: !pending.replace,
         },
       });
       const merged = JSON.parse(result.json) as unknown;
@@ -308,7 +317,27 @@ export class LocalCaseProvider implements DocumentProvider {
     return this.connection;
   }
 
+  /** Keep this device's copy and the shared copy of the Drive connection together. */
+  private saveConnection() {
+    if (this.connection) this.saveShared("connection", CONN_KEY, this.connection, { replace: true });
+  }
+
+  /**
+   * The Drive connection is set up once for the whole case, so a device signing in
+   * for the first time takes the shared copy (and whichever update was most recent).
+   */
   async getConnection() {
+    if (!this.hasPulled) await this.pull();
+    const local = this.loadConnection();
+    const shared = this.storeCache.get("connection") as ProviderConnection | undefined;
+    if (shared && typeof shared === "object" && !this.storePending.has("connection")) {
+      const newer = (shared.lastSyncedAt ?? "") > (local.lastSyncedAt ?? "");
+      this.connection = {
+        ...(newer ? { ...local, ...shared } : { ...shared, ...local }),
+        connected: Boolean(local.connected || shared.connected),
+      };
+      writeJson(CONN_KEY, this.connection);
+    }
     return { ...this.loadConnection() };
   }
 
@@ -322,13 +351,13 @@ export class LocalCaseProvider implements DocumentProvider {
       folderPath: config.folderPath || prev.folderPath || "/I601 Evidence/",
       lastSyncedAt: new Date().toISOString(),
     };
-    writeJson(CONN_KEY, this.connection);
+    this.saveConnection();
     return { ...this.connection };
   }
 
   async disconnect() {
     this.connection = { ...this.loadConnection(), connected: false };
-    writeJson(CONN_KEY, this.connection);
+    this.saveConnection();
     return { ...this.connection };
   }
 
@@ -363,7 +392,7 @@ export class LocalCaseProvider implements DocumentProvider {
     this.queue([created.id]);
     const conn = this.loadConnection();
     this.connection = { ...conn, lastSyncedAt: now };
-    writeJson(CONN_KEY, this.connection);
+    this.saveConnection();
     return created;
   }
 
