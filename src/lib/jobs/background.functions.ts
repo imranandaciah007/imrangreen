@@ -233,3 +233,9 @@ export const listCloneFolders = createServerFn({ method: "GET" }).handler(async 
   return { root: "I601 Evidence Clones", folders };
 });
 
+
+/** Compare every Drive original with the exhibit copies (read-only). */
+export const checkCopiesAgainstOriginals = createServerFn({ method: "POST" }).handler(async () => {
+  const { checkCopies } = await import("@/lib/jobs/copy-check.server");
+  return checkCopies();
+});
