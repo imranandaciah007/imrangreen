@@ -63,6 +63,8 @@ function fileTypeFor(name: string, mime: string): FileType | null {
   if (lower.endsWith(".docx") || mime.includes("wordprocessingml")) return "DOCX";
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || mime === "image/jpeg") return "JPG";
   if (lower.endsWith(".png") || mime === "image/png") return "PNG";
+  // Other photos (e.g. iPhone HEIC) are copied as JPEG pictures.
+  if (/\.(heic|heif|webp|gif|bmp|tiff?)$/.test(lower) || /^image\//.test(mime)) return "JPG";
   return null;
 }
 

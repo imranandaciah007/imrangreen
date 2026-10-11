@@ -343,6 +343,19 @@ export async function fetchDriveBytes(fileId: string): Promise<Uint8Array> {
   return new Uint8Array(await res.arrayBuffer());
 }
 
+/** JPEG picture of an image Drive can display but pdf-lib cannot embed (e.g. HEIC). */
+export async function fetchDriveJpegRendering(fileId: string): Promise<Uint8Array> {
+  const meta = await fetch(`${GATEWAY}/drive/v3/files/${driveId(fileId)}?fields=thumbnailLink`, {
+    headers: driveHeaders(),
+  });
+  if (!meta.ok) throw new Error(`Could not read the photo details [${meta.status}]: ${await meta.text()}`);
+  const { thumbnailLink } = (await meta.json()) as { thumbnailLink?: string };
+  if (!thumbnailLink) throw new Error("Drive has not prepared a picture of this photo yet.");
+  const res = await fetch(thumbnailLink.replace(/=s\d+$/, "=s2400"));
+  if (!res.ok) throw new Error(`Could not download the photo picture [${res.status}]`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 const GOOGLE_NATIVE = /^application\/vnd\.google-apps\.(document|spreadsheet|presentation|drawing)$/;
 
 const OFFICE_TO_GOOGLE: Record<string, string> = {
@@ -394,6 +407,10 @@ export async function fetchOriginalForEmbedding(input: {
   }
   if (/^image\/jpe?g$/.test(mime) || /\.jpe?g$/.test(name)) {
     return { bytes: await fetchDriveBytes(input.fileId), kind: "jpg" };
+  }
+  // iPhone photos (HEIC/HEIF) and other picture types: Drive renders a JPEG.
+  if (/^image\//.test(mime) || /\.(heic|heif|webp|gif|bmp|tiff?)$/.test(name)) {
+    return { bytes: await fetchDriveJpegRendering(input.fileId), kind: "jpg" };
   }
   if (GOOGLE_NATIVE.test(mime)) {
     return { bytes: await exportAsPdf(input.fileId), kind: "pdf" };
