@@ -51,7 +51,6 @@ import { buildWaiverAnalysis, type WaiverAnalysis } from "@/lib/waiver-analysis.
 import { waiverAnalysisHtml } from "@/lib/evidence/waiver-analysis-html";
 import { FixWizard } from "./FixWizard";
 
-const STEPS = ["Audit", "Sections", "Exhibit index", "Generate", "Saved"] as const;
 
 function download(name: string, mimeType: string, content: string) {
   const blob = new Blob([content], { type: mimeType });
@@ -101,7 +100,6 @@ export function PacketBuilder({
   const [fixAllProgress, setFixAllProgress] = useState("");
 
   const [step, setStep] = useState(0);
-  const [acknowledged, setAcknowledged] = useState(false);
   const [sections, setSections] = useState<string[]>(DEFAULT_CATEGORIES);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<{ name: string; link: string; drive: boolean }[]>([]);
@@ -620,23 +618,8 @@ export function PacketBuilder({
           </div>
         </DialogHeader>
 
-        <ol className="flex shrink-0 items-center gap-1 overflow-x-auto text-[10px]">
-          {STEPS.map((label, i) => (
-            <li
-              key={label}
-              className={`flex items-center gap-1 rounded-full border px-2 py-1 whitespace-nowrap ${
-                i === step
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border text-muted-foreground"
-              }`}
-            >
-              <span className="font-mono">{i + 1}</span> {label}
-            </li>
-          ))}
-        </ol>
-
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-0.5">
-          {step === 0 && (
+          {step < 4 && (
             <>
               {latestPacket && !savedPacket && (
                 <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-2.5">
@@ -658,26 +641,11 @@ export function PacketBuilder({
                   </p>
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  {
-                    label: "Ready to include",
-                    n: exhibits.length,
-                    tone: "text-success",
-                  },
-                  {
-                    label: "Needs attention",
-                    n: attention.length + blocking.length,
-                    tone: "text-warning",
-                  },
-                  { label: "Optional", n: optional.length, tone: "text-muted-foreground" },
-                ].map((c) => (
-                  <div key={c.label} className="rounded-lg border border-border bg-card p-2.5">
-                    <div className={`font-mono text-lg font-semibold ${c.tone}`}>{c.n}</div>
-                    <div className="text-[10px] text-muted-foreground">{c.label}</div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs text-foreground">
+                <strong>{exhibits.length}</strong> exhibits · <strong>{pageCount}</strong> pages ·{" "}
+                <strong>{sections.length}</strong> tabs
+                {latestPacket ? ` · last built ${formatDateTime(latestPacket.generatedAt)}` : ""}
+              </p>
 
               {blocking.length > 0 && (
                 <p className="rounded-lg border border-destructive/50 bg-destructive/10 p-2.5 text-[11px]">
@@ -686,6 +654,14 @@ export function PacketBuilder({
                 </p>
               )}
 
+              {blocking.length + attention.length + optional.length > 0 && (
+                <details className="rounded-lg border border-border bg-card p-2.5" open={blocking.length > 0}>
+                  <summary className="cursor-pointer select-none text-xs font-semibold text-foreground">
+                    {blocking.length
+                      ? `${blocking.length} must be fixed before building`
+                      : `${attention.length + optional.length} document(s) could be improved (optional)`}
+                  </summary>
+                  <div className="mt-2 space-y-2">
               {(() => {
                 const ids = Array.from(
                   new Set(
@@ -786,20 +762,16 @@ export function PacketBuilder({
                 </Button>
               )}
 
-              {(attention.length > 0 || optional.length > 0) && (
-                <label className="flex items-center gap-2 rounded-lg border border-border bg-card p-2.5 text-[11px]">
-                  <Checkbox
-                    checked={acknowledged}
-                    onCheckedChange={(v) => setAcknowledged(Boolean(v))}
-                  />
-                  I have seen these items and want to continue anyway.
-                </label>
+                  </div>
+                </details>
               )}
             </>
           )}
 
-          {step === 1 && (
-            <>
+          {step < 4 && (
+            <details className="rounded-lg border border-border bg-card p-2.5">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-foreground">Tabs in the packet ({sections.length})</summary>
+              <div className="mt-2 space-y-2">
               <p className="text-[11px] text-muted-foreground">
                 Choose the sections to include. Evidence that supports several sections is filed
                 once and cross-referenced.
@@ -837,36 +809,21 @@ export function PacketBuilder({
                   );
                 })}
               </ul>
-            </>
+              </div>
+            </details>
           )}
 
-          {step === 2 && (
-            <>
+          {step < 4 && (
+            <details className="rounded-lg border border-border bg-card p-2.5">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-foreground">Exhibit index ({exhibits.length} exhibits)</summary>
+              <div className="mt-2 space-y-2">
               <p className="text-[11px] text-muted-foreground">
                 {exhibits.length} exhibits, {pageCount} packet pages. Turn an exhibit off to leave
                 it out of this packet — it stays in Documents.
               </p>
               <p className="text-[11px] text-muted-foreground">
                 Each section is a tab, and exhibits are numbered within it (Exhibit A-1, A-2,
-                B-1…). Numbers stay fixed once a packet is generated.{" "}
-                <button
-                  type="button"
-                  className="font-semibold text-primary underline underline-offset-2"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "Number every tab again from 1, in date order? Only do this before you file — numbers in earlier drafts will no longer match.",
-                      )
-                    ) {
-                      const n = resetFilingNumbers();
-                      toast.success(`Numbering cleared on ${n} exhibit(s)`, {
-                        description: "The next packet numbers each tab from 1.",
-                      });
-                    }
-                  }}
-                >
-                  Start numbering again
-                </button>
+                B-1…). Numbers stay fixed once a packet is built.
               </p>
               <ul className="space-y-1.5">
                 {items.map((item) => {
@@ -903,26 +860,14 @@ export function PacketBuilder({
                   </li>
                 )}
               </ul>
-            </>
+              </div>
+            </details>
           )}
 
-          {step === 3 && (
-            <div className="space-y-2.5">
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  ["Exhibits", String(exhibits.length)],
-                  ["Packet pages", String(pageCount)],
-                  ["Timeline events", String(events.length)],
-                  ["Unresolved items", String(gaps.length)],
-                  ["Documented since 18 Aug 2026", `£${totals.documented.toFixed(2)}`],
-                  ["Sections", String(sections.length)],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-border bg-card p-2.5">
-                    <div className="text-[10px] text-muted-foreground">{label}</div>
-                    <div className="font-mono text-sm font-semibold text-foreground">{value}</div>
-                  </div>
-                ))}
-              </div>
+          {step < 4 && (
+            <details className="rounded-lg border border-border bg-card p-2.5">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-foreground">Cover letter, waiver analysis and preview (optional)</summary>
+              <div className="mt-2 space-y-2.5">
               <p className="rounded-lg border border-border bg-secondary/40 p-2.5 text-[11px] text-muted-foreground">
                 Last edited: {stats.lastEditedAt ? formatDateTime(stats.lastEditedAt) : "—"}
                 <br />
@@ -1005,7 +950,8 @@ export function PacketBuilder({
               <Button variant="outline" className="h-11 w-full" onClick={printPacket}>
                 <FileText className="size-4" /> Preview / save as PDF
               </Button>
-            </div>
+              </div>
+            </details>
           )}
 
           {step === 4 && (
@@ -1144,28 +1090,14 @@ export function PacketBuilder({
         </div>
 
         <div className="flex shrink-0 gap-2 border-t border-border pt-3">
-          {step > 0 && step < 4 && (
-            <Button variant="outline" className="h-11 flex-1" onClick={() => setStep(step - 1)}>
-              Back
-            </Button>
-          )}
-          {step < 3 && (
+          {step < 4 && (
             <Button
               className="h-11 flex-1"
-              disabled={
-                step === 0 &&
-                (blocking.length > 0 ||
-                  ((attention.length > 0 || optional.length > 0) && !acknowledged))
-              }
-              onClick={() => setStep(step + 1)}
+              disabled={busy || blocking.length > 0 || !exhibits.length}
+              onClick={() => void generate()}
             >
-              Continue
-            </Button>
-          )}
-          {step === 3 && (
-            <Button className="h-11 flex-1" disabled={busy} onClick={() => void generate()}>
               {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-              {busy ? "Generating…" : `Generate packet v${nextVersion}`}
+              {busy ? "Building…" : `Build packet v${nextVersion}`}
             </Button>
           )}
           {step === 4 && (

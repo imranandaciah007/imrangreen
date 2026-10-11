@@ -1,55 +1,15 @@
-import { AlertTriangle, ExternalLink, EyeOff, HeartHandshake, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, EyeOff, Wand2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CaseProgressPanel } from "@/components/evidence/CaseProgressPanel";
+import { FixWizard } from "@/components/evidence/FixWizard";
 import { TasksView } from "@/components/evidence/TasksView";
-import { formatDate, formatDateTime } from "@/lib/evidence/format";
-import { aciahImpactState, type CaseGap } from "@/lib/evidence/review";
+import { formatDate } from "@/lib/evidence/format";
+import type { CaseGap } from "@/lib/evidence/review";
 import { useEvidence } from "@/lib/evidence/store";
 import { taskStatus } from "@/lib/evidence/types";
-
-function Stat({
-  label,
-  value,
-  hint,
-  attention,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  attention?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-xl border p-3 shadow-panel ${
-        attention ? "border-destructive/60 bg-destructive/10" : "border-border bg-card"
-      }`}
-    >
-      <div
-        className={`text-[10px] font-semibold tracking-wider uppercase ${
-          attention ? "text-destructive" : "text-muted-foreground"
-        }`}
-      >
-        {label}
-      </div>
-      <div
-        className={`mt-1 font-mono text-xl leading-none font-semibold ${
-          attention ? "text-destructive" : "text-foreground"
-        }`}
-      >
-        {value}
-      </div>
-      {hint && (
-        <div
-          className={`mt-1 text-[10px] ${attention ? "text-destructive/80" : "text-muted-foreground"}`}
-        >
-          {hint}
-        </div>
-      )}
-    </div>
-  );
-}
 
 const COVERAGE_STYLE: Record<string, string> = {
   "Good evidence coverage": "border-success/45 bg-success/12 text-foreground",
@@ -57,352 +17,219 @@ const COVERAGE_STYLE: Record<string, string> = {
   "Needs supporting evidence": "border-destructive/40 bg-destructive/10 text-foreground",
 };
 
+const SEVERITY_RANK = { high: 0, medium: 1, low: 2 } as const;
+const PAGE = 15;
+
+/**
+ * One list of everything that needs a look, one row per document or entry,
+ * most important first, with a Start button that walks through them in turn.
+ */
 export function CaseReviewView({
   onAddTask,
-  onBuildPacket,
   onOpenCategory,
+  onOpenFolders,
+  onOpenTimeline,
+  onOpenFinances,
+  focusTasks = false,
 }: {
   onAddTask: () => void;
-  onBuildPacket: () => void;
   onOpenCategory: (category: string) => void;
+  onOpenFolders: () => void;
+  onOpenTimeline: () => void;
+  onOpenFinances: () => void;
+  /** Open with the task list unfolded (from the reminders bell). */
+  focusTasks?: boolean;
 }) {
-  const {
-    stats,
-    gaps,
-    coverage,
-    items,
-    events,
-    finances,
-    tasks,
-    openInspector,
-    profile,
-    resolveConflict,
-    markAllReady,
-    ignoreGap,
-    packets,
-    driveTree,
-  } = useEvidence();
-  const latestPacket = packets.at(-1);
-  const packetFolderLink =
-    latestPacket?.driveFolderWebViewLink ??
-    (() => {
-      const folder = driveTree?.folders.find(
-        (entry) => entry.path.replace(/^\/+|\/+$/g, "") === "I601 Evidence/Generated Case Packets",
-      );
-      return folder ? `https://drive.google.com/drive/folders/${folder.id}` : "";
-    })();
+  const { gaps, coverage, items, events, finances, tasks, openInspector, resolveConflict, ignoreGap } =
+    useEvidence();
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStart, setWizardStart] = useState<string | undefined>(undefined);
+  const [shown, setShown] = useState(PAGE);
 
+  const rows = useMemo(() => {
+    const byRecord = new Map<string, CaseGap[]>();
+    for (const gap of gaps) {
+      const key = `${gap.recordType}:${gap.recordId}`;
+      byRecord.set(key, [...(byRecord.get(key) ?? []), gap]);
+    }
+    const titleOf = (gap: CaseGap) => {
+      if (gap.recordType === "evidence") {
+        const item = items.find((i) => i.id === gap.recordId);
+        return item ? item.title || item.fileName : "Document";
+      }
+      if (gap.recordType === "event") return events.find((e) => e.id === gap.recordId)?.title ?? "Event";
+      if (gap.recordType === "finance") {
+        const f = finances.find((x) => x.id === gap.recordId);
+        return f?.label || "Expense";
+      }
+      return tasks.find((t) => t.id === gap.recordId)?.title ?? "Task";
+    };
+    return [...byRecord.values()]
+      .map((list) => ({
+        first: list[0]!,
+        title: titleOf(list[0]!),
+        issues: list,
+        rank: Math.min(...list.map((g) => SEVERITY_RANK[g.severity])),
+      }))
+      .sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title));
+  }, [gaps, items, events, finances, tasks]);
 
-  const uncategorised = items.filter(
-    (i) => !(i.categories?.length ? i.categories : [i.category]).filter(Boolean).length,
-  ).length;
-  const duplicates = items.filter((i) => i.duplicateSuspected || i.duplicateOfId).length;
-  const eventsNoEvidence = events.filter((e) => !(e.evidenceIds ?? []).length).length;
-  const financeNoProof = finances.filter(
-    (f) => !f.excluded && !(f.evidenceIds ?? []).length,
-  ).length;
-  const conflicts = items.filter((i) => (i.aiConflicts?.length ?? 0) > 0);
-
-  const aciahChecks = [
-    ...events.map((e) => ({
-      id: e.id,
-      kind: "Event" as const,
-      title: e.title,
-      date: e.date,
-      state: aciahImpactState(e),
-    })),
-    ...items
-      .filter((i) => (i.people ?? []).includes("Jibril"))
-      .map((i) => ({
-        id: i.id,
-        kind: "Evidence" as const,
-        title: i.title || i.fileName,
-        date: i.dateOfDocument,
-        state: aciahImpactState(i),
-      })),
-  ];
-  const needsExplanation = aciahChecks.filter((c) => c.state === "Needs explanation");
-
+  const evidenceIds = rows.filter((r) => r.first.recordType === "evidence").map((r) => r.first.recordId);
+  const openTasks = tasks.filter((t) => taskStatus(t) !== "Complete").length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start gap-2">
-        <div className="min-w-[12rem] flex-1">
-          <Button className="h-10 w-full text-xs" onClick={onBuildPacket}>
-            Build case packet
-          </Button>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[10px] text-muted-foreground">
-            <span>
-              Last draft: {latestPacket ? formatDateTime(latestPacket.generatedAt) : "None yet"}
-            </span>
-            {packetFolderLink && (
-              <a
-                href={packetFolderLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-7 items-center gap-1 font-semibold text-primary underline underline-offset-2"
-              >
-                <ExternalLink className="size-3" /> Drive folder
-              </a>
-            )}
-          </div>
-        </div>
-        <Button variant="outline" className="h-10 flex-1 text-xs" onClick={markAllReady}>
-          Mark all as Ready
-        </Button>
-      </div>
-
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview" className="text-xs">
-            Overview
-          </TabsTrigger>
-          <TabsTrigger
-            value="gaps"
-            className={`text-xs ${gaps.length ? "text-destructive data-[state=active]:text-destructive" : ""}`}
-          >
-            Gaps ({gaps.length})
-          </TabsTrigger>
-          <TabsTrigger
-            value="aciah"
-            className={`text-xs ${needsExplanation.length ? "text-destructive data-[state=active]:text-destructive" : ""}`}
-          >
-            Aciah impact{needsExplanation.length ? ` (${needsExplanation.length})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="tasks" className="text-xs">
-            Tasks ({tasks.filter((t) => taskStatus(t) !== "Complete").length})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="mt-3 space-y-4">
-          {(() => {
-            const attention: { label: string; value: number; hint?: string }[] = [
-              { label: "Important details missing", value: stats.needsConfirmation },
-              { label: "Missing supporting evidence", value: stats.gaps },
-              { label: "Events without evidence", value: eventsNoEvidence },
-              { label: "Expenses without proof", value: financeNoProof },
-              { label: "Unresolved gaps", value: gaps.length },
-              { label: "Translation needed", value: stats.missingTranslation },
-              { label: "Duplicate suspects", value: duplicates },
-              { label: "Uncategorised", value: uncategorised },
-            ].filter((s) => s.value > 0);
-            return attention.length ? (
-              <section className="rounded-xl border border-destructive/50 bg-destructive/5 p-3">
-                <h3 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-destructive uppercase">
-                  <AlertTriangle className="size-3.5" /> Needs your attention
-                </h3>
-                <div className="mt-2.5 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
-                  {attention.map((s) => (
-                    <Stat key={s.label} label={s.label} value={String(s.value)} attention />
-                  ))}
-                </div>
-              </section>
-            ) : (
-              <p className="rounded-xl border border-success/50 bg-success/10 p-3 text-xs font-medium text-foreground">
-                Nothing needs your attention right now.
+    <div className="mx-auto max-w-3xl space-y-4">
+      <section className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-panel">
+        {rows.length === 0 ? (
+          <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <CheckCircle2 className="size-5 text-success" /> All done. Nothing needs checking right now.
+          </p>
+        ) : (
+          <>
+            <div>
+              <h2 className="font-display text-lg font-black text-foreground">
+                {rows.length} thing{rows.length === 1 ? "" : "s"} to check
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Most important first. Start walks you through the documents one at a time.
               </p>
-            );
-          })()}
-
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <Stat label="Exhibits" value={String(stats.total)} hint={`${stats.totalPages} pages`} />
-            <Stat label="Reviewed & ready" value={String(stats.ready)} />
-            <Stat label="Open tasks" value={String(stats.openTasks)} />
-            <Stat
-              label="Last edited"
-              value={stats.lastEditedAt ? formatDate(stats.lastEditedAt) : "—"}
-              hint={stats.lastEditedAt ? formatDateTime(stats.lastEditedAt) : "Nothing yet"}
-            />
-          </div>
-
-          {conflicts.length > 0 && (
-            <section className="rounded-xl border border-warning/50 bg-warning/10 p-3">
-              <h3 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider uppercase">
-                <Sparkles className="size-3.5" /> AI found possible conflicts
-              </h3>
-              <ul className="mt-2 space-y-2">
-                {conflicts.flatMap((item) =>
-                  (item.aiConflicts ?? []).map((c) => (
-                    <li
-                      key={`${item.id}-${c.field}`}
-                      className="rounded-lg border border-border bg-card p-2.5"
-                    >
-                      <p className="text-xs text-foreground">
-                        {item.exhibitId} · {c.field}
-                      </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        You confirmed “{c.existing}”. A later reading suggested “{c.aiValue}”.
-                      </p>
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 text-[11px]"
-                          onClick={() => resolveConflict(item.id, c.field, false)}
-                        >
-                          Keep existing
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-9 text-[11px]"
-                          onClick={() => resolveConflict(item.id, c.field, true)}
-                        >
-                          Use AI value
-                        </Button>
-                      </div>
-                    </li>
-                  )),
-                )}
-              </ul>
-            </section>
-          )}
-
-          <section className="rounded-xl border border-border bg-card p-3.5 shadow-panel">
-            <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-              Hardship coverage
-            </h3>
-            <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-              {coverage.map((row) => (
-                <button
-                  type="button"
-                  key={row.category}
-                  onClick={() => onOpenCategory(row.category)}
-                  className={`rounded-lg border p-2.5 text-left transition-shadow hover:shadow-panel ${COVERAGE_STYLE[row.label] ?? "border-border"}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-medium text-foreground">{row.category}</p>
-                    <Badge variant="outline" className="shrink-0 text-[10px]">
-                      {row.label}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                    {row.items} evidence · {row.events} events · {row.ready} ready · {row.gapCount}{" "}
-                    gaps
-                  </p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {row.sourceMix.length
-                      ? row.sourceMix.map((s) => `${s.count} ${s.source}`).join(", ")
-                      : "No sources yet"}
-                  </p>
-                  <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                    Most recent: {row.recentDate ? formatDate(row.recentDate) : "—"}
-                  </p>
-                </button>
-              ))}
-
             </div>
-          </section>
-        </TabsContent>
+            {evidenceIds.length > 0 && (
+              <Button
+                className="h-12 w-full"
+                onClick={() => {
+                  setWizardStart(undefined);
+                  setWizardOpen(true);
+                }}
+              >
+                <Wand2 className="size-4" /> Start
+              </Button>
+            )}
+          </>
+        )}
+      </section>
 
-        <TabsContent value="gaps" className="mt-3">
-          {gaps.length === 0 ? (
-            <p className="rounded-xl border border-border bg-card p-4 text-xs text-muted-foreground">
-              No outstanding gaps found in what is stored today.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {gaps.map((gap) => (
-                <li
-                  key={gap.id}
-                  className={`rounded-xl border p-3 shadow-panel ${
-                    gap.severity === "high"
-                      ? "border-destructive/60 bg-destructive/10"
-                      : "border-border bg-card"
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle
-                      className={`mt-0.5 size-3.5 shrink-0 ${
-                        gap.severity === "high"
-                          ? "text-destructive"
-                          : gap.severity === "medium"
-                            ? "text-warning"
-                            : "text-muted-foreground"
-                      }`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-foreground">{gap.label}</p>
-                      <p className="truncate text-[11px] text-muted-foreground">{gap.detail}</p>
+      {rows.length > 0 && (
+        <ul className="space-y-2">
+          {rows.slice(0, shown).map((row) => {
+            const { first } = row;
+            const item = first.recordType === "evidence" ? items.find((i) => i.id === first.recordId) : undefined;
+            return (
+              <li key={`${first.recordType}:${first.recordId}`} className="rounded-xl border border-border bg-card p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle
+                    className={`mt-0.5 size-4 shrink-0 ${
+                      row.rank === 0 ? "text-destructive" : row.rank === 1 ? "text-warning" : "text-muted-foreground"
+                    }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-foreground">{row.title}</p>
+                    <p className="text-xs text-muted-foreground">{row.issues.map((g) => g.label).join(" · ")}</p>
+                  </div>
+                </div>
+                {(item?.aiConflicts ?? []).map((c) => (
+                  <div key={c.field} className="mt-2 rounded-lg bg-secondary/50 p-2 text-xs">
+                    <p className="text-muted-foreground">
+                      {c.field}: you confirmed “{c.existing}”, a later reading suggested “{c.aiValue}”.
+                    </p>
+                    <div className="mt-1.5 flex gap-2">
+                      <Button size="sm" variant="outline" className="h-9 text-[11px]" onClick={() => resolveConflict(item!.id, c.field, false)}>
+                        Keep mine
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-9 text-[11px]" onClick={() => resolveConflict(item!.id, c.field, true)}>
+                        Use the new one
+                      </Button>
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {gap.recordType === "evidence" && (
+                ))}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {first.recordType === "evidence" ? (
+                    <>
                       <Button
                         size="sm"
-                        variant="outline"
                         className="h-9 text-[11px]"
-                        onClick={() => openInspector(gap.recordId)}
+                        onClick={() => {
+                          setWizardStart(first.recordId);
+                          setWizardOpen(true);
+                        }}
                       >
-                        Open exhibit
+                        Fix
                       </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-9 text-[11px] text-muted-foreground"
-                      onClick={() => ignoreGap(gap.id)}
-                    >
-                      <EyeOff className="size-3.5" /> Ignore
+                      <Button size="sm" variant="ghost" className="h-9 text-[11px]" onClick={() => openInspector(first.recordId)}>
+                        View
+                      </Button>
+                    </>
+                  ) : first.recordType === "event" ? (
+                    <Button size="sm" variant="outline" className="h-9 text-[11px]" onClick={onOpenTimeline}>
+                      Open timeline
                     </Button>
-
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  ) : first.recordType === "finance" ? (
+                    <Button size="sm" variant="outline" className="h-9 text-[11px]" onClick={onOpenFinances}>
+                      Open finances
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-9 text-[11px] text-muted-foreground"
+                    onClick={() => row.issues.forEach((g) => ignoreGap(g.id))}
+                  >
+                    <EyeOff className="size-3.5" /> Ignore
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+          {rows.length > shown && (
+            <li>
+              <Button variant="outline" className="h-10 w-full text-xs" onClick={() => setShown((n) => n + PAGE)}>
+                Show more ({rows.length - shown} left)
+              </Button>
+            </li>
           )}
-        </TabsContent>
+        </ul>
+      )}
 
-        <TabsContent value="aciah" className="mt-3 space-y-3">
-          <div className="rounded-xl border border-border bg-card p-3 shadow-panel">
-            <h3 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-              <HeartHandshake className="size-3.5" /> Is the impact on Aciah clear?
-            </h3>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Aciah is the qualifying relative. Evidence about Jibril is kept as it is — you are
-              only asked to record how the issue affects Aciah where that is factually true.
-            </p>
-            <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-              {aciahChecks.length - needsExplanation.length} of {aciahChecks.length} records have
-              the impact recorded.
-            </p>
-          </div>
-          {needsExplanation.length === 0 ? (
-            <p className="rounded-xl border border-border bg-card p-4 text-xs text-muted-foreground">
-              Nothing is waiting for an explanation.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {needsExplanation.map((c) => (
-                <li
-                  key={c.id}
-                  className="rounded-xl border border-destructive/60 bg-destructive/10 p-3"
-                >
-                  <p className="text-xs font-medium text-foreground">{c.title}</p>
-                  <p className="font-mono text-[10px] text-destructive">
-                    {c.kind} · {c.date ? formatDate(c.date) : "no date"} · Needs explanation
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {c.kind === "Evidence" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-9 text-[11px]"
-                        onClick={() => openInspector(c.id)}
-                      >
-                        Add explanation
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </TabsContent>
-
-        <TabsContent value="tasks" className="mt-3">
+      <details className="rounded-xl border border-border bg-card p-3" open={focusTasks}>
+        <summary className="cursor-pointer select-none text-sm font-semibold text-foreground">
+          Your tasks ({openTasks})
+        </summary>
+        <div className="mt-3">
           <TasksView onAddTask={onAddTask} />
-        </TabsContent>
-      </Tabs>
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-border bg-card p-3">
+        <summary className="cursor-pointer select-none text-sm font-semibold text-foreground">
+          Case progress
+        </summary>
+        <div className="mt-3 space-y-3">
+          <div className="grid gap-2 md:grid-cols-2">
+            {coverage.map((row) => (
+              <button
+                type="button"
+                key={row.category}
+                onClick={() => onOpenCategory(row.category)}
+                className={`rounded-lg border p-2.5 text-left ${COVERAGE_STYLE[row.label] ?? "border-border"}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium text-foreground">{row.category}</p>
+                  <Badge variant="outline" className="shrink-0 text-[10px]">
+                    {row.label}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {row.items} documents · {row.events} events
+                  {row.recentDate ? ` · latest ${formatDate(row.recentDate)}` : ""}
+                </p>
+              </button>
+            ))}
+          </div>
+          <CaseProgressPanel onOpenCategory={onOpenCategory} onOpenBoard={onOpenFolders} />
+        </div>
+      </details>
+
+      <FixWizard open={wizardOpen} onOpenChange={setWizardOpen} itemIds={evidenceIds} startId={wizardStart} />
     </div>
   );
 }

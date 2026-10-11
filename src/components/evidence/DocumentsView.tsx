@@ -1,12 +1,10 @@
+import { useState } from "react";
 import { FolderTree, List } from "lucide-react";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryPanel } from "@/components/evidence/CategoryPanel";
 import { EvidenceTable } from "@/components/evidence/EvidenceTable";
-import { ExhibitIndexView } from "@/components/evidence/ExhibitIndexView";
 import { FileBoardView } from "@/components/evidence/FileBoardView";
 import { FilterToolbar } from "@/components/evidence/FilterToolbar";
-import { KanbanBoard } from "@/components/evidence/KanbanBoard";
 import type { EvidenceItem } from "@/lib/evidence/types";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +22,7 @@ export function DocumentsView({
   onUploadTo: (category: string) => void;
   onEdit: (item: EvidenceItem) => void;
 }) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
   return (
     <div className="space-y-4">
       <div
@@ -61,33 +60,10 @@ export function DocumentsView({
       {layout === "folders" ? (
         <FileBoardView />
       ) : (
-        <div className="space-y-4 lg:grid lg:grid-cols-[320px_1fr] lg:items-start lg:gap-4 lg:space-y-0">
-          <CategoryPanel onUploadTo={onUploadTo} />
-          <div className="space-y-3">
-            <FilterToolbar />
-            <Tabs defaultValue="table">
-              <TabsList>
-                <TabsTrigger value="table" className="text-xs">
-                  List
-                </TabsTrigger>
-                <TabsTrigger value="kanban" className="text-xs">
-                  Review stages
-                </TabsTrigger>
-                <TabsTrigger value="index" className="text-xs">
-                  Exhibit index
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="table" className="mt-3">
-                <EvidenceTable onEdit={onEdit} />
-              </TabsContent>
-              <TabsContent value="kanban" className="mt-3">
-                <KanbanBoard />
-              </TabsContent>
-              <TabsContent value="index" className="mt-3">
-                <ExhibitIndexView />
-              </TabsContent>
-            </Tabs>
-          </div>
+        <div className="space-y-3">
+          <FilterToolbar showFilters={filtersOpen} onToggleFilters={() => setFiltersOpen((v) => !v)} />
+          {filtersOpen && <CategoryPanel onUploadTo={onUploadTo} />}
+          <EvidenceTable onEdit={onEdit} />
         </div>
       )}
     </div>

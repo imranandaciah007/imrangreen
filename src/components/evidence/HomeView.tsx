@@ -1,57 +1,36 @@
-import {
-  ArrowRight,
-  Bell,
-  CheckCircle2,
-  ChevronRight,
-  Clock3,
-  DollarSign,
-  FileStack,
-  FileText,
-  ListChecks,
-  PauseCircle,
-  RefreshCw,
-  SearchCheck,
-  Upload,
-} from "lucide-react";
+import { ArrowRight, FileStack, PauseCircle, RefreshCw, SearchCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { statusLabel } from "@/components/evidence/status-ui";
-import { formatDate, parseDay } from "@/lib/evidence/format";
 import { STALE_JOB_MS } from "@/lib/evidence/shared-state";
 import { useEvidence } from "@/lib/evidence/store";
-import { CaseProgressPanel } from "@/components/evidence/CaseProgressPanel";
-import { isOpenTask } from "@/lib/task-reminders";
 
 function greeting() {
   const hour = new Date().getHours();
   return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 }
 
-function Metric({
+function Counter({
   label,
   value,
-  icon,
-  tone,
+  attention,
   onClick,
 }: {
   label: string;
-  value: string;
-  icon: React.ReactNode;
-  tone: "yellow" | "blue" | "orange" | "green";
+  value: number | string;
+  attention?: boolean;
   onClick: () => void;
 }) {
   return (
-    <Button
-      variant="ghost"
+    <button
+      type="button"
       onClick={onClick}
-      className={`case-metric case-metric-${tone} min-w-0 whitespace-normal`}
+      className="rounded-xl border border-border bg-card px-3 py-2.5 text-left transition-colors hover:bg-accent/40"
     >
-      <span className="case-metric-icon">{icon}</span>
-      <span className="min-w-0 text-left">
-        <span className="block font-display text-xl font-black leading-none text-navy">{value}</span>
-        <span className="mt-1.5 block break-words text-[10px] font-extrabold uppercase leading-tight tracking-[.06em] text-navy/65 sm:text-[11px]">{label}</span>
+      <span className={`block font-display text-xl font-black ${attention ? "text-destructive" : "text-foreground"}`}>
+        {value}
       </span>
-    </Button>
+      <span className="block truncate text-[11px] font-bold text-muted-foreground">{label}</span>
+    </button>
   );
 }
 
@@ -64,32 +43,18 @@ type NextStep = {
 
 export function HomeView({
   onNavigate,
-  onOpenFolders,
-  onUpload,
-  onAddTask,
   onBuildPacket,
   onResumeFiling,
   onSyncDrive,
-  onOpenCategory,
 }: {
-  onNavigate: (tab: "timeline" | "finances" | "documents" | "review") => void;
-  onOpenFolders: () => void;
-  onUpload: () => void;
-  onAddTask: () => void;
+  onNavigate: (tab: "documents" | "review") => void;
   onBuildPacket: () => void;
   onResumeFiling: () => void;
   onSyncDrive: () => Promise<void>;
-  onOpenCategory: (category: string) => void;
 }) {
-  const { stats, caseSettings, tasks, events, items, gaps, packets, connection, driveSyncing, scanProgress, pauseSync, openInspector, jobs, jobsHere } = useEvidence();
+  const { stats, gaps, packets, connection, driveSyncing, scanProgress, pauseSync, jobs, jobsHere } = useEvidence();
   const busy = driveSyncing || scanProgress.running;
-  const gbp = (n: number) => `£${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  const openTasks = tasks.filter(isOpenTask);
-  const recentEvents = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
-  const recentEvidence = [...items]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 3);
-  const attentionRecords = new Set(gaps.map((gap) => `${gap.recordType}:${gap.recordId}`)).size;
+  const toCheck = new Set(gaps.map((gap) => `${gap.recordType}:${gap.recordId}`)).size;
   const latestPacket = packets.at(-1);
   const filingLink = latestPacket?.filingFiles?.[0]?.webViewLink;
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -176,134 +141,59 @@ export function HomeView({
                 run: () => (filingLink ? window.open(filingLink, "_blank") : onBuildPacket()),
               };
 
+  const lastUpdated = connection?.lastSyncedAt
+    ? new Date(connection.lastSyncedAt).toLocaleString(undefined, {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
   return (
-    <div className="case-home space-y-4">
-      <section className="case-hero">
-        <div className="case-hero-copy">
-          <span className="case-kicker">NEXT STEP</span>
-          <h2>{greeting()}, Imran &amp; Aciah</h2>
-          <p aria-live="polite">{statusLine}</p>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:max-w-md">
-          <Button onClick={next.run} size="lg" className="case-primary-action h-14 w-full justify-between text-base">
-            <span className="flex items-center gap-2">
-              {next.icon} {next.label}
-            </span>
-            <ArrowRight />
-          </Button>
-          <p className="px-1 text-xs font-semibold text-navy/70">{next.why}</p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            {!busy && connection?.lastSyncedAt && (
-              <Button onClick={() => void onSyncDrive()} variant="outline" size="sm" className="case-secondary-action">
-                <RefreshCw /> Update from Drive
-              </Button>
-            )}
-            <Button onClick={onUpload} variant="outline" size="sm" className="case-secondary-action">
-              <Upload /> Add evidence
-            </Button>
-            <Button onClick={onAddTask} variant="outline" size="sm" className="case-secondary-action">
-              <ListChecks /> Add task
-            </Button>
-          </div>
-          {connection?.lastSyncedAt && (
-            <span className="px-1 text-[11px] font-semibold text-navy/60">
-              Last updated from Drive{" "}
-              {new Date(connection.lastSyncedAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-              {attentionRecords ? ` · ${plural(attentionRecords, "record")} need supporting evidence or details` : ""}
-            </span>
-          )}
-        </div>
+    <div className="case-home mx-auto max-w-xl space-y-4">
+      <section className="space-y-1 px-1 pt-2">
+        <h2 className="font-display text-2xl font-black text-foreground">{greeting()}, Imran &amp; Aciah</h2>
+        <p className="text-sm font-semibold text-muted-foreground" aria-live="polite">
+          {statusLine}
+        </p>
       </section>
 
-      <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <Metric label="Total Exhibits" value={String(stats.total)} icon={<FileText />} tone="yellow" onClick={() => onNavigate("documents")} />
-        <Metric label="Reviewed & Ready" value={String(stats.ready)} icon={<CheckCircle2 />} tone="blue" onClick={() => onNavigate("documents")} />
-        <Metric label="Open Tasks" value={String(openTasks.length)} icon={<Clock3 />} tone="orange" onClick={() => onNavigate("review")} />
-        <Metric label={stats.financialUnconfirmed ? "Separation costs (estimate)" : "Separation Costs"} value={gbp(stats.financialImpact)} icon={<DollarSign />} tone="green" onClick={() => onNavigate("finances")} />
+      <section className="space-y-2 rounded-xl border border-border bg-card p-4 shadow-panel">
+        <span className="text-[10px] font-extrabold tracking-[.12em] text-muted-foreground uppercase">Next step</span>
+        <Button onClick={next.run} size="lg" className="h-auto min-h-14 w-full justify-between py-3 text-base whitespace-normal">
+          <span className="flex min-w-0 items-center gap-2 text-left">
+            {next.icon} {next.label}
+          </span>
+          <ArrowRight />
+        </Button>
+        <p className="px-1 text-xs text-muted-foreground">{next.why}</p>
       </section>
 
-      <div className="case-dashboard-grid">
-        <CaseProgressPanel
-          onOpenCategory={onOpenCategory}
-          onOpenBoard={onOpenFolders}
+      <section className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+        <Button
+          variant="outline"
+          className="h-11 shrink-0"
+          disabled={busy}
+          onClick={() => void onSyncDrive()}
+        >
+          <RefreshCw className={busy ? "animate-spin" : undefined} />
+          {busy ? "Updating…" : "Update from Drive"}
+        </Button>
+        <span className="min-w-0 text-xs text-muted-foreground">
+          {busy ? "Bringing in your latest Drive changes." : lastUpdated ? `Last updated ${lastUpdated}` : "Not updated yet"}
+        </span>
+      </section>
+
+      <section className="grid grid-cols-3 gap-2">
+        <Counter label="Documents" value={stats.total} onClick={() => onNavigate("documents")} />
+        <Counter label="To check" value={toCheck} attention={toCheck > 0} onClick={() => onNavigate("review")} />
+        <Counter
+          label={latestPacket ? `Packet v${latestPacket.version}` : "Packet"}
+          value={latestPacket?.filingBuiltAt ? "Ready" : latestPacket ? "Draft" : "—"}
+          onClick={onBuildPacket}
         />
-
-
-        <section className="case-panel">
-          <div className="case-panel-heading">
-            <div>
-              <span className="case-kicker">WHAT'S NEXT</span>
-              <h3>Priority Tasks</h3>
-            </div>
-            <button className="case-view-link" onClick={() => onNavigate("review")}>View all</button>
-          </div>
-          <div className="case-list">
-            {openTasks.length ? openTasks.slice(0, 4).map((task) => (
-              <button key={task.id} className="case-list-row" onClick={() => onNavigate("review")}>
-                <span className="case-check" />
-                <span className="min-w-0 flex-1 text-left">
-                  <strong>{task.title}</strong>
-                  <small>{task.assignedTo || "Unassigned"}</small>
-                </span>
-                <span className={task.priority === "High" ? "case-pill-red" : "case-pill"}>{task.priority || "Normal"}</span>
-              </button>
-            )) : <div className="case-empty"><CheckCircle2 /> Nothing outstanding.</div>}
-          </div>
-        </section>
-
-        <section className="case-panel">
-          <div className="case-panel-heading">
-            <div>
-              <span className="case-kicker">ACTIVITY</span>
-              <h3>Recent Timeline</h3>
-            </div>
-            <button className="case-view-link" onClick={() => onNavigate("timeline")}>View timeline</button>
-          </div>
-          <div className="case-timeline-list">
-            {recentEvents.length ? recentEvents.map((event) => (
-              <button key={event.id} onClick={() => onNavigate("timeline")} className="case-timeline-row">
-                <span className="case-date-box"><strong>{parseDay(event.date).getDate() || "—"}</strong><small>{parseDay(event.date).toLocaleString("en", { month: "short" }).toUpperCase()}</small></span>
-                <span className="min-w-0 text-left"><strong>{event.title}</strong><small>{event.category}</small></span>
-              </button>
-            )) : <div className="case-empty"><Clock3 /> No events recorded yet.</div>}
-          </div>
-        </section>
-
-        <section className="case-panel">
-          <div className="case-panel-heading">
-            <div>
-              <span className="case-kicker">DOCUMENTS</span>
-              <h3>Recently Added</h3>
-            </div>
-            <button className="case-view-link" onClick={() => onNavigate("documents")}>View all</button>
-          </div>
-          <div className="case-list">
-            {recentEvidence.length ? recentEvidence.map((item) => (
-              <button key={item.id} className="case-document-row" onClick={() => openInspector(item.id)}>
-                <span className="case-doc-icon"><FileText /></span>
-                <span className="min-w-0 flex-1 text-left"><strong>{item.title}</strong><small>{item.exhibitId || item.fileName} · {formatDate(item.updatedAt)}</small></span>
-
-                <span className="case-pill-green">{statusLabel(item.status)}</span>
-              </button>
-            )) : <div className="case-empty"><FileText /> No evidence added yet.</div>}
-          </div>
-        </section>
-      </div>
-
-      <button className="case-review-banner" onClick={onBuildPacket}>
-        <span className="case-review-icon"><CheckCircle2 /></span>
-        <span className="min-w-0 flex-1 text-left"><strong>Case packet</strong><small>Put the evidence in order, number the exhibits and build the filing PDF.</small></span>
-        <span className="case-review-button">Open packet <ChevronRight /></span>
-      </button>
-
-      <p className="case-last-edited">
-        Last edited: {stats.lastEditedAt ? new Date(stats.lastEditedAt).toLocaleString() : "No case activity yet"}
-        <span> · Separation began {formatDate(caseSettings.separationStartDate)}</span>
-      </p>
-
-      {openTasks.some((task) => task.reminderAt) && (
-        <div className="sr-only"><Bell /> Task reminders are active.</div>
-      )}
+      </section>
     </div>
   );
 }
