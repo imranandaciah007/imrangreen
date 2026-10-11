@@ -34,6 +34,8 @@ export interface DriveFileNode {
   path: string;
   /** Drive content checksum, when Drive provides one (binary uploads only). */
   checksum?: string;
+  /** For clone PDFs: the Drive id of the original the clone was built from. */
+  originalId?: string;
 }
 
 /** Drive ids are letters, digits, "-" and "_". Anything else is refused before it reaches a URL. */
@@ -78,6 +80,7 @@ interface RawFile {
   webViewLink?: string;
   parents?: string[];
   md5Checksum?: string;
+  properties?: Record<string, string>;
 }
 
 /** Whole-Drive folder tree plus files, each with its full folder path. */
@@ -85,6 +88,10 @@ export async function listTree(): Promise<{
   folders: DriveFolderNode[];
   files: DriveFileNode[];
   syncedAt: string;
+  /** Every non-trashed file id in Drive, including files inside "ignore" folders. */
+  allFileIds: string[];
+  /** False when Drive had more pages than were read, so the picture is partial. */
+  complete: boolean;
 }> {
   const raw: RawFile[] = [];
   let pageToken: string | undefined;
@@ -93,7 +100,7 @@ export async function listTree(): Promise<{
     const params = new URLSearchParams({
       q: "trashed = false",
       fields:
-        "nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,parents,md5Checksum)",
+        "nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,parents,md5Checksum,properties)",
       pageSize: "1000",
       orderBy: "folder,name",
     });
@@ -163,6 +170,7 @@ export async function listTree(): Promise<{
         parentId: folderMeta.has(parentId ?? "") ? parentId : null,
         path: pathOf(parentId),
         ...(f.md5Checksum ? { checksum: f.md5Checksum } : {}),
+        ...(f.properties?.["originalDriveId"] ? { originalId: f.properties["originalDriveId"] } : {}),
       });
     }
   }
@@ -177,7 +185,15 @@ export async function listTree(): Promise<{
     if (parent) parent.folderCount += 1;
   }
 
-  return { folders, files, syncedAt: new Date().toISOString() };
+  return {
+    folders,
+    files,
+    syncedAt: new Date().toISOString(),
+    allFileIds: raw
+      .filter((f) => f.mimeType !== "application/vnd.google-apps.folder")
+      .map((f) => f.id),
+    complete: !pageToken,
+  };
 }
 
 /** Find or create a folder path, returning the deepest folder id. */

@@ -187,7 +187,7 @@ interface EvidenceContextValue {
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
   driveTree: { folders: DriveFolderNode[]; files: DriveFileNode[]; syncedAt: string } | null;
   driveSyncing: boolean;
-  syncDrive: () => Promise<{
+  syncDrive: (options?: { auto?: boolean }) => Promise<{
     added: number;
     updated: number;
     removed: number;
@@ -1586,7 +1586,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
-  const syncDrive = useCallback(async () => {
+  const syncDrive = useCallback(async (options?: { auto?: boolean }) => {
     if (driveSyncInFlight.current) {
       return {
         added: 0,
@@ -1602,12 +1602,15 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     scanCancelled.current = false;
     setDriveSyncing(true);
     // Pressing Synch now also lifts a pause on the always-on builder.
-    // ...and starts a backend run straight away: match originals to copies,
-    // bin copies whose original is gone, queue copies for new originals.
+    // ...and starts a backend run straight away with a fresh Drive scan (no
+    // 15-minute cache): match originals to copies, bin copies whose original is
+    // gone, queue copies for new originals. The quiet check on returning to the
+    // app scans afresh too, but never lifts a pause and builds fewer copies.
+    const auto = options?.auto === true;
     void import("@/lib/jobs/background.functions")
       .then(async ({ resumeBackgroundSync, runBackgroundBatch }) => {
-        await resumeBackgroundSync();
-        await runBackgroundBatch({ data: { batch: 12 } });
+        if (!auto) await resumeBackgroundSync();
+        await runBackgroundBatch({ data: { batch: auto ? 2 : 12, freshScan: true } });
       })
       .catch(() => {});
 
@@ -1817,6 +1820,27 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       void syncDriveRef.current();
     }
   }, [autoSyncNonce]);
+
+  // Google Drive does not tell the app when files change, so returning to the
+  // app (switching back to the tab, reopening the phone app) runs a quiet check.
+  // At most once every two minutes, and only once Drive has been linked.
+  const lastFocusCheck = useRef(0);
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState === "hidden") return;
+      if (!hydrated.current || !connectionRef.current?.connected) return;
+      if (driveSyncInFlight.current) return;
+      if (Date.now() - lastFocusCheck.current < 2 * 60_000) return;
+      lastFocusCheck.current = Date.now();
+      void syncDriveRef.current({ auto: true }).catch(() => undefined);
+    };
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, []);
 
   const exhibitGroups = useMemo(
     () => Array.from(new Set(items.map((i) => groupOf(i.exhibitId)))).sort(),

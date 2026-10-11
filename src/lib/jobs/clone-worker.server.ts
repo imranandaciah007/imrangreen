@@ -29,6 +29,7 @@ export interface TickResult {
   folders?: number;
   files?: number;
   reason?: string;
+  orphansBinned?: number;
 }
 
 interface JobRow {
@@ -90,7 +91,10 @@ function blockedReason(error: unknown): string | null {
   return null;
 }
 
-export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
+export async function runCloneTick(
+  limit = DEFAULT_BATCH,
+  options: { freshScan?: boolean } = {},
+): Promise<TickResult> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const drive = await import("@/lib/drive-core.server");
   const now = new Date();
@@ -130,6 +134,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
   let cloned = 0;
   let verified = 0;
   let failed = 0;
+  let orphansBinned = 0;
   let folders = state?.folders ?? 0;
   let files = state?.files ?? 0;
   let pauseReason: string | null = paused ? (state?.paused_reason ?? "Paused") : null;
@@ -143,7 +148,8 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
       .in("status", ["pending", "processing"]);
 
     const treeStale = now.getTime() - lastTree > TREE_REFRESH_MINUTES * 60_000;
-    if (treeStale || !pendingBefore) {
+    // "Synch now" asks for a fresh scan, so Drive changes show up straight away.
+    if (treeStale || !pendingBefore || options.freshScan) {
       const tree = await drive.listTree();
       folders = tree.folders.length;
       files = tree.files.length;
@@ -326,6 +332,35 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
             .from("gc_clone_jobs")
             .delete()
             .in("drive_file_id", cleared.slice(index, index + 200));
+        }
+      }
+
+      // Direct orphan cleanup: every clone PDF in the clones folder records the
+      // Drive id of its original. If that original no longer exists anywhere in
+      // Drive (including "ignore" folders), the clone is a straggler: bin it.
+      // This catches clones the queue never recorded, such as ones built in the
+      // app before the queue tracked clone ids. Clones without a recorded
+      // original are left alone, and nothing is binned from a partial listing.
+      if (tree.complete) {
+        const existing = new Set(tree.allFileIds);
+        const cloneFiles = tree.files.filter(
+          (file) => file.path.split("/").includes(CLONE_ROOT) && file.originalId,
+        );
+        const orphans = cloneFiles.filter((file) => !existing.has(file.originalId!));
+        const tooMany = cloneFiles.length >= 20 && orphans.length > cloneFiles.length * 0.5;
+        if (tooMany) {
+          console.warn(
+            `Skipped orphan cleanup: ${orphans.length} of ${cloneFiles.length} clones look orphaned.`,
+          );
+        } else {
+          for (const orphan of orphans) {
+            try {
+              await drive.trashNode(orphan.id);
+              orphansBinned += 1;
+            } catch (error) {
+              console.error(`Could not bin the orphan clone ${orphan.name}:`, error);
+            }
+          }
         }
       }
 
@@ -578,7 +613,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
         files,
         last_run_cloned: cloned,
         last_run_queued: queued,
-        note: `${cloned} clone(s) built, ${verified} already existed, ${pendingAfter ?? 0} waiting`,
+        note: `${cloned} clone(s) built, ${verified} already existed, ${pendingAfter ?? 0} waiting${orphansBinned ? `, ${orphansBinned} orphan clone(s) moved to the bin` : ""}`,
         updated_at: new Date().toISOString(),
       })
       .eq("id", true);
@@ -591,6 +626,7 @@ export async function runCloneTick(limit = DEFAULT_BATCH): Promise<TickResult> {
       cloned,
       verified,
       failed,
+      orphansBinned,
       pending: pendingAfter ?? 0,
       folders,
       files,
