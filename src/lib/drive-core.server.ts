@@ -401,12 +401,24 @@ async function exportAsPdf(fileId: string): Promise<Uint8Array> {
   return new Uint8Array(await res.arrayBuffer());
 }
 
+/**
+ * Remove a temporary file the app made. The Drive connection does not allow a
+ * permanent delete, so it is moved to the bin (as elsewhere in the app); the
+ * permanent delete is only a fallback. Any leftover is binned by the worker.
+ */
 async function deleteQuietly(fileId: string) {
-  await fetch(`${GATEWAY}/drive/v3/files/${driveId(fileId)}`, {
-    method: "DELETE",
-    headers: driveHeaders(),
-  }).catch(() => undefined);
+  try {
+    await trashNode(fileId);
+  } catch {
+    await fetch(`${GATEWAY}/drive/v3/files/${driveId(fileId)}`, {
+      method: "DELETE",
+      headers: driveHeaders(),
+    }).catch(() => undefined);
+  }
 }
+
+/** Office files bigger than this are not printed: Google cannot export them, and each try leaves a copy. */
+const MAX_CONVERT_BYTES = 20 * 1024 * 1024;
 
 /**
  * Print a Word, Excel, PowerPoint, OpenDocument, text or web page file as a PDF
@@ -418,6 +430,12 @@ async function convertToPdf(input: { fileId: string; fileName: string; mimeType:
   const { googleConversionTarget, sourceMimeFor } = await import("@/lib/evidence/file-formats");
   const target = googleConversionTarget(input.fileName, input.mimeType);
   if (!target) return null;
+  const meta = await driveJson<{ size?: string }>(
+    `${GATEWAY}/drive/v3/files/${driveId(input.fileId)}?fields=size&supportsAllDrives=true`,
+  ).catch(() => ({ size: undefined }));
+  if (Number(meta.size ?? 0) > MAX_CONVERT_BYTES) {
+    throw new Error("This file is too large for Google to turn into a PDF; the original stays in Drive.");
+  }
   try {
     const copy = await driveJson<{ id: string }>(
       `${GATEWAY}/drive/v3/files/${driveId(input.fileId)}/copy?fields=id`,
