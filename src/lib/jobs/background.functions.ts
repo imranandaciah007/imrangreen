@@ -8,21 +8,25 @@ export const getBackgroundStatus = createServerFn({ method: "GET" }).handler(asy
 
 /** Kick one background batch by hand, e.g. from the Synch now button. */
 export const runBackgroundBatch = createServerFn({ method: "POST" })
-  .inputValidator((data: { batch?: number } | undefined) => ({
+  .inputValidator((data: { batch?: number; freshScan?: boolean } | undefined) => ({
     batch: Math.min(Math.max(data?.batch ?? 12, 1), 24),
+    freshScan: data?.freshScan === true,
   }))
-
   .handler(async ({ data }) => {
     const { runCloneTick } = await import("@/lib/jobs/clone-worker.server");
-    return runCloneTick(data.batch);
+    return runCloneTick(data.batch, { freshScan: data.freshScan });
   });
 
-/** Clear a paused state (after credits are topped up or access restored). */
+/**
+ * Clear a paused state (after credits are topped up or access restored). Also
+ * expires the 15-minute Drive cache, so the next run scans Drive afresh even if
+ * a run is already in progress when "Synch now" is pressed.
+ */
 export const resumeBackgroundSync = createServerFn({ method: "POST" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   await supabaseAdmin
     .from("gc_job_state")
-    .update({ status: "idle", paused_reason: null, lease_until: null })
+    .update({ status: "idle", paused_reason: null, lease_until: null, last_tree_sync_at: null })
     .eq("id", true);
   return { ok: true };
 });
