@@ -37,7 +37,9 @@ import {
 } from "./review";
 
 import {
+  BENEFICIARIES,
   CASE_SETTINGS,
+  countsTowardTotals,
   DEFAULT_CATEGORIES,
   DEFAULT_INCOME,
   EXPENSE_CATEGORIES,
@@ -214,6 +216,8 @@ interface EvidenceContextValue {
   }>;
 
   /** Verifies existing clones first, then only builds the ones genuinely missing. */
+  /** Looks through receipts, transfers and statements for payments, and lists them to confirm. */
+  findAmounts: () => Promise<{ documents: number; found: number }>;
   scanAllDocuments: (opts?: { rescanAll?: boolean }) => Promise<{
     scanned: number;
     cloned: number;
@@ -1303,6 +1307,144 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   );
 
 
+  /**
+   * Money documents (receipts, invoices, transfer screenshots, bank statements)
+   * are read for the payments in them. Each payment found by both reads becomes
+   * an expense waiting for confirmation, linked to the document as proof. A
+   * payment already recorded (same date, amount, currency and kind) only gains
+   * the extra document, so nothing is counted twice. Each document is read once.
+   */
+  const findAmounts = useCallback(async () => {
+    if (scanInFlight.current) return { documents: 0, found: 0 };
+    const looksLikeMoney = (item: EvidenceItem) => {
+      if (["Video", "Audio", "Zip"].includes(item.fileType)) return false;
+      if (item.sourceType === "Financial / Bank" || item.sourceType === "Receipt / Purchase") return true;
+      if ((item.categories?.length ? item.categories : [item.category]).includes("Financial Hardship")) return true;
+      return /(receipt|invoice|statement|transfer|remit|wise|western union|paypal|payment|bank|bill)/i.test(
+        `${item.title} ${item.fileName}`,
+      );
+    };
+    const queue = itemsRef.current.filter(
+      (item) => item.driveFileId && !item.moneyReadAt && !item.duplicateOfId && looksLikeMoney(item),
+    );
+    if (!queue.length) return { documents: 0, found: 0 };
+
+    scanInFlight.current = true;
+    scanCancelled.current = false;
+    let done = 0;
+    let found = 0;
+    setScanProgress({ running: true, phase: "Finding amounts", done: 0, total: queue.length, scanned: 0, cloned: 0, failed: 0 });
+    reportJob("read", { status: "running", done: 0, total: queue.length });
+    const { extractMoney } = await import("@/lib/ai.functions");
+    const kindFor = (category: string): FinancialEntry["kind"] =>
+      /childcare/.test(category)
+        ? "Childcare"
+        : /medic|pregnan/.test(category)
+          ? "Medical costs"
+          : /Housing|Relocation/.test(category)
+            ? "Housing / Rent"
+            : /Immigration/.test(category)
+              ? "Legal fees"
+              : /travel/.test(category)
+                ? "Travel / Flights"
+                : /Communication/.test(category)
+                  ? "Communication"
+                  : "Other";
+    try {
+      for (const item of queue) {
+        if (scanCancelled.current) break;
+        try {
+          const read = await extractMoney({
+            data: {
+              driveFileId: item.driveFileId,
+              fileName: item.fileName,
+              mimeType: item.mimeType ?? "",
+              title: item.title,
+              separationStartDate: CASE_SETTINGS.separationStartDate,
+            },
+          });
+          const payments = read.payments.filter((p) => p.category !== "Not hardship");
+          if (payments.length) {
+            const now = nowIso();
+            setFinances((prev) => {
+              const next = [...prev];
+              for (const p of payments) {
+                const category = p.category as ExpenseCategory;
+                const label = p.payee || p.description || "Payment";
+                const key = `${p.date}|${p.amount.toFixed(2)}|${p.currency}|${label.trim().toLowerCase()}`;
+                const twin = next.findIndex(
+                  (f) =>
+                    f.transferKey === key ||
+                    (f.date === p.date &&
+                      f.currency === p.currency &&
+                      Math.abs(f.amount - p.amount) < 0.005 &&
+                      financeGroupOf(f) === financeGroupOf({ expenseCategory: category })),
+                );
+                if (twin >= 0) {
+                  const f = next[twin]!;
+                  if (!(f.evidenceIds ?? []).includes(item.id)) {
+                    next[twin] = { ...f, evidenceIds: [...(f.evidenceIds ?? []), item.id], updatedAt: now };
+                  }
+                  continue;
+                }
+                const conv = convert(p.amount, p.currency);
+                next.push({
+                  id: rid("fin"),
+                  date: p.date,
+                  label,
+                  kind: kindFor(category),
+                  amount: p.amount,
+                  currency: p.currency,
+                  recurring: false,
+                  notes: `Found in "${item.title || item.fileName}"${p.categoryAgreed ? "" : " — check the type"}`,
+                  evidenceIds: [item.id],
+                  expenseCategory: category,
+                  payer: p.payer === "Aciah" ? "Aciah" : "Imran",
+                  beneficiary: (BENEFICIARIES as readonly string[]).includes(p.beneficiary)
+                    ? (p.beneficiary as FinancialEntry["beneficiary"])
+                    : undefined,
+                  merchant: p.payee || undefined,
+                  purpose: p.description || undefined,
+                  gbpEquivalent: Math.round(conv.gbp * 100) / 100,
+                  usdEquivalent: Math.round(conv.usd * 100) / 100,
+                  exchangeRate: conv.rate,
+                  exchangeRateDate: income.rateDate || now.slice(0, 10),
+                  exchangeRateSource: income.rateSource,
+                  status: "Needs confirmation",
+                  transferKey: key,
+                  autoFound: true,
+                  createdBy: profile,
+                  lastEditedBy: profile,
+                  createdAt: now,
+                  updatedAt: now,
+                });
+                found += 1;
+              }
+              return next;
+            });
+          }
+          // Mark it read (even with nothing found) so it is not paid for again.
+          if (read.contentRead) applyPatch([item.id], { moneyReadAt: nowIso() }, "Looked for payments");
+        } catch {
+          // Left unmarked, so the next update tries this document again.
+        } finally {
+          done += 1;
+          setScanProgress((prev) => ({ ...prev, done }));
+          reportJob("read", { status: "running", done, total: queue.length });
+        }
+      }
+    } finally {
+      scanInFlight.current = false;
+      setScanProgress((prev) => ({ ...prev, running: false, phase: "" }));
+      reportJob("read", {
+        status: done >= queue.length ? "done" : scanCancelled.current ? "paused" : "stopped",
+        done,
+        total: queue.length,
+      });
+    }
+    return { documents: done, found };
+  }, [applyPatch, convert, income.rateDate, income.rateSource, profile, reportJob]);
+
   const applyConfirmed = useCallback((item: EvidenceItem, field: string, value: string) => {
     const patch: Partial<EvidenceItem> = {};
     if (field === "title") patch.title = value;
@@ -2051,7 +2193,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     const since = CASE_SETTINGS.separationStartDate;
     // Same rule as "Documented burden" on the Finances page, so both show one figure.
     const sinceSeparation = finances.filter(
-      (f) => !f.excluded && f.date >= since && financeGroupOf(f) !== "UK fixed obligations",
+      (f) => countsTowardTotals(f) && f.date >= since && financeGroupOf(f) !== "UK fixed obligations",
     );
     const financialImpact = sinceSeparation.reduce(
       (sum, f) => sum + (f.gbpEquivalent ?? convert(f.amount, f.currency).gbp),
@@ -2157,6 +2299,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     syncDrive,
     queueBackgroundBuild,
     scanAllDocuments,
+    findAmounts,
     scanProgress,
     pauseSync,
     jobs,

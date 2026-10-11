@@ -16,6 +16,7 @@ export type GapKind =
   | "medical-no-independent"
   | "finance-no-receipt"
   | "finance-duplicate"
+  | "finance-found"
   | "evidence-no-date"
   | "evidence-no-person"
   | "evidence-no-category"
@@ -279,6 +280,17 @@ export function detectGaps(
   for (const entry of finances) {
     if (entry.excluded) continue;
     const base = { recordType: "finance" as const, recordId: entry.id };
+    if (entry.autoFound && entry.status === "Needs confirmation") {
+      gaps.push({
+        ...base,
+        id: `${entry.id}-found`,
+        kind: "finance-found",
+        severity: "medium",
+        label: "Amount found in a document — confirm it",
+        detail: `${entry.date} — ${entry.label} (${entry.currency === "GBP" ? "£" : "$"}${entry.amount.toLocaleString()})`,
+        taskTitle: `Confirm the amount ${entry.label}`,
+      });
+    }
     if (!(entry.evidenceIds ?? []).length) {
       gaps.push({
         ...base,
