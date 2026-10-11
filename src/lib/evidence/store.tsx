@@ -12,7 +12,6 @@ import { toast } from "sonner";
 
 import { extractDocument } from "@/lib/ai.functions";
 import {
-  generateCloneDocument,
   listDriveTree,
   type DriveFileNode,
   type DriveFolderNode,
@@ -182,11 +181,17 @@ interface EvidenceContextValue {
   savePacketVersion: (
     record: Omit<PacketVersion, "id" | "version" | "generatedAt" | "generatedBy">,
   ) => PacketVersion;
+  /** Add details to a saved packet version (e.g. the filing PDF links). */
+  updatePacketVersion: (id: string, patch: Partial<PacketVersion>) => void;
+  /** Forget every frozen filing number, so the next packet numbers each tab from 1. */
+  resetFilingNumbers: () => number;
 
   connection: ProviderConnection | null;
   connectDrive: (config: { apiKey?: string; folderPath?: string; accountLabel?: string }) => void;
   driveTree: { folders: DriveFolderNode[]; files: DriveFileNode[]; syncedAt: string } | null;
   driveSyncing: boolean;
+  /** Start a background build run now (fresh Drive scan), e.g. after an upload. */
+  queueBackgroundBuild: () => Promise<void>;
   syncDrive: (options?: { auto?: boolean }) => Promise<{
     added: number;
     updated: number;
@@ -443,6 +448,16 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     setItems(next);
     void documentProvider.putMany(changed);
     return changed.length;
+  }, []);
+
+  const queueBackgroundBuild = useCallback(async () => {
+    lastBackgroundKick.current = Date.now();
+    try {
+      const { runBackgroundBatch } = await import("@/lib/jobs/background.functions");
+      await runBackgroundBatch({ data: { batch: 4, freshScan: true } });
+    } catch (error) {
+      console.error("Background build could not start", error);
+    }
   }, []);
 
   const applyPatch = useCallback(
@@ -1095,9 +1110,17 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
               .filter((row) => !live || !row.clone_file_id || live.has(row.clone_file_id))
               .map((row) => [row.drive_file_id, row]),
           );
+          // An exact copy of another document shares that document's clone.
+          const resolve = (driveFileId: string) => {
+            const row = byDriveId.get(driveFileId);
+            if (row?.status === "duplicate" && row.duplicate_of) {
+              return byDriveId.get(row.duplicate_of) ?? row;
+            }
+            return row;
+          };
           for (const item of itemsRef.current) {
             if (!item.driveFileId) continue;
-            const row = byDriveId.get(item.driveFileId);
+            const row = resolve(item.driveFileId);
             if (!row) continue;
             const alreadyClone = Boolean(item.cloneFileId) || !row.clone_file_id;
             const alreadyRead = Boolean(item.aiExtraction?.contentRead) || !row.ai_read_at;
@@ -1170,7 +1193,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       const queue = itemsRef.current.filter(
         (item) =>
           item.driveFileId &&
-          (rescan || !item.aiExtraction?.contentRead || !item.cloneFileId || needsFix(item)),
+          (rescan || !item.aiExtraction?.contentRead || needsFix(item)),
       );
       if (!queue.length) {
         setScanProgress({ running: false, phase: "", done: 0, total: 0, scanned: 0, cloned: 0, failed: 0 });
@@ -1179,7 +1202,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       scanInFlight.current = true;
 
       let scanned = 0;
-      let cloned = 0;
+      const cloned = 0;
       let failed = 0;
       let done = 0;
       setScanProgress({
@@ -1194,75 +1217,15 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       try {
         for (const item of queue) {
           if (scanCancelled.current) break;
-          let latest = item;
           try {
-            if (rescan || !item.aiExtraction?.contentRead || needsFix(item)) {
-              setExtractingIds((prev) => [...prev, item.id]);
-              setScanProgress((prev) => ({ ...prev, phase: `Reading ${item.fileName}` }));
-              try {
-                const result = await runOne(item, categories);
-                const a = result.agreed;
-                const validCategories = (a.categories ?? []).filter((c) =>
-                  categories.includes(c as Category),
-                ) as Category[];
-                const confirmed = item.confirmedFields ?? [];
-                latest = {
-                  ...item,
-                  title: !confirmed.includes("title") && a.title ? a.title : item.title,
-                  dateOfDocument:
-                    !confirmed.includes("documentDate") &&
-                    a.documentDate && /^\d{4}-\d{2}-\d{2}$/.test(a.documentDate)
-                      ? a.documentDate
-                      : item.dateOfDocument,
-                  people: !confirmed.includes("people") && a.people?.length ? a.people : item.people,
-                  categories:
-                    !confirmed.includes("categories") && validCategories.length
-                      ? validCategories
-                      : item.categories,
-                  pageCount: a.pageCount && a.pageCount > 0 ? a.pageCount : item.pageCount,
-                  notes: item.notes || result.summary || item.notes,
-                };
-                scanned += 1;
-              } finally {
-                setExtractingIds((prev) => prev.filter((x) => x !== item.id));
-              }
-            }
-
-            if (rescan || !latest.cloneFileId) {
-              setScanProgress((prev) => ({ ...prev, phase: `Building clone for ${latest.exhibitId}` }));
-              const clone = await generateCloneDocument({
-                data: {
-                  driveFileId: latest.driveFileId,
-                  fileName: latest.fileName,
-                  folderPath: latest.driveFolder ?? "",
-                  mimeType: latest.mimeType,
-                  meta: {
-                    exhibitId: latest.exhibitId,
-                    title: latest.title,
-                    documentDate: latest.dateOfDocument,
-                    person: latest.people?.[0] ?? "Aciah",
-                    categories: latest.categories ?? [],
-                    people: latest.people ?? [],
-                    sourceType: latest.sourceType ?? "",
-                    status: latest.status ?? "",
-                    summary: latest.aiExtraction?.summary || latest.notes || "",
-                    tags: latest.tags ?? [],
-                    affectsAciah: latest.affectsAciah,
-                    addedBy: profile,
-                  },
-                },
-              });
-              applyPatch(
-                [item.id],
-                {
-                  cloneFileId: clone.id,
-                  cloneUrl: clone.webViewLink,
-                  cloneFileName: clone.name,
-                  cloneGeneratedAt: nowIso(),
-                },
-                `Detailed clone generated — ${clone.name}`,
-              );
-              cloned += 1;
+            setExtractingIds((prev) => [...prev, item.id]);
+            setScanProgress((prev) => ({ ...prev, phase: `Reading ${item.fileName}` }));
+            try {
+              // runOne saves what it reads, respecting confirmed fields.
+              await runOne(item, categories);
+              scanned += 1;
+            } finally {
+              setExtractingIds((prev) => prev.filter((x) => x !== item.id));
             }
           } catch {
             failed += 1;
@@ -1275,9 +1238,12 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         scanInFlight.current = false;
         setScanProgress((prev) => ({ ...prev, running: false, phase: "" }));
       }
+      // Clones are made only by the background builder; nudge it now. Its
+      // clones are linked to these records by the verify step on the next synch.
+      void queueBackgroundBuild();
       return { scanned, cloned, failed, total: queue.length, verified };
     },
-    [applyPatch, categories, profile, runOne],
+    [applyPatch, categories, queueBackgroundBuild, runOne],
   );
 
 
@@ -1937,6 +1903,20 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     [applyPatch, items],
   );
 
+  const updatePacketVersion = useCallback((id: string, patch: Partial<PacketVersion>) => {
+    setPackets((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
+
+  const resetFilingNumbers = useCallback(
+    () =>
+      rewriteItems((item) =>
+        item.packetExhibitNo
+          ? { ...item, packetExhibitNo: undefined, updatedAt: nowIso() }
+          : item,
+      ),
+    [rewriteItems],
+  );
+
   /** Store an immutable packet version and freeze the exhibit numbers it used. */
   const savePacketVersion = useCallback(
     (record: Omit<PacketVersion, "id" | "version" | "generatedAt" | "generatedBy">) => {
@@ -1949,8 +1929,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       };
       setPackets((prev) => [...prev, version]);
       rewriteItems((item) => {
+        // Freeze the filing number this packet used.
         const mapped = record.exhibitMap.find((m) => m.evidenceId === item.id);
-        if (!mapped || item.packetExhibitNo) return item;
+        if (!mapped || item.packetExhibitNo === mapped.number) return item;
         return { ...item, packetExhibitNo: mapped.number, updatedAt: nowIso() };
       });
       return version;
@@ -2105,12 +2086,15 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     packets,
     togglePacketExclusion,
     savePacketVersion,
+    updatePacketVersion,
+    resetFilingNumbers,
 
     connection,
     connectDrive,
     driveTree,
     driveSyncing,
     syncDrive,
+    queueBackgroundBuild,
     scanAllDocuments,
     scanProgress,
     pauseSync,

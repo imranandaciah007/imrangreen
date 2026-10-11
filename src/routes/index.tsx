@@ -146,11 +146,11 @@ function CaseApp() {
       toast.success("Drive synched successfully", { description });
       const scan = await scanAllDocuments();
       if (scan.verified || scan.total) {
-        const allFailed = scan.failed > 0 && scan.cloned === 0 && scan.verified === 0;
+        const allFailed = scan.failed > 0 && scan.scanned === 0 && scan.verified === 0;
         const headline = scan.total
           ? `Checked ${scan.total} document(s)`
           : `Verified ${scan.verified} exhibit(s)`;
-        const detail = `${scan.verified} already built and verified · ${scan.cloned} newly built${scan.failed ? ` · ${scan.failed} could not be read` : ""}`;
+        const detail = `${scan.verified} linked to their clones · ${scan.scanned} read${scan.failed ? ` · ${scan.failed} could not be read` : ""} · new clones are made in the background`;
         if (allFailed) {
           toast.error("No documents could be read", { description: detail });
         } else if (scan.failed) {

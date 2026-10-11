@@ -38,9 +38,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useEvidence } from "@/lib/evidence/store";
+import { queueClone } from "@/lib/jobs/background.functions";
 import {
   createDriveFolder,
-  generateCloneDocument,
   moveDriveNode,
   renameDriveNode,
   uploadEvidenceToFolder,
@@ -48,7 +48,6 @@ import {
   type DriveFolderNode,
 } from "@/lib/drive-tree.functions";
 import { cn } from "@/lib/utils";
-import { todayLocal } from "@/lib/evidence/format";
 
 interface DriveTree {
   folders: DriveFolderNode[];
@@ -127,7 +126,7 @@ function countChanges(before: DriveTree | null, after: DriveTree): string | null
 }
 
 export function FileBoardView() {
-  const { items, profile, connection, driveTree, driveSyncing, syncDrive } = useEvidence();
+  const { items, connection, driveTree, driveSyncing, syncDrive, queueBackgroundBuild } = useEvidence();
   const [tree, setTree] = useState<DriveTree | null>(() => driveTree ?? readJson<DriveTree | null>(TREE_KEY, null));
   const [syncing, setSyncing] = useState(false);
   const [autoSyncing, setAutoSyncing] = useState(false);
@@ -347,7 +346,7 @@ export function FileBoardView() {
     try {
       for (const file of Array.from(files)) {
         const base64 = await fileToBase64(file);
-        const uploaded = await uploadEvidenceToFolder({
+        await uploadEvidenceToFolder({
           data: {
             folderPath: currentPath,
             name: file.name,
@@ -355,31 +354,12 @@ export function FileBoardView() {
             base64,
           },
         });
-        const exhibitId = exhibitFor(uploaded.id);
-        await generateCloneDocument({
-          data: {
-            driveFileId: uploaded.id,
-            fileName: file.name,
-            folderPath: currentPath,
-            mimeType: file.type || "application/octet-stream",
-            meta: {
-              exhibitId,
-              title: file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "),
-              documentDate: todayLocal(),
-              person: "Aciah",
-              categories: [],
-              people: ["Aciah"],
-              sourceType: "Other",
-              status: "Needs confirmation",
-              summary: "New evidence uploaded through GC. Confirm the important document details in the app.",
-              tags: [],
-              addedBy: profile,
-            },
-          },
-        });
       }
-      toast.success(`${files.length} original${files.length > 1 ? "s" : ""} and matching PDF clone${files.length > 1 ? "s" : ""} saved to Drive`);
+      toast.success(`${files.length} original${files.length > 1 ? "s" : ""} saved to Drive`, {
+        description: "The background builder makes the matching clone in the next minute or two.",
+      });
       await sync();
+      void queueBackgroundBuild();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "The upload failed.");
     } finally {
@@ -390,36 +370,24 @@ export function FileBoardView() {
 
   async function makeClone(file: DriveFileNode) {
     setBusy(file.id);
-    const item = byDriveId.get(file.id);
     try {
-      const result = await generateCloneDocument({
-        data: {
-          driveFileId: file.id,
-          fileName: file.name,
-          folderPath: file.path,
-          mimeType: file.mimeType,
-          meta: {
-            exhibitId: item?.exhibitId || exhibitFor(file.id),
-            title: item?.title || file.name.replace(/\.[^.]+$/, ""),
-            documentDate: item?.dateOfDocument || file.modifiedTime.slice(0, 10),
-            person: item?.people?.[0] || "Aciah",
-            categories: item?.categories ?? [],
-            people: item?.people ?? [],
-            sourceType: item?.sourceType ?? "",
-            status: item?.status ?? "",
-            summary: item?.notes ?? "",
-            tags: item?.tags ?? [],
-            affectsAciah: item?.affectsAciah,
-            addedBy: profile,
-          },
-        },
-      });
-      toast.success(`Clone saved: ${result.name}`, {
-        description: `${result.folderPath} · ${result.totalPages} pages`,
-        action: result.webViewLink
-          ? { label: "Open", onClick: () => window.open(result.webViewLink, "_blank") }
-          : undefined,
-      });
+      // Clones are made only by the background builder, so there is one per document.
+      const result = await queueClone({ data: { driveFileId: file.id } });
+      if (result.status === "exists") {
+        toast.success("This document already has its clone", {
+          action: result.link
+            ? { label: "Open", onClick: () => window.open(result.link!, "_blank") }
+            : undefined,
+        });
+      } else if (result.status === "duplicate") {
+        toast.info("This is an exact copy of another document", {
+          description: "Its clone is the one made for the other copy, so no second clone is made.",
+        });
+      } else {
+        toast.success("Clone requested", {
+          description: "The background builder is making it now. It appears in the clones folder shortly.",
+        });
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "The clone could not be generated.");
     } finally {

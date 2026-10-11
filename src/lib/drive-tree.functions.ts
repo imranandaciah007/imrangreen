@@ -68,43 +68,5 @@ export const uploadEvidenceToFolder = createServerFn({ method: "POST" })
     return { ...file, folderPath: data.folderPath };
   });
 
-/**
- * Build the annotated clone of one exhibit: cover sheet with exhibit number,
- * title, date and page references, followed by the original pages.
- */
-export const generateCloneDocument = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: {
-      driveFileId?: string | undefined;
-      fileName: string;
-      folderPath: string;
-      mimeType?: string | undefined;
-      base64?: string | undefined;
-      meta: import("./drive-core.server").CloneMeta;
-    }) => {
-      if (!data?.fileName || !data?.meta?.exhibitId) {
-        throw new Error("The exhibit number and file name are required.");
-      }
-      return data;
-    },
-  )
-  .handler(async ({ data }) => {
-    const { buildClone, findExistingClone } = await import("./drive-core.server");
-    // Scan Drive first: adopt a clone that already exists for this original
-    // instead of spending time and AI credit building a duplicate.
-    if (data.driveFileId) {
-      const existing = await findExistingClone(data.driveFileId, data.meta.exhibitId);
-      if (existing) {
-        return {
-          id: existing.id,
-          name: existing.name,
-          webViewLink: existing.webViewLink,
-          folderPath: "",
-          originalPages: 0,
-          totalPages: 0,
-          note: "Existing clone adopted — no rebuild needed",
-        };
-      }
-    }
-    return buildClone(data);
-  });
+// Clones are built only by the background builder (lib/jobs/clone-worker.server.ts),
+// so every document gets exactly one clone.

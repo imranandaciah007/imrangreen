@@ -85,10 +85,6 @@ export function preflightAudit(
 
 /* ---------------------------- exhibit numbering ---------------------------- */
 
-function sectionLetter(index: number) {
-  return String.fromCharCode(65 + index);
-}
-
 export interface PacketExhibit {
   item: EvidenceItem;
   number: string;
@@ -98,56 +94,83 @@ export interface PacketExhibit {
   lastPage: number;
 }
 
+/** Filing numbers look like "Exhibit A-3": the tab letter, then the place in that tab. */
+const FILING_NO = /^Exhibit ([A-Z]{1,2})-(\d+)$/;
+
+/** Tab letters A, B, … Z, then AA, AB, … for very long section lists. */
+function tabLetter(index: number) {
+  return index < 26
+    ? String.fromCharCode(65 + index)
+    : String.fromCharCode(64 + Math.floor(index / 26)) + String.fromCharCode(65 + (index % 26));
+}
+
 /**
- * Stable numbering: an exhibit keeps any number it was given in an earlier packet
- * version; new exhibits continue the sequence. Sections cross-reference the same
- * exhibit instead of duplicating it.
+ * Filing numbers, by tab. Each section the user chose is a tab (A, B, C, …) and
+ * exhibits are numbered within it: Exhibit A-1, A-2, B-1. These are the only
+ * numbers that appear on anything filed; the app's own working codes (D-87,
+ * EX-UY37R) never do.
+ *
+ * A number is frozen once a packet has been generated with it, and is kept as
+ * long as the exhibit is still in the same tab. New exhibits continue each
+ * tab's sequence. Older "Exhibit 001" style numbers are not filing numbers and
+ * are replaced. An exhibit that supports several sections appears once, in the
+ * first chosen section it belongs to.
  */
 export function buildExhibits(items: EvidenceItem[], sections: string[]): PacketExhibit[] {
   const included = items.filter((i) => !i.excludeFromPacket);
   const catsOf = (i: EvidenceItem) => (i.categories?.length ? i.categories : [i.category]);
-  const ordered: EvidenceItem[] = [];
-  const seen = new Set<string>();
-  for (const section of sections) {
-    for (const item of included) {
-      if (seen.has(item.id)) continue;
-      if (catsOf(item).includes(section)) {
-        seen.add(item.id);
-        ordered.push(item);
-      }
-    }
-  }
-  for (const item of included) if (!seen.has(item.id)) ordered.push(item);
+  const tabs = [...sections, "Other"];
+  const letterOf = (section: string) => tabLetter(Math.max(0, tabs.indexOf(section)));
 
-  const used = new Set(items.map((i) => i.packetExhibitNo).filter(Boolean) as string[]);
-  let next = 1;
-  const nextFree = () => {
-    let candidate = `Exhibit ${String(next).padStart(3, "0")}`;
-    while (used.has(candidate)) {
-      next += 1;
-      candidate = `Exhibit ${String(next).padStart(3, "0")}`;
-    }
-    used.add(candidate);
-    next += 1;
-    return candidate;
-  };
-
-  let page = 1;
-  return ordered.map((item) => {
+  // Group by tab, in the chosen section order; within a tab, oldest document first.
+  const byTab = new Map<string, EvidenceItem[]>(tabs.map((t) => [t, []]));
+  for (const item of included) {
     const cats = catsOf(item);
     const section = sections.find((s) => cats.includes(s)) ?? "Other";
-    const pages = Math.max(1, item.pageCount || 1);
-    const exhibit: PacketExhibit = {
-      item,
-      number: item.packetExhibitNo || nextFree(),
-      section,
-      sectionLetter: sectionLetter(Math.max(0, sections.indexOf(section))),
-      firstPage: page,
-      lastPage: page + pages - 1,
+    byTab.get(section)!.push(item);
+  }
+
+  const result: PacketExhibit[] = [];
+  let page = 1;
+  for (const section of tabs) {
+    const tabItems = byTab.get(section)!;
+    if (!tabItems.length) continue;
+    const letter = letterOf(section);
+    // Keep frozen numbers that still belong to this tab (and are not repeated).
+    const kept = new Map<string, number>();
+    const taken = new Set<number>();
+    for (const item of tabItems) {
+      const m = FILING_NO.exec(item.packetExhibitNo ?? "");
+      if (m && m[1] === letter && !taken.has(Number(m[2]))) {
+        kept.set(item.id, Number(m[2]));
+        taken.add(Number(m[2]));
+      }
+    }
+    let next = 1;
+    const nextFree = () => {
+      while (taken.has(next)) next += 1;
+      taken.add(next);
+      return next;
     };
-    page += pages;
-    return exhibit;
-  });
+    const numbered = [...tabItems]
+      .sort((x, y) => (x.dateOfDocument || "").localeCompare(y.dateOfDocument || ""))
+      .map((item) => ({ item, n: kept.get(item.id) ?? 0 }));
+    for (const entry of numbered) if (!entry.n) entry.n = nextFree();
+    numbered.sort((x, y) => x.n - y.n);
+    for (const { item, n } of numbered) {
+      const pages = Math.max(1, item.pageCount || 1);
+      result.push({
+        item,
+        number: `Exhibit ${letter}-${n}`,
+        section,
+        sectionLetter: letter,
+        firstPage: page,
+        lastPage: page + pages - 1,
+      });
+      page += pages;
+    }
+  }
+  return result;
 }
 
 /* --------------------------------- exports --------------------------------- */
@@ -371,14 +394,18 @@ export function financeSummaryHtml(p: PacketInput) {
 }
 
 export function packetHtml(p: PacketInput) {
-  const toc = p.sections
+  // Exhibits outside every chosen section sit in a final "Other" tab.
+  const tabs = p.exhibits.some((e) => e.section === "Other") && !p.sections.includes("Other")
+    ? [...p.sections, "Other"]
+    : p.sections;
+  const toc = tabs
     .map((s, i) => {
       const count = p.exhibits.filter((e) => e.section === s).length;
-      return `<tr><td>${sectionLetter(i)}</td><td>${esc(s)}</td><td>${count} exhibit${count === 1 ? "" : "s"}</td></tr>`;
+      return `<tr><td>${tabLetter(i)}</td><td>${esc(s)}</td><td>${count} exhibit${count === 1 ? "" : "s"}</td></tr>`;
     })
     .join("");
 
-  const sectionBlocks = p.sections
+  const sectionBlocks = tabs
     .map((s, i) => {
       const own = p.exhibits.filter((e) => e.section === s);
       const crossRefs = p.exhibits.filter(
@@ -386,7 +413,7 @@ export function packetHtml(p: PacketInput) {
           e.section !== s &&
           (e.item.categories?.length ? e.item.categories : [e.item.category]).includes(s),
       );
-      return `<h2 class="sep">${sectionLetter(i)}. ${esc(s)}</h2>
+      return `<h2 class="sep">${tabLetter(i)}. ${esc(s)}</h2>
         ${
           own.length
             ? `<table><thead><tr><th>Exhibit</th><th>Title</th><th>Date</th><th>Source</th><th>Pages</th></tr></thead><tbody>${own
