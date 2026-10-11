@@ -624,6 +624,14 @@ export async function runCloneTick(
       }),
     );
 
+    // With time to spare, look for payments in a few money documents that are done.
+    if (!stop && !pauseReason && Date.now() - startedAt < TIME_BUDGET_MS - 40_000) {
+      try {
+        await findPaymentsInDoneDocuments(startedAt + TIME_BUDGET_MS - 20_000);
+      } catch (error) {
+        console.error("Looking for payments failed; it is tried again next run", error);
+      }
+    }
 
     const { count: pendingAfter } = await supabaseAdmin
       .from("gc_clone_jobs")
@@ -673,6 +681,95 @@ export async function runCloneTick(
       .eq("id", true);
     throw error;
   }
+}
+
+/** Where payments found in documents are kept for the app to collect. */
+const MONEY_KEY = "moneyFound";
+const MONEY_PER_RUN = 6;
+
+export type MoneyFoundMap = Record<
+  string,
+  { readAt: string; payments: import("@/lib/jobs/money-read.server").FoundPayment[] }
+>;
+
+/**
+ * Reads a few finished money documents (receipts, transfers, statements) for the
+ * payments in them and saves what it finds in the shared case, keyed by Drive
+ * file. Each document is read once; the app turns the results into expenses
+ * waiting for confirmation the next time it opens.
+ */
+async function findPaymentsInDoneDocuments(deadline: number) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { looksLikeMoneyDocument, readPayments } = await import("@/lib/jobs/money-read.server");
+  const { CASE_SETTINGS } = await import("@/lib/evidence/types");
+
+  const readMap = async (): Promise<MoneyFoundMap> => {
+    const { data } = await supabaseAdmin
+      .from("gc_case_store" as never)
+      .select("data")
+      .eq("key", MONEY_KEY)
+      .maybeSingle();
+    return (((data as { data?: unknown } | null)?.data ?? {}) as MoneyFoundMap) || {};
+  };
+  const already = await readMap();
+
+  type DoneRow = {
+    drive_file_id: string;
+    file_name: string;
+    mime_type: string;
+    ai_title: string | null;
+    ai_source_type: string | null;
+    ai_categories: string[] | null;
+  };
+  const candidates: DoneRow[] = [];
+  for (let from = 0; from < 50_000 && candidates.length < MONEY_PER_RUN; from += 1000) {
+    const { data: page, error } = await supabaseAdmin
+      .from("gc_clone_jobs")
+      .select("drive_file_id,file_name,mime_type,ai_title,ai_source_type,ai_categories")
+      .eq("status", "done")
+      .is("duplicate_of", null)
+      .order("drive_file_id")
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    for (const row of (page ?? []) as DoneRow[]) {
+      if (already[row.drive_file_id]) continue;
+      if (
+        !looksLikeMoneyDocument({
+          fileName: row.file_name,
+          title: row.ai_title,
+          sourceType: row.ai_source_type,
+          categories: row.ai_categories,
+        })
+      )
+        continue;
+      candidates.push(row);
+      if (candidates.length >= MONEY_PER_RUN) break;
+    }
+    if ((page ?? []).length < 1000) break;
+  }
+  if (!candidates.length) return;
+
+  const results: MoneyFoundMap = {};
+  for (const row of candidates) {
+    if (Date.now() > deadline) break;
+    const read = await readPayments({
+      driveFileId: row.drive_file_id,
+      fileName: row.file_name,
+      mimeType: row.mime_type,
+      title: row.ai_title ?? "",
+      separationStartDate: CASE_SETTINGS.separationStartDate,
+    });
+    // A file that could not be opened is left for the next run.
+    if (read.contentRead) {
+      results[row.drive_file_id] = { readAt: new Date().toISOString(), payments: read.payments };
+    }
+  }
+  if (!Object.keys(results).length) return;
+  const latest = await readMap();
+  await supabaseAdmin.from("gc_case_store" as never).upsert(
+    { key: MONEY_KEY, data: { ...latest, ...results }, updated_at: new Date().toISOString() } as never,
+    { onConflict: "key" },
+  );
 }
 
 export async function readJobStatus() {

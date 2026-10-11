@@ -109,7 +109,7 @@ export function ProgressStrip({
     const total = data.clonesBuilt + data.waiting;
     lines.push({
       key: "copies",
-      text: `Making exhibit copies: ${data.clonesBuilt} of ${total}`,
+      text: `Reading documents in the background: ${data.clonesBuilt} of ${total}`,
       done: data.clonesBuilt,
       total,
     });
