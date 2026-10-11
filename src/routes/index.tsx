@@ -55,7 +55,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CaseApp() {
-  const { loading, stats, syncDrive, scanAllDocuments, setFilters, openInspector } = useEvidence();
+  const { loading, syncDrive, scanAllDocuments, findAmounts, setFilters, openInspector } = useEvidence();
   const [tab, setTabRaw] = useState<MainTab>("home");
   // The Documents layout choice follows you to any device you sign in on.
   const [layout, setLayout] = useSharedPref<DocumentsLayout>("documentsLayout", "folders");
@@ -174,6 +174,12 @@ function CaseApp() {
         } else {
           toast.success(headline, { description: detail });
         }
+      }
+      const money = await findAmounts();
+      if (money.found) {
+        toast.info(`Found ${money.found} payment(s) in your documents`, {
+          description: "They are on your Review list to confirm before they count.",
+        });
       }
     } catch (error) {
       toast.error("Drive sync failed", { description: error instanceof Error ? error.message : "Please try again." });

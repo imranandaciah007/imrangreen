@@ -40,8 +40,18 @@ export function CaseReviewView({
   /** Open with the task list unfolded (from the reminders bell). */
   focusTasks?: boolean;
 }) {
-  const { gaps, coverage, items, events, finances, tasks, openInspector, resolveConflict, ignoreGap } =
-    useEvidence();
+  const {
+    gaps,
+    coverage,
+    items,
+    events,
+    finances,
+    tasks,
+    openInspector,
+    resolveConflict,
+    ignoreGap,
+    updateFinance,
+  } = useEvidence();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStart, setWizardStart] = useState<string | undefined>(undefined);
   const [shown, setShown] = useState(PAGE);
@@ -164,9 +174,37 @@ export function CaseReviewView({
                       Open timeline
                     </Button>
                   ) : first.recordType === "finance" ? (
-                    <Button size="sm" variant="outline" className="h-9 text-[11px]" onClick={onOpenFinances}>
-                      Open finances
-                    </Button>
+                    row.issues.some((g) => g.kind === "finance-found") ? (
+                      <>
+                        <Button
+                          size="sm"
+                          className="h-9 text-[11px]"
+                          onClick={() => updateFinance(first.recordId, { status: "Verified" })}
+                        >
+                          Confirm
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 text-[11px]"
+                          onClick={() => updateFinance(first.recordId, { excluded: true })}
+                        >
+                          Not hardship
+                        </Button>
+                        {(() => {
+                          const proof = finances.find((f) => f.id === first.recordId)?.evidenceIds?.[0];
+                          return proof ? (
+                            <Button size="sm" variant="ghost" className="h-9 text-[11px]" onClick={() => openInspector(proof)}>
+                              See document
+                            </Button>
+                          ) : null;
+                        })()}
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" className="h-9 text-[11px]" onClick={onOpenFinances}>
+                        Open finances
+                      </Button>
+                    )
                   ) : null}
                   <Button
                     size="sm"

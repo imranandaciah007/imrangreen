@@ -38,7 +38,13 @@ import {
   type PacketInput,
 } from "@/lib/evidence/packet";
 import { useEvidence } from "@/lib/evidence/store";
-import { CASE_SETTINGS, EXPENSE_GROUPS, DEFAULT_CATEGORIES, type FilingPartRecord } from "@/lib/evidence/types";
+import {
+  CASE_SETTINGS,
+  EXPENSE_GROUPS,
+  DEFAULT_CATEGORIES,
+  countsTowardTotals,
+  type FilingPartRecord,
+} from "@/lib/evidence/types";
 import { uploadPacketFile } from "@/lib/drive.functions";
 import { draftFilingLanguage, type FilingLanguage } from "@/lib/filing.functions";
 import {
@@ -75,7 +81,7 @@ export function PacketBuilder({
   const {
     items,
     events,
-    finances,
+    finances: allFinances,
     tasks,
     gaps,
     stats,
@@ -93,6 +99,8 @@ export function PacketBuilder({
     extractingIds,
     reportJob,
   } = useEvidence();
+  // Amounts found in documents count only once confirmed.
+  const finances = useMemo(() => allFinances.filter(countsTowardTotals), [allFinances]);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStartId, setWizardStartId] = useState<string | undefined>(undefined);
@@ -323,16 +331,21 @@ export function PacketBuilder({
         content: exhibitIndexHtml(input),
       },
       { name: `I601_Timeline_v${v}.html`, mime: "text/html", content: timelineHtml(input) },
-      {
-        name: `I601_Financial_Summary_v${v}.html`,
-        mime: "text/html",
-        content: financeSummaryHtml(input),
-      },
-      {
-        name: `I601_Financial_Summary_v${v}.csv`,
-        mime: "text/csv",
-        content: financeCsv(finances, items, exhibits),
-      },
+      // With no confirmed costs yet, the summary is left out rather than showing £0.
+      ...(finances.length
+        ? [
+            {
+              name: `I601_Financial_Summary_v${v}.html`,
+              mime: "text/html",
+              content: financeSummaryHtml(input),
+            },
+            {
+              name: `I601_Financial_Summary_v${v}.csv`,
+              mime: "text/csv",
+              content: financeCsv(finances, items, exhibits),
+            },
+          ]
+        : []),
       { name: `I601_Gap_Report_v${v}.html`, mime: "text/html", content: gapReportHtml(input) },
     ];
     const analysisHtml = analysisDoc();

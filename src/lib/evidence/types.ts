@@ -159,6 +159,8 @@ export interface EvidenceItem {
   cloneUrl?: string | undefined;
   cloneFileName?: string | undefined;
   cloneGeneratedAt?: string | undefined;
+  /** When the payments in this document were looked for (money documents only). */
+  moneyReadAt?: string | undefined;
   /** Fields a human has confirmed — AI must never silently overwrite these. */
   confirmedFields?: string[] | undefined;
   /** Later AI runs that disagree with a human-confirmed field, awaiting a decision. */
@@ -334,6 +336,15 @@ export const EXPENSE_GROUPS: Record<string, ExpenseCategory[]> = {
   ],
 };
 
+/** A payment counts in totals unless left out, or found automatically and not yet confirmed. */
+export function countsTowardTotals(entry: {
+  excluded?: boolean | undefined;
+  autoFound?: boolean | undefined;
+  status?: string | undefined;
+}): boolean {
+  return !entry.excluded && !(entry.autoFound && entry.status === "Needs confirmation");
+}
+
 /** Which reporting group a payment belongs to ("Other" when it has no expense category). */
 export function financeGroupOf(entry: { expenseCategory?: string | undefined }): string {
   const cat = entry.expenseCategory;
@@ -394,6 +405,8 @@ export interface FinancialEntry {
   appendixRefs?: string[] | undefined;
   /** True when the diary describes a cost but gives no amount. */
   amountMissing?: boolean | undefined;
+  /** Found automatically in a document; counts once you confirm it. */
+  autoFound?: boolean | undefined;
   confirmedFields?: string[] | undefined;
   /** Monthly repeats are only generated up to a date the user confirms. */
   recurringUntil?: string | undefined;
