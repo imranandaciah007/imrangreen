@@ -71,6 +71,12 @@ export const resumeBackgroundSync = createServerFn({ method: "POST" }).handler(a
     .from("gc_job_state")
     .update({ status: "idle", paused_reason: null, lease_until: null, last_tree_sync_at: null })
     .eq("id", true);
+  // Documents that gave up after three tries get three fresh tries, so nothing is
+  // left without an exhibit copy because of a passing Drive or network problem.
+  await supabaseAdmin
+    .from("gc_clone_jobs")
+    .update({ status: "pending", attempts: 0, updated_at: new Date().toISOString() })
+    .eq("status", "failed");
   return { ok: true };
 });
 

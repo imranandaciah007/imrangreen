@@ -568,7 +568,7 @@ export function FileBoardView() {
             ref={uploadRef}
             type="file"
             multiple
-            accept="application/pdf,image/*,.doc,.docx"
+            accept="*/*"
             className="hidden"
             onChange={(e) => void addEvidence(e.target.files)}
           />

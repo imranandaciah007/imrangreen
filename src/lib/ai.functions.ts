@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { jsonModelName, runJsonModel } from "./ai-json.server";
 import { verifyWithOpenAi, type VerificationReport } from "./ai-verify.server";
 
-const DRIVE_GATEWAY = "https://connector-gateway.lovable.dev/google_drive";
 const MAX_BYTES = 12 * 1024 * 1024;
 
 export interface ExtractionPass {
@@ -85,26 +84,26 @@ function samePass(a: string[], b: string[]) {
   return sa === sb;
 }
 
-async function fetchDriveBytes(fileId: string) {
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  const connectionKey = process.env["GOOGLE_DRIVE_API_KEY"];
-  if (!lovableKey || !connectionKey) return null;
+/**
+ * The Drive original as base64 in a form the reader understands: PDFs and photos
+ * as they are, Word / Google Docs / sheets / emails as their printed PDF.
+ */
+async function fetchDriveFile(fileId: string, fileName: string, mimeType: string) {
+  if (!process.env["LOVABLE_API_KEY"] || !process.env["GOOGLE_DRIVE_API_KEY"]) return null;
   if (!/^[A-Za-z0-9_-]{6,200}$/.test(fileId)) return null;
-  const res = await fetch(`${DRIVE_GATEWAY}/drive/v3/files/${fileId}?alt=media`, {
-    headers: {
-      Authorization: `Bearer ${lovableKey}`,
-      "X-Connection-Api-Key": connectionKey,
-    },
-  });
-  if (!res.ok) return null;
-  const buf = await res.arrayBuffer();
-  if (buf.byteLength > MAX_BYTES) return null;
-  const bytes = new Uint8Array(buf);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  try {
+    const { fetchReadableFile } = await import("./drive-core.server");
+    const readable = await fetchReadableFile({ fileId, fileName, mimeType });
+    if (!readable || readable.bytes.byteLength > MAX_BYTES) return null;
+    const bytes = readable.bytes;
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 8192) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    }
+    return { base64: btoa(binary), mimeType: readable.mimeType };
+  } catch {
+    return null;
   }
-  return btoa(binary);
 }
 
 async function runPass(input: {
@@ -154,8 +153,10 @@ export const extractDocument = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }): Promise<ExtractionResult> => {
-    const base64 = data.driveFileId ? await fetchDriveBytes(data.driveFileId) : null;
-    return twoPass({ ...data, base64 });
+    const file = data.driveFileId
+      ? await fetchDriveFile(data.driveFileId, data.fileName, data.mimeType)
+      : null;
+    return twoPass({ ...data, base64: file?.base64 ?? null, mimeType: file?.mimeType ?? data.mimeType });
   });
 
 /**
@@ -634,8 +635,12 @@ export const extractReceipt = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }): Promise<ReceiptRead> => {
-    const base64 =
-      data.base64 || (data.driveFileId ? await fetchDriveBytes(data.driveFileId) : null);
+    const file =
+      !data.base64 && data.driveFileId
+        ? await fetchDriveFile(data.driveFileId, data.fileName, data.mimeType)
+        : null;
+    const base64 = data.base64 || file?.base64 || null;
+    if (file) data.mimeType = file.mimeType;
     const prompt = [
       "Read this receipt, invoice, bank statement or transfer screenshot for a US I-601 hardship case.",
       "Imran (UK) supports Aciah (US citizen spouse) and their son Jibril while the family is separated since 2026-08-18.",

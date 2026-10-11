@@ -1,3 +1,4 @@
+import { formatKind, isEvidenceFile } from "./file-formats";
 import type { DriveFileSummary } from "@/lib/drive.functions";
 import type { EvidenceStatus, FileType, SourceType } from "./types";
 
@@ -57,15 +58,34 @@ const SOURCE_RULES: [RegExp, SourceType][] = [
   [/photo|img_|\.jpe?g|\.png/i, "Photo"],
 ];
 
+/** The label shown for a Drive file, or null for things that are not evidence (folders, system files). */
 function fileTypeFor(name: string, mime: string): FileType | null {
+  if (!isEvidenceFile(name, mime)) return null;
   const lower = name.toLowerCase();
-  if (lower.endsWith(".pdf") || mime === "application/pdf") return "PDF";
-  if (lower.endsWith(".docx") || mime.includes("wordprocessingml")) return "DOCX";
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || mime === "image/jpeg") return "JPG";
-  if (lower.endsWith(".png") || mime === "image/png") return "PNG";
-  // Other photos (e.g. iPhone HEIC) are copied as JPEG pictures.
-  if (/\.(heic|heif|webp|gif|bmp|tiff?)$/.test(lower) || /^image\//.test(mime)) return "JPG";
-  return null;
+  switch (formatKind(name, mime)) {
+    case "pdf":
+      return "PDF";
+    case "word":
+      return "DOCX";
+    case "image":
+      return lower.endsWith(".png") || mime === "image/png" ? "PNG" : "JPG";
+    case "spreadsheet":
+      return "Spreadsheet";
+    case "slides":
+      return "Slides";
+    case "text":
+      return "Text";
+    case "email":
+      return "Email";
+    case "video":
+      return "Video";
+    case "audio":
+      return "Audio";
+    case "archive":
+      return "Zip";
+    default:
+      return "Other";
+  }
 }
 
 function titleFromName(name: string) {

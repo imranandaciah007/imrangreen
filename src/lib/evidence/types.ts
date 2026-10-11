@@ -76,7 +76,20 @@ export const STAGES = ["New", "Needs confirmation", "Reviewed", "Ready"] as cons
 
 export type Stage = (typeof STAGES)[number];
 
-export const FILE_TYPES = ["PDF", "DOCX", "JPG", "PNG"] as const;
+export const FILE_TYPES = [
+  "PDF",
+  "DOCX",
+  "JPG",
+  "PNG",
+  "Spreadsheet",
+  "Slides",
+  "Text",
+  "Email",
+  "Video",
+  "Audio",
+  "Zip",
+  "Other",
+] as const;
 export type FileType = (typeof FILE_TYPES)[number];
 
 export const TAGS = [

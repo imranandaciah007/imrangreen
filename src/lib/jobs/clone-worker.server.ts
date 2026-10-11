@@ -6,6 +6,7 @@
  * file, and pauses itself if the AI/Drive gateway blocks the workspace.
  */
 
+import { isEvidenceFile } from "@/lib/evidence/file-formats";
 import { classifyDriveFile } from "@/lib/evidence/drive-classify";
 
 const LEASE_MINUTES = 3;
@@ -52,19 +53,9 @@ function exhibitIdFor(driveFileId: string): string {
   return `EX-${hash.toString(36).toUpperCase().padStart(5, "0").slice(-5)}`;
 }
 
+/** Every file counts as evidence (see file-formats.ts); unprintable ones get a cover sheet. */
 function supportedFile(name: string, mimeType: string): boolean {
-  const lower = name.toLowerCase();
-  // Email archives, videos and archives cannot become page-accurate exhibits.
-  if (/\.(msg|eml|zip|rar|7z|mp4|mov|m4a|mp3|wav|numbers|pages|key)$/.test(lower)) return false;
-  return (
-    mimeType === "application/pdf" ||
-    lower.endsWith(".pdf") ||
-    /^image\/(png|jpe?g|heic|heif|webp|gif|bmp|tiff)$/.test(mimeType) ||
-    /\.(png|jpe?g|heic|heif|webp|gif|bmp|tiff?)$/.test(lower) ||
-    /wordprocessingml|presentationml|spreadsheetml|msword|ms-powerpoint|ms-excel/.test(mimeType) ||
-    /\.(docx?|pptx?|xlsx?)$/.test(lower) ||
-    /^application\/vnd\.google-apps\.(document|spreadsheet|presentation)$/.test(mimeType)
-  );
+  return isEvidenceFile(name, mimeType);
 }
 
 function titleFromName(name: string, folderPath = "") {
