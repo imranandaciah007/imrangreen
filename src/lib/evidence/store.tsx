@@ -1602,8 +1602,13 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     scanCancelled.current = false;
     setDriveSyncing(true);
     // Pressing Synch now also lifts a pause on the always-on builder.
+    // ...and starts a backend run straight away: match originals to copies,
+    // bin copies whose original is gone, queue copies for new originals.
     void import("@/lib/jobs/background.functions")
-      .then(({ resumeBackgroundSync }) => resumeBackgroundSync())
+      .then(async ({ resumeBackgroundSync, runBackgroundBatch }) => {
+        await resumeBackgroundSync();
+        await runBackgroundBatch({ data: { batch: 12 } });
+      })
       .catch(() => {});
 
     try {
