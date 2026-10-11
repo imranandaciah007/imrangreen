@@ -25,20 +25,11 @@ import { TaskReminderManager } from "@/components/evidence/TaskReminderManager";
 import { DiaryImportDialog } from "@/components/evidence/DiaryImportDialog";
 import { SignInGate } from "@/components/evidence/SignInGate";
 import { UploadDialog } from "@/components/evidence/UploadDialog";
+import { useSharedPref } from "@/lib/evidence/shared-state";
 import { EvidenceStoreProvider, useEvidence } from "@/lib/evidence/store";
 import { type EvidenceItem } from "@/lib/evidence/types";
 
 const title = "I-601 Evidence Portal — Imran & Aciah";
-const LAYOUT_KEY = "gc-documents-layout";
-
-function readLayout(): DocumentsLayout {
-  try {
-    return window.localStorage.getItem(LAYOUT_KEY) === "list" ? "list" : "folders";
-  } catch {
-    return "folders";
-  }
-}
-
 const description =
   "Private hardship evidence portal for a potential I-601 waiver: collect, organise, review and export supporting evidence from your phone.";
 
@@ -65,17 +56,8 @@ export const Route = createFileRoute("/")({
 function CaseApp() {
   const { loading, stats, syncDrive, scanAllDocuments, setFilters, openInspector } = useEvidence();
   const [tab, setTabRaw] = useState<MainTab>("home");
-  const [layout, setLayoutRaw] = useState<DocumentsLayout>("folders");
-  useEffect(() => setLayoutRaw(readLayout()), []);
-
-  function setLayout(next: DocumentsLayout) {
-    setLayoutRaw(next);
-    try {
-      window.localStorage.setItem(LAYOUT_KEY, next);
-    } catch {
-      // Remembering the choice is only a convenience.
-    }
-  }
+  // The Documents layout choice follows you to any device you sign in on.
+  const [layout, setLayout] = useSharedPref<DocumentsLayout>("documentsLayout", "folders");
   const tabRef = useRef<MainTab>("home");
 
   // Give every page switch its own browser history entry, so the phone's back
@@ -105,7 +87,12 @@ function CaseApp() {
   const [eventOpen, setEventOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
-  const [packetOpen, setPacketOpen] = useState(false);
+  const [packetOpen, setPacketOpenRaw] = useState(false);
+  const [packetResume, setPacketResume] = useState(false);
+  function setPacketOpen(next: boolean) {
+    setPacketOpenRaw(next);
+    if (!next) setPacketResume(false);
+  }
   const [diaryOpen, setDiaryOpen] = useState(false);
   const [uploadCategory, setUploadCategory] = useState<string | undefined>(undefined);
   const [editItem, setEditItem] = useState<EvidenceItem | null>(null);
@@ -229,7 +216,13 @@ function CaseApp() {
             else setTab("home");
           }}
         />
-        <ProgressStrip />
+        <ProgressStrip
+          onContinueUpdate={() => void handleDriveSync()}
+          onContinueFiling={() => {
+            setPacketResume(true);
+            setPacketOpen(true);
+          }}
+        />
 
          <main className="mx-auto max-w-[1440px] space-y-4 p-3 sm:p-5 lg:p-7">
         {loading ? (
@@ -249,6 +242,10 @@ function CaseApp() {
                 onUpload={() => openUpload()}
                 onAddTask={() => setTaskOpen(true)}
                 onBuildPacket={() => setPacketOpen(true)}
+                onResumeFiling={() => {
+                  setPacketResume(true);
+                  setPacketOpen(true);
+                }}
                 onSyncDrive={handleDriveSync}
                 onOpenCategory={openCategory}
               />
@@ -309,7 +306,7 @@ function CaseApp() {
       <DiaryImportDialog open={diaryOpen} onOpenChange={setDiaryOpen} />
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
       <EventDialog open={eventOpen} onOpenChange={setEventOpen} />
-      <PacketBuilder open={packetOpen} onOpenChange={setPacketOpen} />
+      <PacketBuilder open={packetOpen} onOpenChange={setPacketOpen} resumeOnOpen={packetResume} />
       <AskEvidenceDialog open={askOpen} onOpenChange={setAskOpen} />
       <TaskDialog open={taskOpen} onOpenChange={setTaskOpen} />
       <BottomNav tab={tab} onTab={openNavItem} onAdd={() => setAddOpen(true)} />

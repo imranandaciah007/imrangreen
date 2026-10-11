@@ -19,6 +19,14 @@ import {
 import type { DiaryPlan } from "./diary-merge";
 import { classifyDriveFile, fileTypeFor, titleFromName } from "./drive-classify";
 import { documentProvider, type ProviderConnection } from "./provider";
+import {
+  JOBS_KEY,
+  JOBS_LOCAL_KEY,
+  deviceId,
+  type JobKind,
+  type SharedJob,
+  type SharedJobs,
+} from "./shared-state";
 import { defaultReminderAt } from "../task-reminders";
 import {
   categoryCoverage,
@@ -217,6 +225,11 @@ interface EvidenceContextValue {
   scanProgress: ScanProgress;
   /** Stops the run in progress (and the always-on builder) after the current file. */
   pauseSync: () => void;
+  /** Progress of long jobs, shared so whichever device you sign in on can resume them. */
+  jobs: SharedJobs;
+  /** Jobs running in this browser right now (a quiet job is not a stopped one). */
+  jobsHere: Partial<Record<JobKind, boolean>>;
+  reportJob: (kind: JobKind, patch: Partial<SharedJob> & { status: SharedJob["status"] }) => void;
   exhibitGroups: string[];
   stats: {
     total: number;
@@ -312,6 +325,33 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
   itemsRef.current = items;
   const driveSyncInFlight = useRef(false);
 
+  const [jobs, setJobs] = useState<SharedJobs>({});
+  const jobsRef = useRef(jobs);
+  jobsRef.current = jobs;
+  const [jobsHere, setJobsHere] = useState<Partial<Record<JobKind, boolean>>>({});
+  const reportJob = useCallback(
+    (kind: JobKind, patch: Partial<SharedJob> & { status: SharedJob["status"] }) => {
+      const next: SharedJobs = {
+        ...jobsRef.current,
+        [kind]: {
+          done: 0,
+          total: 0,
+          ...jobsRef.current[kind],
+          ...patch,
+          updatedAt: nowIso(),
+          device: deviceId(),
+        },
+      };
+      jobsRef.current = next;
+      setJobs(next);
+      setJobsHere((prev) =>
+        prev[kind] === (patch.status === "running") ? prev : { ...prev, [kind]: patch.status === "running" },
+      );
+      documentProvider.saveShared(JOBS_KEY, JOBS_LOCAL_KEY, next, { replace: true });
+    },
+    [],
+  );
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -343,6 +383,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         }
       }
       setIgnoredGaps(await documentProvider.loadShared<string[]>("ignoredGaps", IGNORED_GAPS_KEY, []));
+      setJobs(documentProvider.peekShared<SharedJobs>(JOBS_KEY) ?? {});
       hydrated.current = true;
       setLoading(false);
     })();
@@ -364,6 +405,14 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           documentProvider.loadRecords(),
           documentProvider.loadShared<string[]>("ignoredGaps", IGNORED_GAPS_KEY, []),
         ]);
+        // The Drive link, last update time and job progress may come from another device.
+        const conn = await documentProvider.getConnection();
+        setConnection((p) => (JSON.stringify(p) === JSON.stringify(conn) ? p : conn));
+        const sharedJobs = documentProvider.peekShared<SharedJobs>(JOBS_KEY) ?? {};
+        if (JSON.stringify(sharedJobs) !== JSON.stringify(jobsRef.current)) {
+          jobsRef.current = sharedJobs;
+          setJobs(sharedJobs);
+        }
         setItems((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
         const same = <T,>(a: T, b: T) => (JSON.stringify(a) === JSON.stringify(b) ? a : b);
         setEvents((p) => same(p, records.events ?? []));
@@ -1200,6 +1249,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
         return { scanned: 0, cloned: 0, failed: 0, total: 0, verified };
       }
       scanInFlight.current = true;
+      reportJob("read", { status: "running", done: 0, total: queue.length });
 
       let scanned = 0;
       const cloned = 0;
@@ -1232,18 +1282,24 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
           } finally {
             done += 1;
             setScanProgress((prev) => ({ ...prev, done, scanned, cloned, failed }));
+            reportJob("read", { status: "running", done, total: queue.length });
           }
         }
       } finally {
         scanInFlight.current = false;
         setScanProgress((prev) => ({ ...prev, running: false, phase: "" }));
+        reportJob("read", {
+          status: done >= queue.length ? "done" : scanCancelled.current ? "paused" : "stopped",
+          done,
+          total: queue.length,
+        });
       }
       // Clones are made only by the background builder; nudge it now. Its
       // clones are linked to these records by the verify step on the next synch.
       void queueBackgroundBuild();
       return { scanned, cloned, failed, total: queue.length, verified };
     },
-    [applyPatch, categories, queueBackgroundBuild, runOne],
+    [applyPatch, categories, queueBackgroundBuild, reportJob, runOne],
   );
 
 
@@ -1588,6 +1644,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     // they start a background run at most once every two minutes.
     const auto = options?.auto === true;
     const kickDue = !auto || Date.now() - lastBackgroundKick.current > 2 * 60_000;
+    // Quiet checks are not worth telling other devices about; a pressed update is.
+    let synced = false;
+    if (!auto) reportJob("drive", { status: "running", done: 0, total: 0 });
     if (kickDue) {
       lastBackgroundKick.current = Date.now();
       void import("@/lib/jobs/background.functions")
@@ -1797,6 +1856,7 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
       await documentProvider.putMany([...syncChanged.values()]);
       const conn = await documentProvider.connect({ accountLabel: "Google Drive", folderPath: "/My Drive/" });
       setConnection({ ...conn, lastSyncedAt: next.syncedAt });
+      synced = true;
       return {
         added: created.length,
         updated,
@@ -1811,8 +1871,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     } finally {
       driveSyncInFlight.current = false;
       setDriveSyncing(false);
+      if (!auto) reportJob("drive", { status: synced ? "done" : "stopped" });
     }
-  }, [auditEntry, driveTree, items, profile]);
+  }, [auditEntry, driveTree, items, profile, reportJob]);
 
   // Auto-synch with Drive whenever a new evidence entry is created in the app.
   const connectionRef = useRef(connection);
@@ -2098,6 +2159,9 @@ export function EvidenceStoreProvider({ children }: { children: ReactNode }) {
     scanAllDocuments,
     scanProgress,
     pauseSync,
+    jobs,
+    jobsHere,
+    reportJob,
     exhibitGroups,
     stats,
   };

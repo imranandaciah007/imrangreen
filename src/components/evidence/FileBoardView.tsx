@@ -38,6 +38,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useSharedPref } from "@/lib/evidence/shared-state";
 import { useEvidence } from "@/lib/evidence/store";
 import { queueClone } from "@/lib/jobs/background.functions";
 import {
@@ -133,11 +134,10 @@ export function FileBoardView() {
   const [syncing, setSyncing] = useState(false);
   const [autoSyncing, setAutoSyncing] = useState(false);
   const [folderId, setFolderId] = useState<string | null>(null);
-  const [favourites, setFavourites] = useState<string[]>(() => readJson<string[]>(FAV_KEY, []));
-  const [recent, setRecent] = useState<string[]>(() => readJson<string[]>(RECENT_KEY, []));
-  const [order, setOrder] = useState<Record<string, string[]>>(() =>
-    readJson<Record<string, string[]>>(ORDER_KEY, {}),
-  );
+  // Favourites, recent folders and folder order follow you to any device.
+  const [favourites, setFavourites] = useSharedPref<string[]>("boardFavourites", [], FAV_KEY);
+  const [recent, setRecent] = useSharedPref<string[]>("boardRecent", [], RECENT_KEY);
+  const [order, setOrder] = useSharedPref<Record<string, string[]>>("boardOrder", {}, ORDER_KEY);
   const [open, setOpen] = useState({ favourites: true, recent: true, all: true });
   const [visible, setVisible] = useState(PAGE);
   const [newFolder, setNewFolder] = useState("");
@@ -281,19 +281,11 @@ export function FileBoardView() {
 
   function openFolder(id: string) {
     setFolderId(id);
-    setRecent((prev) => {
-      const next = [id, ...prev.filter((r) => r !== id)].slice(0, 12);
-      writeJson(RECENT_KEY, next);
-      return next;
-    });
+    setRecent((prev) => [id, ...prev.filter((r) => r !== id)].slice(0, 12));
   }
 
   function toggleFavourite(id: string) {
-    setFavourites((prev) => {
-      const next = prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id];
-      writeJson(FAV_KEY, next);
-      return next;
-    });
+    setFavourites((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
   }
 
   function reorder(id: string, direction: -1 | 1) {
@@ -302,11 +294,7 @@ export function FileBoardView() {
     const to = from + direction;
     if (from < 0 || to < 0 || to >= ids.length) return;
     ids.splice(to, 0, ids.splice(from, 1)[0]!);
-    setOrder((prev) => {
-      const next = { ...prev, [orderKey]: ids };
-      writeJson(ORDER_KEY, next);
-      return next;
-    });
+    setOrder((prev) => ({ ...prev, [orderKey]: ids }));
   }
 
   function dropOn(targetId: string) {
@@ -316,11 +304,7 @@ export function FileBoardView() {
     const to = ids.indexOf(targetId);
     if (from < 0 || to < 0) return;
     ids.splice(to, 0, ids.splice(from, 1)[0]!);
-    setOrder((prev) => {
-      const next = { ...prev, [orderKey]: ids };
-      writeJson(ORDER_KEY, next);
-      return next;
-    });
+    setOrder((prev) => ({ ...prev, [orderKey]: ids }));
     setDragId(null);
   }
 
