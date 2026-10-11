@@ -54,12 +54,12 @@ function exhibitIdFor(driveFileId: string): string {
 function supportedFile(name: string, mimeType: string): boolean {
   const lower = name.toLowerCase();
   // Email archives, videos and archives cannot become page-accurate exhibits.
-  if (/\.(msg|eml|zip|rar|7z|mp4|mov|m4a|mp3|wav|heic|numbers|pages|key)$/.test(lower)) return false;
+  if (/\.(msg|eml|zip|rar|7z|mp4|mov|m4a|mp3|wav|numbers|pages|key)$/.test(lower)) return false;
   return (
     mimeType === "application/pdf" ||
     lower.endsWith(".pdf") ||
-    /^image\/(png|jpe?g)$/.test(mimeType) ||
-    /\.(png|jpe?g)$/.test(lower) ||
+    /^image\/(png|jpe?g|heic|heif|webp|gif|bmp|tiff)$/.test(mimeType) ||
+    /\.(png|jpe?g|heic|heif|webp|gif|bmp|tiff?)$/.test(lower) ||
     /wordprocessingml|presentationml|spreadsheetml|msword|ms-powerpoint|ms-excel/.test(mimeType) ||
     /\.(docx?|pptx?|xlsx?)$/.test(lower) ||
     /^application\/vnd\.google-apps\.(document|spreadsheet|presentation)$/.test(mimeType)
