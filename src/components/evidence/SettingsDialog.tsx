@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   BookOpen,
+  ClipboardCheck,
+  Loader2,
   CheckCheck,
   ListRestart,
   LogOut,
@@ -19,6 +21,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getAiUsage, type AiUsageSummary } from "@/lib/ai-usage.functions";
+import { checkCopiesAgainstOriginals } from "@/lib/jobs/background.functions";
+import type { CopyCheck, CheckedFile } from "@/lib/jobs/copy-check.server";
 import { useEvidence } from "@/lib/evidence/store";
 import { useSignOut } from "@/components/evidence/SignInGate";
 
@@ -30,6 +34,87 @@ function formatWhen(iso: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function FileList({ title, files }: { title: string; files: (CheckedFile & { note?: string })[] }) {
+  if (!files.length) return null;
+  return (
+    <details className="rounded-md border border-border p-2">
+      <summary className="cursor-pointer select-none text-xs font-semibold text-foreground">
+        {title} ({files.length})
+      </summary>
+      <ul className="mt-2 space-y-1.5">
+        {files.map((f, i) => (
+          <li key={`${f.link}-${i}`} className="text-[11px]">
+            <a href={f.link} target="_blank" rel="noreferrer" className="font-medium text-primary underline">
+              {f.name}
+            </a>
+            <span className="block truncate text-muted-foreground">{f.path || "My Drive"}</span>
+            {f.note ? <span className="block text-muted-foreground">{f.note}</span> : null}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/** Compares every original with the exhibit copies, so each document has exactly one. */
+function CopyCheckSection() {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<CopyCheck | null>(null);
+  const [error, setError] = useState("");
+  const run = async () => {
+    setRunning(true);
+    setError("");
+    try {
+      setResult(await checkCopiesAgainstOriginals());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The check could not finish. Please try again.");
+    } finally {
+      setRunning(false);
+    }
+  };
+  const all = result
+    ? result.missing.length === 0 && result.extra.length === 0 && result.orphans.length === 0
+    : false;
+  return (
+    <Section title="Originals and exhibit copies">
+      <p className="text-xs text-muted-foreground">
+        Checks that every document in your Drive has exactly one exhibit copy, and that every copy
+        belongs to a real original. Nothing is changed.
+      </p>
+      <Button variant="outline" className="h-11 w-full justify-start" disabled={running} onClick={() => void run()}>
+        {running ? <Loader2 className="size-4 animate-spin" /> : <ClipboardCheck className="size-4" />}
+        {running ? "Checking your Drive…" : "Check copies against originals"}
+      </Button>
+      {error && <p className="text-xs font-semibold text-destructive">{error}</p>}
+      {result && (
+        <div className="space-y-2 text-xs">
+          <p className={all ? "font-semibold text-success" : "font-semibold text-foreground"}>
+            {all
+              ? `All matched: ${result.documents} documents, each with exactly one copy.`
+              : `${result.matched} of ${result.documents} documents have exactly one copy.`}
+          </p>
+          <ul className="space-y-0.5 text-muted-foreground">
+            <li>
+              {result.originals} original files
+              {result.identicalOriginals
+                ? ` (${result.identicalOriginals} are identical to another file and share its copy)`
+                : ""}
+            </li>
+            <li>{result.copies} exhibit copies in the clones folder</li>
+            {!result.complete && <li>Drive did not list everything this time, so try again for exact numbers.</li>}
+          </ul>
+          <FileList title="Documents with no copy yet" files={result.missing.map((m) => ({ ...m, note: `${m.status}${m.note ? ` — ${m.note}` : ""}` }))} />
+          <FileList
+            title="Documents with more than one copy"
+            files={result.extra.flatMap((e) => e.copies.map((c) => ({ ...c, note: `copy of ${e.original.name}` })))}
+          />
+          <FileList title="Copies whose original is gone" files={result.orphans} />
+        </div>
+      )}
+    </Section>
+  );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -97,6 +182,8 @@ export function SettingsDialog({
               {busy ? "Updating…" : "Update from Drive"}
             </Button>
           </Section>
+
+          <CopyCheckSection />
 
           <Section title="Tools">
             <Button variant="outline" className="h-11 w-full justify-start" onClick={then(onAskEvidence)}>
