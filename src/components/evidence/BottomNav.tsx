@@ -1,19 +1,21 @@
-import { ClipboardCheck, Coins, Home, LayoutGrid, ListChecks, Plus, Vault } from "lucide-react";
+import { ClipboardCheck, Coins, FileStack, Files, Home, ListChecks, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-export type MainTab = "home" | "board" | "timeline" | "finances" | "vault" | "review";
+export type MainTab = "home" | "documents" | "timeline" | "finances" | "review";
 
-const tabs: { id: MainTab; label: string; icon: typeof Home }[] = [
+/** Dock items: five pages plus "Packet", which opens the packet builder. */
+export type NavItemId = MainTab | "packet";
+
+const tabs: { id: NavItemId; label: string; short?: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
-  { id: "board", label: "Files", icon: LayoutGrid },
+  { id: "documents", label: "Documents", short: "Docs", icon: Files },
   { id: "timeline", label: "Timeline", icon: ListChecks },
   { id: "finances", label: "Finances", icon: Coins },
-  { id: "vault", label: "Vault", icon: Vault },
   { id: "review", label: "Review", icon: ClipboardCheck },
+  { id: "packet", label: "Packet", icon: FileStack },
 ];
-
 
 export function BottomNav({
   tab,
@@ -21,7 +23,7 @@ export function BottomNav({
   onAdd,
 }: {
   tab: MainTab;
-  onTab: (t: MainTab) => void;
+  onTab: (t: NavItemId) => void;
   onAdd: () => void;
 }) {
   const left = tabs.slice(0, 3);
@@ -63,7 +65,7 @@ function TabButton({
   active,
   onClick,
 }: {
-  t: { id: MainTab; label: string; icon: typeof Home };
+  t: { id: NavItemId; label: string; short?: string; icon: typeof Home };
   active: boolean;
   onClick: () => void;
 }) {
@@ -87,7 +89,7 @@ function TabButton({
       >
         <Icon className={cn("size-5", active && "stroke-[2.5]")} />
       </span>
-      <span className="max-w-full truncate px-0.5">{t.label}</span>
+      <span className="max-w-full truncate tracking-tight">{t.short ?? t.label}</span>
       <span
         aria-hidden="true"
         className={cn(

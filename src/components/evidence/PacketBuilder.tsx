@@ -786,7 +786,7 @@ export function PacketBuilder({
             <>
               <p className="text-[11px] text-muted-foreground">
                 {exhibits.length} exhibits, {pageCount} packet pages. Turn an exhibit off to leave
-                it out of this packet — it stays in the vault.
+                it out of this packet — it stays in Documents.
               </p>
               <p className="text-[11px] text-muted-foreground">
                 Each section is a tab, and exhibits are numbered within it (Exhibit A-1, A-2,

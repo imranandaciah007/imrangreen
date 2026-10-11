@@ -462,7 +462,7 @@ export function DiaryImportDialog({
 
                 <label className="flex items-center gap-2 text-[11px]">
                   <Switch checked={keepMaster} onCheckedChange={setKeepMaster} />
-                  Keep the diary itself in the vault as the master source document
+                  Keep the diary itself in Documents as the master source document
                 </label>
               </div>
             </ScrollArea>

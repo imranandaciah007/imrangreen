@@ -5,27 +5,22 @@ import { Plus, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NAVIGATE_HOME_EVENT } from "@/components/ui/overlay-navigation";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppHeader } from "@/components/evidence/AppHeader";
-import { BottomNav, mainTabs, type MainTab } from "@/components/evidence/BottomNav";
+import { BottomNav, mainTabs, type MainTab, type NavItemId } from "@/components/evidence/BottomNav";
 import { CaseReviewView } from "@/components/evidence/CaseReviewView";
 import { PacketBuilder } from "@/components/evidence/PacketBuilder";
-import { CategoryPanel } from "@/components/evidence/CategoryPanel";
 
 import { AskEvidenceDialog } from "@/components/evidence/AskEvidence";
 import { CommandPalette } from "@/components/evidence/CommandPalette";
 import { ConnectDriveDialog } from "@/components/evidence/ConnectDriveDialog";
-import { EvidenceTable } from "@/components/evidence/EvidenceTable";
-import { ExhibitIndexView } from "@/components/evidence/ExhibitIndexView";
-import { FilterToolbar } from "@/components/evidence/FilterToolbar";
+import { DocumentsView, type DocumentsLayout } from "@/components/evidence/DocumentsView";
 import { FinancesView } from "@/components/evidence/FinancesView";
 import { HomeView } from "@/components/evidence/HomeView";
-import { FileBoardView } from "@/components/evidence/FileBoardView";
 
 import { InspectorDrawer } from "@/components/evidence/InspectorDrawer";
-import { KanbanBoard } from "@/components/evidence/KanbanBoard";
 import { AddSheet, EventDialog, ExpenseDialog, TaskDialog } from "@/components/evidence/QuickAdd";
 import { TimelineView } from "@/components/evidence/TimelineView";
+import { ProgressStrip } from "@/components/evidence/ProgressStrip";
 import { TaskReminderManager } from "@/components/evidence/TaskReminderManager";
 import { DiaryImportDialog } from "@/components/evidence/DiaryImportDialog";
 import { SignInGate } from "@/components/evidence/SignInGate";
@@ -34,6 +29,16 @@ import { EvidenceStoreProvider, useEvidence } from "@/lib/evidence/store";
 import { type EvidenceItem } from "@/lib/evidence/types";
 
 const title = "I-601 Evidence Portal — Imran & Aciah";
+const LAYOUT_KEY = "gc-documents-layout";
+
+function readLayout(): DocumentsLayout {
+  try {
+    return window.localStorage.getItem(LAYOUT_KEY) === "list" ? "list" : "folders";
+  } catch {
+    return "folders";
+  }
+}
+
 const description =
   "Private hardship evidence portal for a potential I-601 waiver: collect, organise, review and export supporting evidence from your phone.";
 
@@ -60,6 +65,17 @@ export const Route = createFileRoute("/")({
 function CaseApp() {
   const { loading, stats, syncDrive, scanAllDocuments, setFilters, openInspector } = useEvidence();
   const [tab, setTabRaw] = useState<MainTab>("home");
+  const [layout, setLayoutRaw] = useState<DocumentsLayout>("folders");
+  useEffect(() => setLayoutRaw(readLayout()), []);
+
+  function setLayout(next: DocumentsLayout) {
+    setLayoutRaw(next);
+    try {
+      window.localStorage.setItem(LAYOUT_KEY, next);
+    } catch {
+      // Remembering the choice is only a convenience.
+    }
+  }
   const tabRef = useRef<MainTab>("home");
 
   // Give every page switch its own browser history entry, so the phone's back
@@ -74,7 +90,8 @@ function CaseApp() {
   useEffect(() => {
     window.history.replaceState({ gcTab: "home" }, "");
     const onPop = (event: PopStateEvent) => {
-      const target = (event.state?.gcTab as MainTab | undefined) ?? "home";
+      const saved = event.state?.gcTab as MainTab | undefined;
+      const target = saved && mainTabs.some((t) => t.id === saved) ? saved : "home";
       tabRef.current = target;
       setTabRaw(target);
     };
@@ -125,7 +142,13 @@ function CaseApp() {
 
   function openCategory(category: string) {
     setFilters({ categories: [category] });
-    setTab("vault");
+    setLayout("list");
+    setTab("documents");
+  }
+
+  function openNavItem(id: NavItemId) {
+    if (id === "packet") setPacketOpen(true);
+    else setTab(id);
   }
 
 
@@ -134,7 +157,7 @@ function CaseApp() {
     try {
       const result = await syncDrive();
       if (result.skipped) {
-        toast.info("A synch is already running", {
+        toast.info("An update is already running", {
           description: "It will finish on its own — no need to press again.",
         });
         return;
@@ -143,14 +166,14 @@ function CaseApp() {
       const description = changed
         ? `${result.added} added · ${result.updated} renamed or moved · ${result.removed} removed · ${result.duplicates} duplicate(s) merged`
         : `${result.folders} folders and ${result.files} original files already match`;
-      toast.success("Drive synched successfully", { description });
+      toast.success("Updated from Drive", { description });
       const scan = await scanAllDocuments();
       if (scan.verified || scan.total) {
         const allFailed = scan.failed > 0 && scan.scanned === 0 && scan.verified === 0;
         const headline = scan.total
           ? `Checked ${scan.total} document(s)`
           : `Verified ${scan.verified} exhibit(s)`;
-        const detail = `${scan.verified} linked to their clones · ${scan.scanned} read${scan.failed ? ` · ${scan.failed} could not be read` : ""} · new clones are made in the background`;
+        const detail = `${scan.verified} already had exhibit copies · ${scan.scanned} read${scan.failed ? ` · ${scan.failed} could not be read` : ""} · new exhibit copies are made in the background`;
         if (allFailed) {
           toast.error("No documents could be read", { description: detail });
         } else if (scan.failed) {
@@ -172,12 +195,12 @@ function CaseApp() {
         <nav className="mt-5 flex w-full flex-col gap-1 px-3" aria-label="Primary navigation">
           {mainTabs.map((item) => {
             const Icon = item.icon;
-            const active = tab === item.id;
+            const active = tab === item.id || (item.id === "packet" && packetOpen);
             return (
               <Button
                 key={item.id}
                 variant="ghost"
-                onClick={() => setTab(item.id)}
+                onClick={() => openNavItem(item.id)}
                 aria-current={active ? "page" : undefined}
                 className={`case-side-link h-11 w-full justify-start gap-3 px-4 text-sm font-bold ${
                   active
@@ -206,6 +229,7 @@ function CaseApp() {
             else setTab("home");
           }}
         />
+        <ProgressStrip />
 
          <main className="mx-auto max-w-[1440px] space-y-4 p-3 sm:p-5 lg:p-7">
         {loading ? (
@@ -213,10 +237,31 @@ function CaseApp() {
         ) : (
           <>
             {tab === "home" && (
-              <HomeView onNavigate={(t) => setTab(t)} onUpload={() => openUpload()} onAddTask={() => setTaskOpen(true)} onBuildPacket={() => setPacketOpen(true)} onSyncDrive={handleDriveSync} onOpenCategory={openCategory} />
+              <HomeView
+                onNavigate={(t) => {
+                  if (t === "documents") setLayout("list");
+                  setTab(t);
+                }}
+                onOpenFolders={() => {
+                  setLayout("folders");
+                  setTab("documents");
+                }}
+                onUpload={() => openUpload()}
+                onAddTask={() => setTaskOpen(true)}
+                onBuildPacket={() => setPacketOpen(true)}
+                onSyncDrive={handleDriveSync}
+                onOpenCategory={openCategory}
+              />
             )}
 
-            {tab === "board" && <FileBoardView />}
+            {tab === "documents" && (
+              <DocumentsView
+                layout={layout}
+                onLayout={setLayout}
+                onUploadTo={(c) => openUpload(c)}
+                onEdit={openEdit}
+              />
+            )}
 
 
             {tab === "timeline" && (
@@ -233,37 +278,6 @@ function CaseApp() {
               />
             )}
 
-
-            {tab === "vault" && (
-              <div className="space-y-4 lg:grid lg:grid-cols-[320px_1fr] lg:items-start lg:gap-4 lg:space-y-0">
-                <CategoryPanel onUploadTo={(c) => openUpload(c)} />
-                <div className="space-y-3">
-                  <FilterToolbar />
-                  <Tabs defaultValue="table">
-                    <TabsList>
-                      <TabsTrigger value="table" className="text-xs">
-                        List
-                      </TabsTrigger>
-                      <TabsTrigger value="kanban" className="text-xs">
-                        Review stages
-                      </TabsTrigger>
-                      <TabsTrigger value="index" className="text-xs">
-                        Exhibit index
-                      </TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="table" className="mt-3">
-                      <EvidenceTable onEdit={openEdit} />
-                    </TabsContent>
-                    <TabsContent value="kanban" className="mt-3">
-                      <KanbanBoard />
-                    </TabsContent>
-                    <TabsContent value="index" className="mt-3">
-                      <ExhibitIndexView />
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              </div>
-            )}
 
             <p className="pt-2 text-center text-[10px] font-semibold text-muted-foreground">
               {stats.total} exhibits · {stats.totalPages} pages
@@ -298,7 +312,7 @@ function CaseApp() {
       <PacketBuilder open={packetOpen} onOpenChange={setPacketOpen} />
       <AskEvidenceDialog open={askOpen} onOpenChange={setAskOpen} />
       <TaskDialog open={taskOpen} onOpenChange={setTaskOpen} />
-      <BottomNav tab={tab} onTab={setTab} onAdd={() => setAddOpen(true)} />
+      <BottomNav tab={tab} onTab={openNavItem} onAdd={() => setAddOpen(true)} />
     </div>
   );
 }

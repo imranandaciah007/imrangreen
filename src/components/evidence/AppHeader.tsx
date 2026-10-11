@@ -10,12 +10,11 @@ import type { MainTab } from "@/components/evidence/BottomNav";
 import { useSignOut } from "@/components/evidence/SignInGate";
 
 const pageTitles: Record<MainTab, { title: string; subtitle: string }> = {
-  home: { title: "Case overview", subtitle: "Progress, sync and what needs attention" },
-  board: { title: "File explorer", subtitle: "Your Drive folders, mirrored" },
+  home: { title: "Case overview", subtitle: "Where the case stands and what to do next" },
+  documents: { title: "Documents", subtitle: "Every document, by folder or as a list" },
   timeline: { title: "Timeline", subtitle: "Hardship events since 18 August 2026" },
   finances: { title: "Financial strain", subtitle: "Costs of separation, with evidence" },
   review: { title: "Case review", subtitle: "Coverage, gaps and missing details" },
-  vault: { title: "Evidence vault", subtitle: "Every exhibit, filter and index" },
 };
 
 function formatWhen(iso: string | null) {
@@ -126,7 +125,7 @@ export function AppHeader({
             <PopoverTrigger asChild>
               <button
                 className={`flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold ${readerTone}`}
-                aria-label="AI reader usage"
+                aria-label="Document reading usage"
               >
                 <Sparkles className="size-3.5" />
                 <span className="hidden md:inline">{readerLabel}</span>
@@ -134,7 +133,7 @@ export function AppHeader({
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-72 text-xs">
-              <p className="font-display text-sm font-black">AI reading usage</p>
+              <p className="font-display text-sm font-black">Document reading usage</p>
               <p className="mt-1 text-muted-foreground">
                 Google does not publish a remaining-credit figure for your key, so this shows what
                 the app has actually used.

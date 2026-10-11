@@ -8,6 +8,18 @@ import {
 } from "@/components/ui/select";
 import { STATUSES, type EvidenceStatus } from "@/lib/evidence/types";
 
+/** Plain-English names shown for the stored status values. */
+const STATUS_LABELS: Record<string, string> = {
+  "Needs confirmation": "Check details",
+  "AI processing": "Reading…",
+  "Duplicate suspected": "Possible duplicate",
+  "Missing supporting evidence": "Needs supporting evidence",
+};
+
+export function statusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? status;
+}
+
 const statusStyles: Record<EvidenceStatus, string> = {
   New: "bg-neutral-chip text-neutral-chip-foreground border-border",
   "AI processing": "bg-info/10 text-info border-info/30",
@@ -29,7 +41,7 @@ export function StatusBadge({ status, className }: { status: EvidenceStatus; cla
         className,
       )}
     >
-      {status}
+      {statusLabel(status)}
     </span>
   );
 }
@@ -53,7 +65,7 @@ export function StatusSelect({
       <SelectContent>
         {STATUSES.map((s) => (
           <SelectItem key={s} value={s} className="text-xs">
-            {s}
+            {statusLabel(s)}
           </SelectItem>
         ))}
       </SelectContent>

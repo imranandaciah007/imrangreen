@@ -1,3 +1,4 @@
+import { statusLabel } from "@/components/evidence/status-ui";
 import { useEffect, useState } from "react";
 
 import {
@@ -61,7 +62,7 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
                 setOpen(false);
               }}
             >
-              Filter status: {s}
+              Filter status: {statusLabel(s)}
             </CommandItem>
           ))}
           {categories.map((c) => (
@@ -95,7 +96,7 @@ export function CommandPalette({ onConnectDrive }: { onConnectDrive: () => void 
               setOpen(false);
             }}
           >
-            Synch Drive…
+            Update from Drive…
           </CommandItem>
         </CommandGroup>
       </CommandList>

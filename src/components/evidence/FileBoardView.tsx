@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  CheckCircle2,
   ArrowLeft,
   ChevronDown,
   ChevronRight,
@@ -126,7 +127,8 @@ function countChanges(before: DriveTree | null, after: DriveTree): string | null
 }
 
 export function FileBoardView() {
-  const { items, connection, driveTree, driveSyncing, syncDrive, queueBackgroundBuild } = useEvidence();
+  const { items, connection, driveTree, driveSyncing, syncDrive, queueBackgroundBuild, openInspector } =
+    useEvidence();
   const [tree, setTree] = useState<DriveTree | null>(() => driveTree ?? readJson<DriveTree | null>(TREE_KEY, null));
   const [syncing, setSyncing] = useState(false);
   const [autoSyncing, setAutoSyncing] = useState(false);
@@ -172,7 +174,7 @@ export function FileBoardView() {
       setTree(next);
       writeJson(TREE_KEY, next);
       if (mode === "manual") {
-        toast.success(`Drive synched — ${result.folders} folders, ${result.files} original files`);
+        toast.success(`Updated from Drive — ${result.folders} folders, ${result.files} documents`);
       } else if (changes) {
         toast.success("Your Drive changed — the board has been updated", {
           description: changes,
@@ -223,7 +225,11 @@ export function FileBoardView() {
 
 
   const childFolders = useMemo(
-    () => (tree?.folders ?? []).filter((f) => f.parentId === folderId),
+    // The exhibit copies folder is managed by the app; each document shows its own copy instead.
+    () =>
+      (tree?.folders ?? []).filter(
+        (f) => f.parentId === folderId && !(folderId === null && f.name === "I601 Evidence Clones"),
+      ),
     [tree, folderId],
   );
   const childFiles = useMemo(
@@ -337,7 +343,7 @@ export function FileBoardView() {
   async function addEvidence(files: FileList | null) {
     if (!files?.length) return;
     if (currentPath.split("/").includes("I601 Evidence Clones")) {
-      toast.error("Add originals outside the clone folder.", {
+      toast.error("Add documents outside the exhibit copies folder.", {
         description: "GC creates and manages the matching enriched PDF here automatically.",
       });
       return;
@@ -356,7 +362,7 @@ export function FileBoardView() {
         });
       }
       toast.success(`${files.length} original${files.length > 1 ? "s" : ""} saved to Drive`, {
-        description: "The background builder makes the matching clone in the next minute or two.",
+        description: "Its exhibit copy is made in the background in the next minute or two.",
       });
       await sync();
       void queueBackgroundBuild();
@@ -374,22 +380,22 @@ export function FileBoardView() {
       // Clones are made only by the background builder, so there is one per document.
       const result = await queueClone({ data: { driveFileId: file.id } });
       if (result.status === "exists") {
-        toast.success("This document already has its clone", {
+        toast.success("This document already has its exhibit copy", {
           action: result.link
             ? { label: "Open", onClick: () => window.open(result.link!, "_blank") }
             : undefined,
         });
       } else if (result.status === "duplicate") {
         toast.info("This is an exact copy of another document", {
-          description: "Its clone is the one made for the other copy, so no second clone is made.",
+          description: "It shares the exhibit copy made for the identical document, so no second copy is made.",
         });
       } else {
-        toast.success("Clone requested", {
-          description: "The background builder is making it now. It appears in the clones folder shortly.",
+        toast.success("Exhibit copy requested", {
+          description: "It is being made now and will show here shortly.",
         });
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "The clone could not be generated.");
+      toast.error(error instanceof Error ? error.message : "The exhibit copy could not be made.");
     } finally {
       setBusy(null);
     }
@@ -477,7 +483,7 @@ export function FileBoardView() {
         )}
         <Button size="sm" className="h-10" onClick={() => void sync("manual")} disabled={syncing || driveSyncing}>
           {syncing || driveSyncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          {syncing || driveSyncing ? "Synching" : "Synch now"}
+          {syncing || driveSyncing ? "Updating…" : "Update from Drive"}
         </Button>
 
       </header>
@@ -602,22 +608,31 @@ export function FileBoardView() {
               onMoveTo={() => setMoveFor({ id: f.id, name: f.name })}
             />
           ))}
-          {childFiles.slice(0, Math.max(0, visible - orderedFolders.length)).map((file) => (
+          {childFiles.slice(0, Math.max(0, visible - orderedFolders.length)).map((file) => {
+            const item = byDriveId.get(file.id);
+            return (
             <FileCard
               key={file.id}
               file={file}
-              exhibit={byDriveId.get(file.id)?.exhibitId ?? exhibitFor(file.id)}
+              exhibit={item?.exhibitId ?? exhibitFor(file.id)}
+              copyLink={
+                item?.cloneFileId
+                  ? (item.cloneUrl ?? `https://drive.google.com/file/d/${item.cloneFileId}/view`)
+                  : undefined
+              }
               busy={busy === file.id}
+              onDetails={item ? () => openInspector(item.id) : undefined}
               onClone={() => void makeClone(file)}
               onRename={() => startRename(file)}
               onMoveTo={() => setMoveFor({ id: file.id, name: file.name })}
             />
-          ))}
+            );
+          })}
         </CardGrid>
         <div ref={sentinel} className="h-8" />
         {!tree && (
           <p className="py-8 text-center text-xs font-semibold text-muted-foreground">
-            {connection?.connected ? "Loading your Drive…" : "Synch Drive to load your folders."}
+            {connection?.connected ? "Loading your Drive…" : "Press Update from Drive to load your folders."}
           </p>
         )}
       </Section>
@@ -823,14 +838,18 @@ function FolderCard({
 function FileCard({
   file,
   exhibit,
+  copyLink,
   busy,
+  onDetails,
   onClone,
   onRename,
   onMoveTo,
 }: {
   file: DriveFileNode;
   exhibit: string;
+  copyLink: string | undefined;
   busy: boolean;
+  onDetails: (() => void) | undefined;
   onClone: () => void;
   onRename: () => void;
   onMoveTo: () => void;
@@ -839,18 +858,39 @@ function FileCard({
     <div className="grid min-h-[72px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:border-ring hover:bg-accent/40">
       <span className="grid size-11 place-items-center rounded-md bg-muted text-destructive"><FileText className="size-5" /></span>
       <div className="min-w-0">
-        <span className="block truncate text-sm font-bold text-foreground">
-          {file.name}
-        </span>
+        {onDetails ? (
+          <button
+            type="button"
+            onClick={onDetails}
+            className="block max-w-full truncate text-left text-sm font-bold text-foreground hover:underline"
+          >
+            {file.name}
+          </button>
+        ) : (
+          <span className="block truncate text-sm font-bold text-foreground">{file.name}</span>
+        )}
         <span className="mt-1 block font-mono text-[10px] text-muted-foreground">
           {exhibit} · {(file.size / 1024 / 1024).toFixed(1)} MB
         </span>
       </div>
         <div className="flex items-center gap-1.5">
-          <Button size="sm" className="h-9 text-[11px]" onClick={onClone} disabled={busy}>
-            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-            Clone
-          </Button>
+          {copyLink ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 border-success/40 text-[11px] text-success"
+              onClick={() => window.open(copyLink, "_blank")}
+              aria-label="Open exhibit copy"
+            >
+              <CheckCircle2 className="size-3.5" />
+              Exhibit ready
+            </Button>
+          ) : (
+            <Button size="sm" className="h-9 text-[11px]" onClick={onClone} disabled={busy}>
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+              Make exhibit copy
+            </Button>
+          )}
           {file.webViewLink && (
             <Button
               size="icon"

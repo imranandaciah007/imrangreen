@@ -248,11 +248,11 @@ function FolderFiles({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <ExternalLink className="size-3" /> Exhibit clone
+                  <ExternalLink className="size-3" /> Exhibit copy
                 </a>
               ) : (
                 <span className="text-[10px] font-semibold text-navy/45">
-                  {file.status === "error" ? "Could not be read" : "Clone still to build"}
+                  {file.status === "error" ? "Could not be read" : "Exhibit copy still to make"}
                 </span>
               )}
             </div>
@@ -390,10 +390,10 @@ export function CaseProgressPanel({
       <div className="case-panel-heading">
         <div>
           <span className="case-kicker">CASE PROGRESS</span>
-          <h3>{data?.root ?? "I601 Evidence Clones"}</h3>
+          <h3>Exhibit copies</h3>
         </div>
         <Button variant="ghost" onClick={onOpenBoard}>
-          Open board <ChevronRight />
+          Open folders <ChevronRight />
         </Button>
       </div>
 
@@ -418,7 +418,7 @@ export function CaseProgressPanel({
 
           <div className="flex flex-wrap items-center gap-1 text-[11px] font-bold text-navy/70">
             <button type="button" className="case-view-link" onClick={() => setPath([])}>
-              {data?.root ?? "I601 Evidence Clones"}
+              Exhibit copies
             </button>
             {path.map((part, index) => (
               <span key={part + index} className="flex items-center gap-1">
@@ -458,7 +458,7 @@ export function CaseProgressPanel({
 
           {isLoading ? (
             <div className="case-empty">
-              <Loader2 className="animate-spin" /> Checking the clones folder…
+              <Loader2 className="animate-spin" /> Checking the exhibit copies folder…
             </div>
           ) : tree.length ? (
             <>
@@ -530,7 +530,7 @@ export function CaseProgressPanel({
             </>
           ) : (
             <div className="case-empty">
-              <Folder /> No folders yet — press Synch now to mirror your Drive.
+              <Folder /> No folders yet — press Update from Drive to load them.
             </div>
           )}
         </TabsContent>

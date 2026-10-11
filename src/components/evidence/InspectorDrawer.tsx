@@ -324,7 +324,7 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
 
               <div className="rounded-lg border border-border bg-secondary/40 p-3">
                 <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                  <Sparkles className="size-3" /> AI reading
+                  <Sparkles className="size-3" /> Reading the document
                 </p>
                 {!item.aiExtraction ? (
                   <p className="mt-1.5 text-xs text-muted-foreground">
@@ -346,7 +346,7 @@ export function InspectorDrawer({ onEdit }: { onEdit: (item: EvidenceItem) => vo
                     <VerificationBadge report={item.aiExtraction.verification} showAudit />
                     {item.aiExtraction.applied.length > 0 && (
                       <p className="text-[11px] text-success">
-                        Verified by double scan: {item.aiExtraction.applied.join(", ")}
+                        Checked twice: {item.aiExtraction.applied.join(", ")}
                       </p>
                     )}
                     {item.aiExtraction.uncertain.length === 0 ? (
