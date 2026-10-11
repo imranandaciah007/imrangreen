@@ -361,33 +361,33 @@ export async function fetchDriveBytes(fileId: string): Promise<Uint8Array> {
 
 /** JPEG picture of an image Drive can display but pdf-lib cannot embed (e.g. HEIC). */
 export async function fetchDriveJpegRendering(fileId: string): Promise<Uint8Array> {
-  const meta = await fetch(`${GATEWAY}/drive/v3/files/${driveId(fileId)}?fields=thumbnailLink`, {
-    headers: driveHeaders(),
-  });
-  if (!meta.ok) throw new Error(`Could not read the photo details [${meta.status}]: ${await meta.text()}`);
-  const { thumbnailLink } = (await meta.json()) as { thumbnailLink?: string };
-  if (!thumbnailLink) throw new Error("Drive has not prepared a picture of this photo yet.");
-  const res = await fetch(thumbnailLink.replace(/=s\d+$/, "=s2400"));
-  if (!res.ok) throw new Error(`Could not download the photo picture [${res.status}]`);
-  return new Uint8Array(await res.arrayBuffer());
+  // A photo uploaded moments ago may not have its picture ready yet, so wait briefly.
+  for (let attempt = 0; ; attempt += 1) {
+    const meta = await fetch(`${GATEWAY}/drive/v3/files/${driveId(fileId)}?fields=thumbnailLink`, {
+      headers: driveHeaders(),
+    });
+    if (!meta.ok) throw new Error(`Could not read the photo details [${meta.status}]: ${await meta.text()}`);
+    const { thumbnailLink } = (await meta.json()) as { thumbnailLink?: string };
+    if (thumbnailLink) {
+      const res = await fetch(thumbnailLink.replace(/=s\d+$/, "=s2400"));
+      if (res.ok) return new Uint8Array(await res.arrayBuffer());
+      if (attempt >= 2) throw new Error(`Could not download the photo picture [${res.status}]`);
+    } else if (attempt >= 2) {
+      throw new Error("Drive has not prepared a picture of this photo yet.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2500 * (attempt + 1)));
+  }
+}
+
+/** What the first bytes say a file really is, whatever its name or label claims. */
+function sniff(bytes: Uint8Array): "pdf" | "png" | "jpg" | null {
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return "pdf";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "png";
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpg";
+  return null;
 }
 
 const GOOGLE_NATIVE = /^application\/vnd\.google-apps\.(document|spreadsheet|presentation|drawing)$/;
-
-const OFFICE_TO_GOOGLE: Record<string, string> = {
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-    "application/vnd.google-apps.document",
-  "application/msword": "application/vnd.google-apps.document",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-    "application/vnd.google-apps.presentation",
-  "application/vnd.ms-powerpoint": "application/vnd.google-apps.presentation",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-    "application/vnd.google-apps.spreadsheet",
-  "application/vnd.ms-excel": "application/vnd.google-apps.spreadsheet",
-  "text/plain": "application/vnd.google-apps.document",
-  "text/csv": "application/vnd.google-apps.spreadsheet",
-  "application/rtf": "application/vnd.google-apps.document",
-};
 
 async function exportAsPdf(fileId: string): Promise<Uint8Array> {
   const res = await fetch(
@@ -401,57 +401,148 @@ async function exportAsPdf(fileId: string): Promise<Uint8Array> {
   return new Uint8Array(await res.arrayBuffer());
 }
 
+async function deleteQuietly(fileId: string) {
+  await fetch(`${GATEWAY}/drive/v3/files/${driveId(fileId)}`, {
+    method: "DELETE",
+    headers: driveHeaders(),
+  }).catch(() => undefined);
+}
+
 /**
- * Returns the original's page content as embeddable bytes.
- * PDFs come straight through, images stay images, Google Docs/Sheets/Slides and
- * Office documents are converted to PDF through a temporary Drive copy that is
- * deleted afterwards. The original file is never touched.
+ * Print a Word, Excel, PowerPoint, OpenDocument, text or web page file as a PDF
+ * through a throwaway Google-format copy, deleted straight afterwards. If Drive
+ * will not convert the file as labelled (e.g. it only knows "some bytes"), the
+ * file is uploaded again labelled by its extension and converted from that.
+ */
+async function convertToPdf(input: { fileId: string; fileName: string; mimeType: string }) {
+  const { googleConversionTarget, sourceMimeFor } = await import("@/lib/evidence/file-formats");
+  const target = googleConversionTarget(input.fileName, input.mimeType);
+  if (!target) return null;
+  try {
+    const copy = await driveJson<{ id: string }>(
+      `${GATEWAY}/drive/v3/files/${driveId(input.fileId)}/copy?fields=id`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: `GC conversion ${input.fileName}`, mimeType: target }),
+      },
+    );
+    try {
+      return await exportAsPdf(copy.id);
+    } finally {
+      await deleteQuietly(copy.id);
+    }
+  } catch (copyError) {
+    const bytes = await fetchDriveBytes(input.fileId);
+    const boundary = `gc${Date.now()}${Math.random().toString(36).slice(2)}`;
+    const head = new TextEncoder().encode(
+      [
+        `--${boundary}`,
+        "Content-Type: application/json; charset=UTF-8",
+        "",
+        JSON.stringify({ name: `GC conversion ${input.fileName}`, mimeType: target }),
+        `--${boundary}`,
+        `Content-Type: ${sourceMimeFor(input.fileName, input.mimeType)}`,
+        "",
+        "",
+      ].join("\r\n"),
+    );
+    const tail = new TextEncoder().encode(`\r\n--${boundary}--\r\n`);
+    const body = new Uint8Array(head.length + bytes.length + tail.length);
+    body.set(head, 0);
+    body.set(bytes, head.length);
+    body.set(tail, head.length + bytes.length);
+    const res = await fetch(`${UPLOAD}?uploadType=multipart&fields=id`, {
+      method: "POST",
+      headers: { ...driveHeaders(), "Content-Type": `multipart/related; boundary=${boundary}` },
+      body,
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Drive could not convert this file (${copyError instanceof Error ? copyError.message : "copy failed"}; upload ${res.status})`,
+      );
+    }
+    const { id } = (await res.json()) as { id: string };
+    try {
+      return await exportAsPdf(id);
+    } finally {
+      await deleteQuietly(id);
+    }
+  }
+}
+
+/**
+ * Returns the original's page content as embeddable bytes, for every format
+ * that can be printed. PDFs come straight through; photos stay photos (iPhone
+ * HEIC and other types via Drive's own picture of them); Google Docs, Sheets,
+ * Slides and drawings, Office, OpenDocument, text and web page files become PDFs;
+ * saved emails are laid out as a page. Files whose label is wrong are recognised
+ * by their contents. Returns null only for things that cannot be printed
+ * (videos, recordings, zip files), which then get a cover sheet linking to the
+ * original. The original file is never touched.
  */
 export async function fetchOriginalForEmbedding(input: {
   fileId: string;
   fileName: string;
   mimeType: string;
 }): Promise<{ bytes: Uint8Array; kind: "pdf" | "png" | "jpg" } | null> {
+  const { formatKind } = await import("@/lib/evidence/file-formats");
   const mime = input.mimeType || "";
   const name = input.fileName.toLowerCase();
+  const kind = formatKind(name, mime);
 
-  if (mime === "application/pdf" || name.endsWith(".pdf")) {
-    return { bytes: await fetchDriveBytes(input.fileId), kind: "pdf" };
-  }
-  if (/^image\/png$/.test(mime) || name.endsWith(".png")) {
-    return { bytes: await fetchDriveBytes(input.fileId), kind: "png" };
-  }
-  if (/^image\/jpe?g$/.test(mime) || /\.jpe?g$/.test(name)) {
-    return { bytes: await fetchDriveBytes(input.fileId), kind: "jpg" };
-  }
-  // iPhone photos (HEIC/HEIF) and other picture types: Drive renders a JPEG.
-  if (/^image\//.test(mime) || /\.(heic|heif|webp|gif|bmp|tiff?)$/.test(name)) {
-    return { bytes: await fetchDriveJpegRendering(input.fileId), kind: "jpg" };
-  }
   if (GOOGLE_NATIVE.test(mime)) {
     return { bytes: await exportAsPdf(input.fileId), kind: "pdf" };
   }
-
-  const googleTarget = OFFICE_TO_GOOGLE[mime];
-  if (!googleTarget) return null;
-
-  // Convert through a throwaway Google-format copy, then remove the copy.
-  const copy = await driveJson<{ id: string }>(
-    `${GATEWAY}/drive/v3/files/${driveId(input.fileId)}/copy?fields=id`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: `GC conversion ${input.fileName}`, mimeType: googleTarget }),
-    },
-  );
-  try {
-    return { bytes: await exportAsPdf(copy.id), kind: "pdf" };
-  } finally {
-    await fetch(`${GATEWAY}/drive/v3/files/${driveId(copy.id)}`, {
-      method: "DELETE",
-      headers: driveHeaders(),
-    }).catch(() => undefined);
+  if (kind === "other") {
+    // Unknown type: look at the first bytes only, and fetch the rest just for a PDF or photo.
+    const head = await fetch(`${GATEWAY}/drive/v3/files/${driveId(input.fileId)}?alt=media`, {
+      headers: { ...driveHeaders(), Range: "bytes=0-15" },
+    });
+    if (!head.ok || !sniff(new Uint8Array(await head.arrayBuffer()))) return null;
   }
+  if (kind === "pdf" || kind === "image" || kind === "other") {
+    const bytes = await fetchDriveBytes(input.fileId);
+    const real = sniff(bytes);
+    if (real) return { bytes, kind: real };
+    // iPhone photos (HEIC/HEIF) and other picture types: Drive renders a JPEG.
+    if (kind === "image") return { bytes: await fetchDriveJpegRendering(input.fileId), kind: "jpg" };
+    if (kind === "pdf") throw new Error("This PDF file is damaged or is not really a PDF.");
+    return null;
+  }
+  if (kind === "email") {
+    if (!/\.(eml|emlx)$/.test(name) && mime !== "message/rfc822") return null; // Outlook .msg cannot be read
+    const { emailToPdf } = await import("@/lib/email-pdf.server");
+    return { bytes: await emailToPdf(await fetchDriveBytes(input.fileId), input.fileName), kind: "pdf" };
+  }
+  if (kind === "word" || kind === "spreadsheet" || kind === "slides" || kind === "text") {
+    const pdf = await convertToPdf(input);
+    return pdf ? { bytes: pdf, kind: "pdf" } : null;
+  }
+  return null;
+}
+
+/** File types the document readers accept as they are. */
+const READER_TYPES = /^(application\/pdf|image\/(jpeg|png|webp|heic|heif)|text\/plain)$/;
+
+/**
+ * The original in a form the document reader can read: as it is when the reader
+ * understands it, otherwise its printed PDF (Word, Google Docs, sheets, emails)
+ * or a JPEG picture (other photo types). Null for videos, recordings and the like.
+ */
+export async function fetchReadableFile(input: {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+}): Promise<{ bytes: Uint8Array; mimeType: string } | null> {
+  if (READER_TYPES.test(input.mimeType || "")) {
+    return { bytes: await fetchDriveBytes(input.fileId), mimeType: input.mimeType };
+  }
+  const printed = await fetchOriginalForEmbedding(input);
+  if (!printed) return null;
+  const mimeType =
+    printed.kind === "pdf" ? "application/pdf" : printed.kind === "png" ? "image/png" : "image/jpeg";
+  return { bytes: printed.bytes, mimeType };
 }
 
 export function slug(value: string) {
@@ -732,6 +823,11 @@ async function buildCloneOnce(data: CloneInput, embedOriginal: boolean): Promise
     // Very large originals (long diaries, big scans) cannot be copied page by
     // page inside one background run, so they get a cover sheet that points at
     // the untouched original instead of stalling the queue forever.
+    if (!source && embedOriginal) {
+      const { unprintableNote } = await import("@/lib/evidence/file-formats");
+      originalNote = unprintableNote(data.fileName, data.mimeType ?? "");
+    }
+
     const HEAVY_BYTES = 8 * 1024 * 1024;
     const HEAVY_PAGES = 150;
     if (source?.kind === "pdf" && source.bytes.length > HEAVY_BYTES) {

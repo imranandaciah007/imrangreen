@@ -7,19 +7,10 @@
  * Gemini outage pauses reading rather than spending Lovable credits.
  */
 
-import { fetchDriveBytes } from "@/lib/drive-core.server";
+import { fetchReadableFile } from "@/lib/drive-core.server";
 import { geminiConfigured, jsonModelName, runJsonModel } from "@/lib/ai-json.server";
 import { CATEGORIES, PEOPLE, SOURCE_TYPES } from "@/lib/evidence/types";
 
-const READABLE = [
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "text/plain",
-];
 
 const MAX_BYTES = 12 * 1024 * 1024;
 
@@ -90,13 +81,19 @@ export async function readOriginal(input: {
   folderPath: string;
 }): Promise<ReadResult | null> {
   if (!geminiConfigured()) return null;
-  if (!READABLE.some((m) => input.mimeType.startsWith(m))) return null;
 
+  // Word, Google Docs, sheets, slides and emails are read from their printed PDF.
   let base64: string;
+  let mimeType: string;
   try {
-    const bytes = await fetchDriveBytes(input.driveFileId);
-    if (!bytes?.length || bytes.length > MAX_BYTES) return null;
-    base64 = toBase64(bytes);
+    const readable = await fetchReadableFile({
+      fileId: input.driveFileId,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+    });
+    if (!readable?.bytes.length || readable.bytes.length > MAX_BYTES) return null;
+    base64 = toBase64(readable.bytes);
+    mimeType = readable.mimeType;
   } catch {
     return null;
   }
@@ -120,7 +117,7 @@ export async function readOriginal(input: {
       prompt,
       schema: SCHEMA,
       name: "background_document_read",
-      file: { fileName: input.fileName, mimeType: input.mimeType, base64 },
+      file: { fileName: input.fileName, mimeType, base64 },
       tier: "bulk",
       allowFallback: false,
       // If the free read leaves the essentials blank, the paid reader is asked

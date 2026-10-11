@@ -1,3 +1,4 @@
+import { fileTypeFor } from "@/lib/evidence/drive-classify";
 import { statusLabel } from "@/components/evidence/status-ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Camera, FileUp, Save, Sparkles, UploadCloud } from "lucide-react";
@@ -40,11 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 
 function fileTypeOf(name: string): FileType {
-  const ext = name.split(".").pop()?.toLowerCase();
-  if (ext === "docx" || ext === "doc") return "DOCX";
-  if (ext === "png") return "PNG";
-  if (ext === "jpg" || ext === "jpeg") return "JPG";
-  return "PDF";
+  return fileTypeFor(name, "") ?? "Other";
 }
 
 /** Reads a picked file as base64 so the AI can read it before it reaches Drive. */
@@ -189,6 +186,10 @@ export function UploadDialog({
   }
 
   async function runAi(next: File) {
+    // Word, emails, videos and the like are read by the background reader once
+    // they reach Drive (it prints them first); only PDFs, photos and text are read here.
+    const readableHere = /^(application\/pdf|image\/|text\/plain)/.test(next.type);
+    if (!readableHere || next.size > 12 * 1024 * 1024) return;
     setAiRunning(true);
     try {
       const base64 = await toBase64(next);
@@ -470,7 +471,7 @@ export function UploadDialog({
             <input
               ref={inputRef}
               type="file"
-              accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,image/*,application/pdf"
+              accept="*/*"
               className="hidden"
               onChange={(e) => pick(e.target.files?.[0] ?? null)}
             />
