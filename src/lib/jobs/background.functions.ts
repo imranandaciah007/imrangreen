@@ -18,6 +18,49 @@ export const runBackgroundBatch = createServerFn({ method: "POST" })
   });
 
 /**
+ * Ask the background builder (the only thing that makes clones) for one
+ * document's clone now. An existing clone is reported back instead of being
+ * rebuilt. A document the builder has not seen yet is picked up by a fresh scan.
+ */
+export const queueClone = createServerFn({ method: "POST" })
+  .inputValidator((data: { driveFileId: string }) => {
+    if (!data?.driveFileId || !/^[A-Za-z0-9_-]{6,200}$/.test(data.driveFileId)) {
+      throw new Error("That Drive file reference is not valid.");
+    }
+    return data;
+  })
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { runCloneTick } = await import("@/lib/jobs/clone-worker.server");
+    const { data: row } = await supabaseAdmin
+      .from("gc_clone_jobs")
+      .select("status,clone_file_id,clone_link,duplicate_of")
+      .eq("drive_file_id", data.driveFileId)
+      .maybeSingle();
+    if (row?.status === "done" && row.clone_file_id) {
+      return { status: "exists" as const, link: row.clone_link ?? null };
+    }
+    if (row?.status === "duplicate") {
+      return { status: "duplicate" as const, link: null };
+    }
+    if (row) {
+      // Move it to the front of the queue so the next run builds it first.
+      await supabaseAdmin
+        .from("gc_clone_jobs")
+        .update({
+          status: "pending",
+          attempts: 0,
+          error: null,
+          created_at: new Date(0).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("drive_file_id", data.driveFileId);
+    }
+    const result = await runCloneTick(2, { freshScan: !row });
+    return { status: "queued" as const, link: null, state: result.state };
+  });
+
+/**
  * Clear a paused state (after credits are topped up or access restored). Also
  * expires the 15-minute Drive cache, so the next run scans Drive afresh even if
  * a run is already in progress when "Synch now" is pressed.

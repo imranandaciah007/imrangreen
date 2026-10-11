@@ -4,6 +4,9 @@ export const CASE_SETTINGS = {
   caseName: "Imran & Aciah — Potential I-601",
   separationStartDate: "2026-08-18",
   primaryQualifyingRelative: "Aciah",
+  /** Full names as they appear on the filing packet's title page. */
+  applicantFullName: "Imran Ahmin",
+  qualifyingRelativeFullName: "Aciah Bibi Atayee",
   child: "Jibril",
   baseCurrency: "GBP",
   secondaryCurrency: "USD",
@@ -195,6 +198,10 @@ export interface PacketVersion {
   driveFolderWebViewLink?: string | undefined;
   files: { name: string; driveFileId?: string | undefined; webViewLink?: string | undefined }[];
   exhibitMap: { evidenceId: string; number: string; pages: string }[];
+  /** The finished filing PDFs (index first, then the numbered parts). */
+  filingFiles?: { name: string; webViewLink: string }[] | undefined;
+  filingBuiltAt?: string | undefined;
+  filingPageCount?: number | undefined;
 }
 
 export const EVENT_STATUSES = ["Recorded", "Needs evidence", "Confirmed", "Resolved"] as const;

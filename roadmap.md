@@ -99,3 +99,9 @@
 - [x] AI usage panel shows whether Claude is connected and how many packet sections it wrote
 - [ ] Add ANTHROPIC_API_KEY in the project secrets
 
+## Built for filing (Oct 11)
+- [x] One set of filing numbers by tab (Exhibit A-1, A-2, B-1), frozen when a packet is generated; working codes never appear on filed pages
+- [x] "Start numbering again" before filing
+- [x] Only the background builder makes clones; the app links to them (copies share their twin's clone)
+- [x] Finished filing packet: index (title page, cover letter, table of contents) plus numbered parts with tab dividers, exhibit slip pages, continuous page numbers and bookmarks
+

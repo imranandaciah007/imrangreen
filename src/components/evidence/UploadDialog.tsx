@@ -22,7 +22,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { extractUploadedFile, type ExtractionResult } from "@/lib/ai.functions";
 import { VerificationBadge } from "./VerificationBadge";
-import { generateCloneDocument, uploadEvidenceToFolder } from "@/lib/drive-tree.functions";
+import { uploadEvidenceToFolder } from "@/lib/drive-tree.functions";
 import { formatBytes, todayLocal } from "@/lib/evidence/format";
 import { useEvidence } from "@/lib/evidence/store";
 import {
@@ -95,7 +95,8 @@ export function UploadDialog({
   initialCategory?: string | undefined;
   editItem?: EvidenceItem | null;
 }) {
-  const { addItem, updateItem, items, categories, addEvent, addTask, profile } = useEvidence();
+  const { addItem, updateItem, items, categories, addEvent, addTask, profile, queueBackgroundBuild } =
+    useEvidence();
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const editing = !!editItem;
@@ -364,28 +365,8 @@ export function UploadDialog({
           },
           file,
         );
-        await generateCloneDocument({
-          data: {
-            driveFileId: original.id,
-            fileName: file.name,
-            folderPath: "I601 Evidence/Original Evidence",
-            mimeType: file.type || "application/octet-stream",
-            meta: {
-              exhibitId: created.exhibitId,
-              title: created.title,
-              documentDate: created.dateOfDocument,
-              person: created.people[0] ?? "Aciah",
-              categories: created.categories,
-              people: created.people,
-              sourceType: created.sourceType,
-              status: created.status,
-              summary: created.notes,
-              tags: created.tags,
-              affectsAciah: created.affectsAciah,
-              addedBy: profile,
-            },
-          },
-        });
+        // The background builder makes the matching clone (one per document).
+        void queueBackgroundBuild();
         if (alsoEvent) {
           addEvent({
             date: docDate,
