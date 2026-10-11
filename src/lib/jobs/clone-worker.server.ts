@@ -344,8 +344,8 @@ export async function runCloneTick(
       // Drive id of its original. If that original no longer exists anywhere in
       // Drive (including "ignore" folders), the clone is a straggler: bin it.
       // This catches clones the queue never recorded, such as ones built in the
-      // app before the queue tracked clone ids. Clones without a recorded
-      // original are left alone, and nothing is binned from a partial listing.
+      // app before the queue tracked clone ids. Older clones without a recorded
+      // original are matched by name below; nothing is binned from a partial listing.
       if (tree.complete) {
         const existing = new Set(tree.allFileIds);
 
@@ -400,6 +400,53 @@ export async function runCloneTick(
               orphansBinned += 1;
             } catch (error) {
               console.error(`Could not bin the orphan clone ${orphan.name}:`, error);
+            }
+          }
+        }
+
+        // Older copies (made before copies recorded their original) are matched by
+        // name, since originals are never renamed. A copy is binned only when no
+        // file with a matching name is left anywhere outside the clones folder.
+        const tracked = new Set((known ?? []).map((row) => row.clone_file_id).filter(Boolean));
+        const norm = (value: string) =>
+          value.toLowerCase().replace(/\.[a-z0-9]{1,5}$/, "").replace(/[^a-z0-9]/g, "");
+        const originalNames = tree.files
+          .filter((file) => !file.path.split("/").includes(CLONE_ROOT))
+          .map((file) => norm(file.name))
+          .filter((name) => name.length >= 3);
+        const nameSet = new Set(originalNames);
+        const untagged = tree.files.filter(
+          (file) =>
+            file.path.split("/").includes(CLONE_ROOT) &&
+            /\.pdf$/i.test(file.name) &&
+            !file.originalId &&
+            !tracked.has(file.id),
+        );
+        // A copy is named <code>_<original name>_<date>_<person>.pdf.
+        const originalNameOf = (name: string) => {
+          const parts = name.replace(/\.pdf$/i, "").split("_");
+          return parts.length >= 4 ? norm(parts.slice(1, -2).join("_")) : "";
+        };
+        const goneUntagged = untagged.filter((copy) => {
+          const base = originalNameOf(copy.name);
+          if (base.length < 3 || nameSet.has(base)) return false;
+          // Long names are shortened in the copy's name, so a shared start also counts.
+          return !originalNames.some(
+            (name) =>
+              Math.min(name.length, base.length) >= 8 && (name.startsWith(base) || base.startsWith(name)),
+          );
+        });
+        if (untagged.length >= 20 && goneUntagged.length > untagged.length * 0.5) {
+          console.warn(
+            `Skipped older-copy cleanup: ${goneUntagged.length} of ${untagged.length} look orphaned.`,
+          );
+        } else {
+          for (const copy of goneUntagged) {
+            try {
+              await drive.trashNode(copy.id);
+              orphansBinned += 1;
+            } catch (error) {
+              console.error(`Could not bin the older orphan copy ${copy.name}:`, error);
             }
           }
         }
